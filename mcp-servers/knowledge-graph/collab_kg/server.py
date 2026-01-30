@@ -65,6 +65,41 @@ def get_entities_by_tier(tier: str) -> list[dict]:
 
 
 @mcp.tool()
+def delete_observations(
+    entity_name: str,
+    observations: list[str],
+    caller_role: str = "agent",
+    change_approved: bool = False,
+) -> dict:
+    """Delete specific observations from an entity. Respects tier protection."""
+    deleted, error = graph.delete_observations(
+        entity_name, observations, caller_role, change_approved
+    )
+    if error:
+        return {"deleted": 0, "error": error}
+    return {"deleted": deleted}
+
+
+@mcp.tool()
+def delete_entity(
+    entity_name: str,
+    caller_role: str = "agent",
+) -> dict:
+    """Delete an entire entity. Only allowed for quality-tier or by humans."""
+    deleted, error = graph.delete_entity(entity_name, caller_role)
+    if error:
+        return {"deleted": False, "error": error}
+    return {"deleted": deleted}
+
+
+@mcp.tool()
+def delete_relations(relations: list[dict]) -> dict:
+    """Delete specific relations from the graph."""
+    deleted = graph.delete_relations(relations)
+    return {"deleted": deleted}
+
+
+@mcp.tool()
 def validate_tier_access(
     entity_name: str,
     operation: str,

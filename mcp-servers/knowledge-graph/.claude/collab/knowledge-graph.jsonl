@@ -1,0 +1,10 @@
+{"type": "entity", "name": "TestComponent", "entityType": "component", "observations": ["protection_tier: architecture", "Uses DI pattern"]}
+{"type": "entity", "name": "A", "entityType": "component", "observations": []}
+{"type": "entity", "name": "B", "entityType": "pattern", "observations": []}
+{"type": "entity", "name": "VisionStandard", "entityType": "vision_standard", "observations": ["protection_tier: vision", "mutability: human_only", "human observation"]}
+{"type": "entity", "name": "ArchComponent", "entityType": "component", "observations": ["protection_tier: architecture", "approved obs"]}
+{"type": "entity", "name": "KBOralSessionView", "entityType": "component", "observations": ["Uses DI"]}
+{"type": "entity", "name": "ServiceRegistry", "entityType": "pattern", "observations": ["Core pattern"]}
+{"type": "entity", "name": "V1", "entityType": "vision_standard", "observations": ["protection_tier: vision"]}
+{"type": "entity", "name": "A1", "entityType": "component", "observations": ["protection_tier: architecture"]}
+{"type": "entity", "name": "Q1", "entityType": "problem", "observations": ["protection_tier: quality"]}
