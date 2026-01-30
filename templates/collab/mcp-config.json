@@ -1,0 +1,18 @@
+{
+  "servers": {
+    "knowledge-graph": {
+      "command": "python",
+      "args": ["-m", "collab_kg.server"],
+      "port": 3101,
+      "env": {
+        "KG_STORAGE_PATH": ".claude/collab/knowledge-graph.jsonl"
+      }
+    },
+    "quality": {
+      "command": "python",
+      "args": ["-m", "collab_quality.server"],
+      "port": 3102,
+      "env": {}
+    }
+  }
+}

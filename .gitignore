@@ -1,0 +1,31 @@
+# Node
+node_modules/
+dist/
+out/
+*.vsix
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+extension/webview-dashboard/dist/
+
+# MCP server data (runtime state, not committed)
+*.db
+*.sqlite
+
+# Environment
+.env
+.env.local

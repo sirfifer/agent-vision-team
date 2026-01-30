@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "collab-kg": {
+      "type": "http",
+      "url": "http://localhost:3101/mcp"
+    },
+    "collab-quality": {
+      "type": "http",
+      "url": "http://localhost:3102/mcp"
+    }
+  }
+}

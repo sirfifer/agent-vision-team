@@ -1,0 +1,14 @@
+{
+  "name": "collab-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Collaborative Intelligence System — multi-agent development coordination with VS Code extension and MCP servers",
+  "scripts": {
+    "build:extension": "cd extension && npm run build",
+    "build:webview": "cd extension/webview-dashboard && npm run build",
+    "build": "npm run build:extension && npm run build:webview",
+    "watch:extension": "cd extension && npm run watch",
+    "dev": "npm run watch:extension"
+  },
+  "license": "MIT"
+}
