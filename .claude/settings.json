@@ -1,0 +1,46 @@
+{
+  "mcpServers": {
+    "collab-kg": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "collab_kg.server"],
+      "cwd": "./mcp-servers/knowledge-graph",
+      "env": {}
+    },
+    "collab-quality": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "collab_quality.server"],
+      "cwd": "./mcp-servers/quality",
+      "env": {}
+    }
+  },
+  "hooks": {
+    "beforeTaskStart": {
+      "command": "echo",
+      "args": ["Starting task. Query KG for context: get_entities_by_tier('vision')"]
+    },
+    "afterTaskComplete": {
+      "command": "echo",
+      "args": ["Task complete. Run quality gates: check_all_gates()"]
+    }
+  },
+  "agents": {
+    "defaultModel": "sonnet",
+    "worker": {
+      "model": "opus",
+      "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp:collab-kg", "mcp:collab-quality"]
+    },
+    "quality-reviewer": {
+      "model": "opus",
+      "tools": ["Read", "Glob", "Grep", "Bash", "mcp:collab-kg", "mcp:collab-quality"]
+    },
+    "kg-librarian": {
+      "model": "sonnet",
+      "tools": ["Read", "Write", "Glob", "Grep", "mcp:collab-kg"]
+    }
+  },
+  "workspace": {
+    "taskBriefsPath": ".claude/collab/task-briefs",
+    "memoryPath": ".claude/collab/memory",
+    "sessionStatePath": ".claude/collab/session-state.md"
+  }
+}
