@@ -1,7 +1,7 @@
 {
   "name": "collab-intelligence",
   "displayName": "Collab Intelligence",
-  "description": "Multi-agent development coordination — orchestration UI for the Collaborative Intelligence System",
+  "description": "Observability dashboard for the Collaborative Intelligence System — view knowledge graph, quality findings, and task status",
   "version": "0.1.0",
   "publisher": "collab-intelligence",
   "engines": {
@@ -15,54 +15,46 @@
   "contributes": {
     "commands": [
       {
-        "command": "collab.startSystem",
-        "title": "Start Collab System",
-        "category": "Collab Intelligence"
+        "command": "collab.refreshMemory",
+        "title": "Refresh Memory Browser",
+        "category": "Collab Intelligence",
+        "icon": "$(refresh)"
       },
       {
-        "command": "collab.stopSystem",
-        "title": "Stop Collab System",
-        "category": "Collab Intelligence"
+        "command": "collab.refreshFindings",
+        "title": "Refresh Findings Panel",
+        "category": "Collab Intelligence",
+        "icon": "$(refresh)"
       },
       {
-        "command": "collab.createWorkerSession",
-        "title": "Create Worker Session",
-        "category": "Collab Intelligence"
-      },
-      {
-        "command": "collab.createQualitySession",
-        "title": "Create Quality Session",
-        "category": "Collab Intelligence"
-      },
-      {
-        "command": "collab.createTaskBrief",
-        "title": "Create Task Brief",
-        "category": "Collab Intelligence"
-      },
-      {
-        "command": "collab.checkpoint",
-        "title": "Create Checkpoint",
-        "category": "Collab Intelligence"
-      },
-      {
-        "command": "collab.sendMessage",
-        "title": "Send Message to Agent",
-        "category": "Collab Intelligence"
+        "command": "collab.refreshTasks",
+        "title": "Refresh Tasks Panel",
+        "category": "Collab Intelligence",
+        "icon": "$(refresh)"
       },
       {
         "command": "collab.searchMemory",
         "title": "Search Memory",
-        "category": "Collab Intelligence"
+        "category": "Collab Intelligence",
+        "icon": "$(search)"
       },
       {
         "command": "collab.viewDashboard",
         "title": "View Dashboard",
-        "category": "Collab Intelligence"
+        "category": "Collab Intelligence",
+        "icon": "$(dashboard)"
       },
       {
         "command": "collab.validateAll",
         "title": "Validate All Quality Gates",
-        "category": "Collab Intelligence"
+        "category": "Collab Intelligence",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "collab.connectMcpServers",
+        "title": "Connect to MCP Servers",
+        "category": "Collab Intelligence",
+        "icon": "$(plug)"
       }
     ],
     "viewsContainers": {
@@ -77,8 +69,8 @@
     "views": {
       "collab-intelligence": [
         {
-          "id": "collab.agentStatus",
-          "name": "Agents"
+          "id": "collab.memory",
+          "name": "Memory Browser"
         },
         {
           "id": "collab.findings",
@@ -87,19 +79,30 @@
         {
           "id": "collab.tasks",
           "name": "Tasks"
-        },
-        {
-          "id": "collab.memory",
-          "name": "Memory"
         }
       ]
     },
     "menus": {
-      "view/item/context": [
+      "view/title": [
         {
-          "command": "collab.sendMessage",
-          "when": "view == collab.agentStatus",
-          "group": "inline"
+          "command": "collab.refreshMemory",
+          "when": "view == collab.memory",
+          "group": "navigation"
+        },
+        {
+          "command": "collab.searchMemory",
+          "when": "view == collab.memory",
+          "group": "navigation"
+        },
+        {
+          "command": "collab.refreshFindings",
+          "when": "view == collab.findings",
+          "group": "navigation"
+        },
+        {
+          "command": "collab.refreshTasks",
+          "when": "view == collab.tasks",
+          "group": "navigation"
         }
       ]
     }
