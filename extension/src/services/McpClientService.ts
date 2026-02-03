@@ -251,23 +251,37 @@ export class McpClientService {
 
   async connect(): Promise<void> {
     logSystem('Connecting to MCP servers...');
-    try {
-      this.kgConnection = new McpSseConnection(this.kgUrl);
-      await this.kgConnection.connect();
 
-      this.qualityConnection = new McpSseConnection(this.qualityUrl);
-      await this.qualityConnection.connect();
+    const servers: { name: string; url: string; connect: (conn: McpSseConnection) => void }[] = [
+      { name: 'Knowledge Graph', url: this.kgUrl, connect: (c) => { this.kgConnection = c; } },
+      { name: 'Quality', url: this.qualityUrl, connect: (c) => { this.qualityConnection = c; } },
+      { name: 'Governance', url: this.governanceUrl, connect: (c) => { this.governanceConnection = c; } },
+    ];
 
-      this.governanceConnection = new McpSseConnection(this.governanceUrl);
-      await this.governanceConnection.connect();
-
-      this.connected = true;
-      logSystem('Connected to all MCP servers.');
-    } catch (error) {
-      logSystem(`Failed to connect to MCP servers: ${error}`);
-      this.disconnect();
-      throw error;
+    const failed: string[] = [];
+    for (const server of servers) {
+      try {
+        const conn = new McpSseConnection(server.url);
+        await conn.connect();
+        server.connect(conn);
+        logSystem(`Connected to ${server.name} server.`);
+      } catch (error) {
+        failed.push(`${server.name} (${server.url})`);
+        logSystem(`Failed to connect to ${server.name}: ${error}`);
+      }
     }
+
+    if (failed.length === servers.length) {
+      this.disconnect();
+      throw new Error(`No MCP servers available. Failed: ${failed.join(', ')}. Start servers first.`);
+    }
+
+    if (failed.length > 0) {
+      throw new Error(`Failed to connect to: ${failed.join(', ')}. All servers must be running.`);
+    }
+
+    this.connected = true;
+    logSystem('Connected to all MCP servers.');
   }
 
   async disconnect(): Promise<void> {

@@ -7,6 +7,7 @@ import { StatusBarService } from './services/StatusBarService';
 import { KnowledgeGraphClient } from './mcp/KnowledgeGraphClient';
 import { QualityClient } from './mcp/QualityClient';
 import { GovernanceClient } from './mcp/GovernanceClient';
+import { McpServerManager } from './services/McpServerManager';
 import { FindingsTreeProvider } from './providers/FindingsTreeProvider';
 import { TasksTreeProvider } from './providers/TasksTreeProvider';
 import { MemoryTreeProvider } from './providers/MemoryTreeProvider';
@@ -120,6 +121,7 @@ export function activate(context: vscode.ExtensionContext): void {
   initializeLoggers();
 
   // Initialize services
+  const serverManager = new McpServerManager(outputChannel);
   const mcpClient = new McpClientService();
   const fileWatcher = new FileWatcherService();
   const statusBar = new StatusBarService();
@@ -151,6 +153,8 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('collab.connectMcpServers', async () => {
       try {
+        outputChannel.appendLine('Starting MCP servers...');
+        await serverManager.startAll();
         outputChannel.appendLine('Connecting to MCP servers...');
         await mcpClient.connect();
         statusBar.setHealth('active');
@@ -320,13 +324,47 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register disposables
   context.subscriptions.push(
+    { dispose: () => serverManager.stopAll() },
+    { dispose: () => mcpClient.disconnect() },
     { dispose: () => fileWatcher.dispose() },
     { dispose: () => statusBar.dispose() },
     { dispose: () => findingsProvider.dispose() },
     { dispose: () => disposeLoggers() }
   );
+
+  // Auto-start servers and connect on activation
+  serverManager.startAll().then(async () => {
+    try {
+      await mcpClient.connect();
+      statusBar.setHealth('active');
+      statusBar.setSummary(0, 0, 'ready');
+
+      const root = getWorkspaceRoot();
+      const agents = root ? detectAgents(root) : [];
+      const sessionPhase = root ? getSessionPhase(root) : 'inactive';
+      const tasks = root ? getTaskCounts(root) : { active: 0, total: 0 };
+
+      dashboardProvider.updateData({
+        connectionStatus: 'connected',
+        agents,
+        sessionPhase,
+        tasks,
+      });
+      dashboardProvider.addActivity(
+        makeActivity('orchestrator', 'status', 'MCP servers started and connected automatically')
+      );
+
+      outputChannel.appendLine('Auto-connected to MCP servers on activation.');
+    } catch (error) {
+      outputChannel.appendLine(`Auto-connect failed: ${error}`);
+      statusBar.setHealth('error');
+    }
+  }).catch((error) => {
+    outputChannel.appendLine(`Auto-start servers failed: ${error}`);
+    outputChannel.appendLine('Use "Connect to MCP Servers" command to retry.');
+  });
 }
 
 export function deactivate(): void {
-  // Cleanup handled by disposables
+  // Cleanup handled by disposables (serverManager.stopAll + mcpClient.disconnect)
 }
