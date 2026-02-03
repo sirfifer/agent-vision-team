@@ -122,9 +122,50 @@ export interface Entity {
   relations: { from: string; to: string; relationType: string }[];
 }
 
-export type AgentRole = 'orchestrator' | 'worker' | 'quality-reviewer' | 'kg-librarian' | 'governance-reviewer';
+export type AgentRole = 'orchestrator' | 'worker' | 'quality-reviewer' | 'kg-librarian' | 'governance-reviewer' | 'researcher';
 export type AgentStatusValue = 'active' | 'idle' | 'not-configured';
-export type ActivityType = 'finding' | 'guidance' | 'response' | 'status' | 'drift' | 'decision' | 'review';
+export type ActivityType = 'finding' | 'guidance' | 'response' | 'status' | 'drift' | 'decision' | 'review' | 'research';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Research Prompt Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ResearchType = 'periodic' | 'exploratory';
+export type ResearchModelHint = 'opus' | 'sonnet' | 'auto';
+export type ResearchOutputFormat = 'change_report' | 'research_brief' | 'custom';
+export type ResearchStatus = 'pending' | 'scheduled' | 'in_progress' | 'completed' | 'failed';
+
+export interface ResearchSchedule {
+  type: 'once' | 'daily' | 'weekly' | 'monthly';
+  dayOfWeek?: number;  // 0-6 for weekly
+  dayOfMonth?: number; // 1-31 for monthly
+  time?: string;       // HH:MM format
+  lastRun?: string;    // ISO timestamp
+  nextRun?: string;    // ISO timestamp
+}
+
+export interface ResearchPrompt {
+  id: string;
+  name: string;
+  type: ResearchType;
+  topic: string;
+  context: string;
+  scope: string;
+  modelHint: ResearchModelHint;
+  output: ResearchOutputFormat;
+  relatedEntities: string[];
+  schedule?: ResearchSchedule;
+  status: ResearchStatus;
+  createdAt: string;
+  updatedAt: string;
+  lastResult?: {
+    timestamp: string;
+    success: boolean;
+    summary?: string;
+    briefPath?: string;
+    error?: string;
+  };
+}
 
 export interface AgentStatus {
   id: string;
@@ -160,6 +201,8 @@ export interface DashboardData {
   projectConfig?: ProjectConfig;
   visionDocs?: DocumentInfo[];
   architectureDocs?: DocumentInfo[];
+  // Research prompts
+  researchPrompts?: ResearchPrompt[];
 }
 
 // Message types between extension host and webview
@@ -171,7 +214,10 @@ export type ExtensionMessage =
   | { type: 'visionDocs'; docs: DocumentInfo[] }
   | { type: 'architectureDocs'; docs: DocumentInfo[] }
   | { type: 'ingestionResult'; result: IngestionResult }
-  | { type: 'documentCreated'; docType: 'vision' | 'architecture'; doc: DocumentInfo };
+  | { type: 'documentCreated'; docType: 'vision' | 'architecture'; doc: DocumentInfo }
+  | { type: 'researchPrompts'; prompts: ResearchPrompt[] }
+  | { type: 'researchPromptUpdated'; prompt: ResearchPrompt }
+  | { type: 'researchPromptDeleted'; id: string };
 
 export type WebviewMessage =
   | { type: 'connect' }
@@ -185,7 +231,11 @@ export type WebviewMessage =
   | { type: 'openSettings' }
   | { type: 'savePermissions'; permissions: string[] }
   | { type: 'listVisionDocs' }
-  | { type: 'listArchDocs' };
+  | { type: 'listArchDocs' }
+  | { type: 'listResearchPrompts' }
+  | { type: 'saveResearchPrompt'; prompt: ResearchPrompt }
+  | { type: 'deleteResearchPrompt'; id: string }
+  | { type: 'runResearchPrompt'; id: string };
 
 export interface IngestionResult {
   tier: 'vision' | 'architecture';

@@ -7,6 +7,7 @@ import {
   DEFAULT_PROJECT_CONFIG,
   RECOMMENDED_PERMISSIONS,
 } from '../models/ProjectConfig';
+import { ResearchPrompt, toPromptYaml } from '../models/ResearchPrompt';
 
 /**
  * Service for managing AVT project configuration.
@@ -245,6 +246,8 @@ export class ProjectConfigService {
       path.join(this.avtRoot, 'architecture'),
       path.join(this.avtRoot, 'task-briefs'),
       path.join(this.avtRoot, 'memory'),
+      path.join(this.avtRoot, 'research-prompts'),
+      path.join(this.avtRoot, 'research-briefs'),
     ];
 
     for (const dir of dirs) {
@@ -262,11 +265,149 @@ export class ProjectConfigService {
       path.join(this.avtRoot, 'architecture', 'README.md'),
       ARCHITECTURE_README
     );
+    this.createReadmeIfMissing(
+      path.join(this.avtRoot, 'research-prompts', 'README.md'),
+      RESEARCH_PROMPTS_README
+    );
+    this.createReadmeIfMissing(
+      path.join(this.avtRoot, 'research-briefs', 'README.md'),
+      RESEARCH_BRIEFS_README
+    );
   }
 
   private createReadmeIfMissing(filepath: string, content: string): void {
     if (!fs.existsSync(filepath)) {
       fs.writeFileSync(filepath, content, 'utf-8');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Research Prompts
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  private get researchPromptsPath(): string {
+    return path.join(this.avtRoot, 'research-prompts.json');
+  }
+
+  private get researchPromptsDir(): string {
+    return path.join(this.avtRoot, 'research-prompts');
+  }
+
+  private get researchBriefsDir(): string {
+    return path.join(this.avtRoot, 'research-briefs');
+  }
+
+  /**
+   * List all research prompts
+   */
+  listResearchPrompts(): ResearchPrompt[] {
+    if (!fs.existsSync(this.researchPromptsPath)) {
+      return [];
+    }
+
+    try {
+      const raw = fs.readFileSync(this.researchPromptsPath, 'utf-8');
+      return JSON.parse(raw) as ResearchPrompt[];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Save a research prompt (create or update)
+   */
+  saveResearchPrompt(prompt: ResearchPrompt): void {
+    const prompts = this.listResearchPrompts();
+    const idx = prompts.findIndex(p => p.id === prompt.id);
+
+    if (idx >= 0) {
+      prompts[idx] = prompt;
+    } else {
+      prompts.push(prompt);
+    }
+
+    // Ensure directory exists
+    if (!fs.existsSync(this.avtRoot)) {
+      fs.mkdirSync(this.avtRoot, { recursive: true });
+    }
+
+    // Save to JSON file
+    const tmpPath = this.researchPromptsPath + '.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(prompts, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, this.researchPromptsPath);
+
+    // Also write a YAML prompt file that the researcher agent can read
+    this.writeResearchPromptFile(prompt);
+  }
+
+  /**
+   * Delete a research prompt
+   */
+  deleteResearchPrompt(id: string): void {
+    const prompts = this.listResearchPrompts();
+    const filtered = prompts.filter(p => p.id !== id);
+
+    if (filtered.length === prompts.length) {
+      return; // Not found
+    }
+
+    const tmpPath = this.researchPromptsPath + '.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(filtered, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, this.researchPromptsPath);
+
+    // Remove the prompt file if it exists
+    const promptFile = path.join(this.researchPromptsDir, `${id}.md`);
+    if (fs.existsSync(promptFile)) {
+      fs.unlinkSync(promptFile);
+    }
+  }
+
+  /**
+   * Get a single research prompt by ID
+   */
+  getResearchPrompt(id: string): ResearchPrompt | undefined {
+    const prompts = this.listResearchPrompts();
+    return prompts.find(p => p.id === id);
+  }
+
+  /**
+   * Update the status of a research prompt
+   */
+  updateResearchPromptStatus(id: string, status: ResearchPrompt['status'], result?: ResearchPrompt['lastResult']): void {
+    const prompt = this.getResearchPrompt(id);
+    if (!prompt) return;
+
+    prompt.status = status;
+    prompt.updatedAt = new Date().toISOString();
+    if (result) {
+      prompt.lastResult = result;
+    }
+
+    this.saveResearchPrompt(prompt);
+  }
+
+  /**
+   * Write a research prompt as a markdown file that the researcher agent can read
+   */
+  private writeResearchPromptFile(prompt: ResearchPrompt): void {
+    if (!fs.existsSync(this.researchPromptsDir)) {
+      fs.mkdirSync(this.researchPromptsDir, { recursive: true });
+    }
+
+    const content = toPromptYaml(prompt);
+    const filepath = path.join(this.researchPromptsDir, `${prompt.id}.md`);
+    fs.writeFileSync(filepath, content, 'utf-8');
+  }
+
+  /**
+   * Ensure research-related directories exist
+   */
+  ensureResearchDirectories(): void {
+    if (!fs.existsSync(this.researchPromptsDir)) {
+      fs.mkdirSync(this.researchPromptsDir, { recursive: true });
+    }
+    if (!fs.existsSync(this.researchBriefsDir)) {
+      fs.mkdirSync(this.researchBriefsDir, { recursive: true });
     }
   }
 }
@@ -348,4 +489,115 @@ Each document should follow this format:
 - \`service-registry.md\` — Pattern for service discovery and registration
 - \`auth-service.md\` — Component definition for authentication service
 - \`api-versioning.md\` — Architectural standard for API versioning
+`;
+
+const RESEARCH_PROMPTS_README = `# Research Prompts
+
+This folder contains research prompt definitions for the researcher agent.
+
+## Prompt Types
+
+- **Periodic**: Scheduled checks for changes in external dependencies, APIs, or technologies
+- **Exploratory**: Deep investigation to inform architectural decisions or new features
+
+## Format
+
+Each prompt file follows this format:
+
+\`\`\`yaml
+---
+type: periodic | exploratory
+topic: "What to research"
+context: "Why this research matters"
+scope: "Boundaries of the research"
+model_hint: opus | sonnet | auto
+output: change_report | research_brief | custom
+related_entities:
+  - "KG entity name"
+schedule:  # Only for periodic
+  type: once | daily | weekly | monthly
+  time: "09:00"
+  day_of_week: 1  # For weekly (0=Sunday)
+  day_of_month: 1  # For monthly
+---
+
+# Research Title
+
+## Research Instructions
+[Detailed instructions for the researcher agent]
+
+## Scope
+[What to include and exclude]
+\`\`\`
+
+## Managing Prompts
+
+Prompts are typically managed via the dashboard, but can also be created manually.
+The registry is stored in \`.avt/research-prompts.json\`.
+
+## Output
+
+Research results are stored in \`.avt/research-briefs/\` as markdown files.
+`;
+
+const RESEARCH_BRIEFS_README = `# Research Briefs
+
+This folder contains completed research output from the researcher agent.
+
+## Brief Types
+
+- **Change Reports**: For periodic/maintenance research tracking external changes
+- **Research Briefs**: For exploratory research informing architectural decisions
+
+## Change Report Format
+
+\`\`\`markdown
+## Change Report: [Technology/API Name]
+
+**Date**: YYYY-MM-DD
+**Sources**: [URLs consulted]
+
+### Breaking Changes
+- [Change]: [Impact] → [Required Action]
+
+### Deprecations
+- [Feature]: [Timeline] → [Migration Path]
+
+### New Features
+- [Feature]: [Relevance to Project]
+
+### Recommendations
+1. [Priority action items]
+\`\`\`
+
+## Research Brief Format
+
+\`\`\`markdown
+## Research Brief: [Topic]
+
+**Question**: [What decision this informs]
+**Date**: YYYY-MM-DD
+
+### Options Evaluated
+
+#### Option A: [Name]
+- **Pros**: [In our context]
+- **Cons**: [In our context]
+- **Risks**: [What could go wrong]
+
+### Recommendation
+[Recommended approach with rationale]
+
+### Open Questions
+[What still needs human decision]
+\`\`\`
+
+## Using Briefs
+
+Reference research briefs in task briefs when spawning workers:
+
+\`\`\`markdown
+## Context
+See research brief: .avt/research-briefs/rb-auth-approaches.md
+\`\`\`
 `;

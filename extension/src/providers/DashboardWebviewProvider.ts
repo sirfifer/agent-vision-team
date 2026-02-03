@@ -4,6 +4,7 @@ import * as path from 'path';
 import { Entity } from '../models/Entity';
 import { AgentStatus, ActivityEntry } from '../models/Activity';
 import { ProjectConfig, SetupReadiness } from '../models/ProjectConfig';
+import { ResearchPrompt } from '../models/ResearchPrompt';
 import { ProjectConfigService } from '../services/ProjectConfigService';
 
 interface DocumentInfo {
@@ -26,6 +27,8 @@ interface DashboardData {
   projectConfig?: ProjectConfig;
   visionDocs?: DocumentInfo[];
   architectureDocs?: DocumentInfo[];
+  // Research prompts
+  researchPrompts?: ResearchPrompt[];
 }
 
 function getNonce(): string {
@@ -195,6 +198,22 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         case 'savePermissions':
           this.handleSavePermissions(message.permissions);
           break;
+
+        case 'listResearchPrompts':
+          this.handleListResearchPrompts();
+          break;
+
+        case 'saveResearchPrompt':
+          this.handleSaveResearchPrompt(message.prompt);
+          break;
+
+        case 'deleteResearchPrompt':
+          this.handleDeleteResearchPrompt(message.id);
+          break;
+
+        case 'runResearchPrompt':
+          this.handleRunResearchPrompt(message.id);
+          break;
       }
     });
   }
@@ -323,6 +342,136 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     const config = this.configService.load();
     config.permissions = permissions;
     this.configService.save(config);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Research Prompts Handlers
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  private handleListResearchPrompts(): void {
+    if (!this.configService) return;
+
+    const prompts = this.configService.listResearchPrompts();
+    this.postMessage({ type: 'researchPrompts', prompts });
+  }
+
+  private handleSaveResearchPrompt(prompt: ResearchPrompt): void {
+    if (!this.configService) return;
+
+    this.configService.saveResearchPrompt(prompt);
+    this.postMessage({ type: 'researchPromptUpdated', prompt });
+
+    // Also add activity entry
+    this.addActivity({
+      id: `activity-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      agent: 'orchestrator',
+      type: 'research',
+      summary: `Research prompt "${prompt.name}" ${prompt.createdAt === prompt.updatedAt ? 'created' : 'updated'}`,
+      detail: `Type: ${prompt.type}, Topic: ${prompt.topic}`,
+    });
+  }
+
+  private handleDeleteResearchPrompt(id: string): void {
+    if (!this.configService) return;
+
+    const prompt = this.configService.getResearchPrompt(id);
+    this.configService.deleteResearchPrompt(id);
+    this.postMessage({ type: 'researchPromptDeleted', id });
+
+    if (prompt) {
+      this.addActivity({
+        id: `activity-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        agent: 'orchestrator',
+        type: 'research',
+        summary: `Research prompt "${prompt.name}" deleted`,
+      });
+    }
+  }
+
+  private async handleRunResearchPrompt(id: string): Promise<void> {
+    if (!this.configService) return;
+
+    const prompt = this.configService.getResearchPrompt(id);
+    if (!prompt) return;
+
+    // Update status to in_progress
+    this.configService.updateResearchPromptStatus(id, 'in_progress');
+    const updatedPrompt = this.configService.getResearchPrompt(id);
+    if (updatedPrompt) {
+      this.postMessage({ type: 'researchPromptUpdated', prompt: updatedPrompt });
+    }
+
+    // Add activity entry
+    this.addActivity({
+      id: `activity-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      agent: 'researcher',
+      type: 'research',
+      summary: `Starting research: "${prompt.name}"`,
+      detail: `Topic: ${prompt.topic}\nModel: ${prompt.modelHint}`,
+    });
+
+    // Execute the research via a command (to be implemented in extension.ts)
+    try {
+      const result = await vscode.commands.executeCommand<{
+        success: boolean;
+        summary?: string;
+        briefPath?: string;
+        error?: string;
+      }>('collab.runResearch', id);
+
+      const timestamp = new Date().toISOString();
+      if (result) {
+        this.configService.updateResearchPromptStatus(
+          id,
+          result.success ? 'completed' : 'failed',
+          { timestamp, ...result }
+        );
+      } else {
+        this.configService.updateResearchPromptStatus(id, 'completed', {
+          timestamp,
+          success: true,
+          summary: 'Research completed (no detailed result available)',
+        });
+      }
+
+      const finalPrompt = this.configService.getResearchPrompt(id);
+      if (finalPrompt) {
+        this.postMessage({ type: 'researchPromptUpdated', prompt: finalPrompt });
+      }
+
+      this.addActivity({
+        id: `activity-${Date.now()}`,
+        timestamp,
+        agent: 'researcher',
+        type: 'research',
+        summary: `Research "${prompt.name}" ${result?.success !== false ? 'completed' : 'failed'}`,
+        detail: result?.summary || result?.error,
+      });
+    } catch (err) {
+      const timestamp = new Date().toISOString();
+      this.configService.updateResearchPromptStatus(id, 'failed', {
+        timestamp,
+        success: false,
+        error: String(err),
+      });
+
+      const failedPrompt = this.configService.getResearchPrompt(id);
+      if (failedPrompt) {
+        this.postMessage({ type: 'researchPromptUpdated', prompt: failedPrompt });
+      }
+
+      this.addActivity({
+        id: `activity-${Date.now()}`,
+        timestamp,
+        agent: 'researcher',
+        type: 'research',
+        summary: `Research "${prompt.name}" failed`,
+        detail: String(err),
+      });
+    }
   }
 
   private getHtmlContent(webview: vscode.Webview): string {

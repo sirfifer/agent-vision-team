@@ -6,6 +6,7 @@ import { GovernancePanel } from './components/GovernancePanel';
 import { ActivityFeed } from './components/ActivityFeed';
 import { SetupWizard } from './components/wizard/SetupWizard';
 import { SettingsPanel } from './components/SettingsPanel';
+import { ResearchPromptsPanel } from './components/ResearchPromptsPanel';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
       {/* Overlays */}
       <SetupWizard />
       <SettingsPanel />
+      <ResearchPromptsPanel />
     </DashboardProvider>
   );
 }

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult } from '../types';
+import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt } from '../types';
 import { useVsCodeApi } from '../hooks/useVsCodeApi';
 
 const defaultData: DashboardData = {
@@ -33,6 +33,10 @@ interface DashboardContextValue {
   visionDocs: DocumentInfo[];
   architectureDocs: DocumentInfo[];
   lastIngestionResult: IngestionResult | null;
+  // Research prompts
+  showResearchPrompts: boolean;
+  setShowResearchPrompts: (show: boolean) => void;
+  researchPrompts: ResearchPrompt[];
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
@@ -61,6 +65,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [architectureDocs, setArchitectureDocs] = useState<DocumentInfo[]>([]);
   const [lastIngestionResult, setLastIngestionResult] = useState<IngestionResult | null>(null);
 
+  // Research prompts state
+  const [showResearchPrompts, setShowResearchPrompts] = useState(false);
+  const [researchPrompts, setResearchPrompts] = useState<ResearchPrompt[]>([]);
+
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const msg = event.data;
@@ -79,6 +87,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           }
           if (msg.data.architectureDocs) {
             setArchitectureDocs(msg.data.architectureDocs);
+          }
+          if (msg.data.researchPrompts) {
+            setResearchPrompts(msg.data.researchPrompts);
           }
           break;
         case 'activityAdd':
@@ -108,6 +119,23 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           } else {
             setArchitectureDocs(prev => [...prev, msg.doc]);
           }
+          break;
+        case 'researchPrompts':
+          setResearchPrompts(msg.prompts);
+          break;
+        case 'researchPromptUpdated':
+          setResearchPrompts(prev => {
+            const idx = prev.findIndex(p => p.id === msg.prompt.id);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = msg.prompt;
+              return updated;
+            }
+            return [...prev, msg.prompt];
+          });
+          break;
+        case 'researchPromptDeleted':
+          setResearchPrompts(prev => prev.filter(p => p.id !== msg.id));
           break;
       }
     };
@@ -150,6 +178,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       visionDocs,
       architectureDocs,
       lastIngestionResult,
+      showResearchPrompts, setShowResearchPrompts,
+      researchPrompts,
     }}>
       {children}
     </DashboardContext.Provider>

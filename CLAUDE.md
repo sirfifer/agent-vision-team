@@ -6,7 +6,7 @@ This project uses a collaborative intelligence system with:
 - **Knowledge Graph MCP server** — persistent institutional memory with tier protection
 - **Quality MCP server** — deterministic quality verification with trust engine
 - **Governance MCP server** — transactional review checkpoints for agent decisions
-- **Custom subagents** — worker, quality-reviewer, kg-librarian, governance-reviewer (defined in `.claude/agents/`)
+- **Custom subagents** — worker, quality-reviewer, kg-librarian, governance-reviewer, researcher (defined in `.claude/agents/`)
 
 ## Your Role as Orchestrator
 
@@ -67,6 +67,55 @@ search_nodes("<task type> pattern")
    - Promote recurring solutions to patterns
    - Remove stale entries
    - Sync important entries to archival files in `.claude/collab/memory/`
+
+## Research Protocol
+
+The researcher subagent gathers intelligence to inform development decisions and track external changes that affect the project.
+
+### Research Modes
+
+1. **Periodic/Maintenance Research**: Scheduled or triggered research to track external changes
+   - Monitor APIs, frameworks, and tools the project depends on
+   - Detect breaking changes, deprecations, or new features
+   - Track security advisories for dependencies
+   - Example: Monitoring Claude Code for new features or changes
+
+2. **Exploratory/Design Research**: Deep investigation to inform new development
+   - Research approaches before architectural decisions
+   - Compare alternative technologies or patterns
+   - Investigate unfamiliar domains the project is entering
+   - Example: Evaluating authentication libraries before implementing auth
+
+### When to Use the Researcher
+
+- **Before architectural decisions**: Spawn researcher to gather options and tradeoffs
+- **When integrating external services**: Research API patterns, rate limits, best practices
+- **When adopting new technologies**: Comprehensive technology evaluation
+- **For periodic dependency monitoring**: Track changes in key dependencies
+
+### Research Workflow
+
+1. **Create research prompt**: Define the research in `.avt/research-prompts/` or via the dashboard
+2. **Spawn researcher**:
+   ```
+   Task tool → subagent_type: researcher
+   prompt: "Execute the research prompt in .avt/research-prompts/rp-xxx.md"
+   ```
+3. **Researcher outputs**: Research briefs stored in `.avt/research-briefs/`
+4. **Use findings**: Reference research briefs in task briefs for workers
+
+### Model Selection
+
+The researcher uses different models based on complexity:
+- **Opus**: Novel domains, architectural decisions, security analysis, ambiguous requirements
+- **Sonnet**: Changelog monitoring, version updates, straightforward API documentation
+
+When spawning the researcher, specify `model: opus` or `model: sonnet` based on complexity, or use `model_hint: auto` to let the system decide.
+
+### Research Outputs
+
+- **Change Reports**: Structured reports for periodic/maintenance research with actionable items
+- **Research Briefs**: Comprehensive analysis for exploratory research with recommendations
 
 ## Three-Tier Governance Hierarchy
 
@@ -218,7 +267,8 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 │   ├── worker.md
 │   ├── quality-reviewer.md
 │   ├── kg-librarian.md
-│   └── governance-reviewer.md
+│   ├── governance-reviewer.md
+│   └── researcher.md
 ├── collab/
 │   ├── task-briefs/                 # Task briefs for workers
 │   ├── session-state.md             # Current session progress
@@ -230,6 +280,16 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 │   ├── trust-engine.db              # Trust engine SQLite DB (managed by server)
 │   └── governance.db                # Governance SQLite DB (managed by server)
 └── settings.json                    # Claude Code settings and hooks
+
+.avt/
+├── research-prompts.json            # Research prompt registry
+├── research-prompts/                # Individual research prompt files
+│   └── rp-xxx.md                    # Research prompt definitions
+├── research-briefs/                 # Research output briefs
+│   └── rb-xxx.md                    # Completed research briefs
+├── vision/                          # Vision standard documents
+├── architecture/                    # Architecture documents
+└── project-config.json              # Project configuration
 ```
 
 ## Starting MCP Servers
@@ -256,41 +316,71 @@ All servers will be available to all Claude Code sessions and subagents.
 
 **Task**: Add authentication to the API
 
-1. **Query KG for context**:
+1. **Research first** (for complex/unfamiliar tasks):
+   ```
+   Task tool → subagent_type: researcher
+   prompt: "Research authentication approaches for our API. Compare JWT vs session-based auth, evaluate libraries, and recommend an approach."
+   ```
+
+2. **Query KG for context**:
    ```
    search_nodes("auth")
    get_entities_by_tier("vision")
    ```
 
-2. **Create task brief**: Write `.claude/collab/task-briefs/001-add-auth.md`
+3. **Create task brief**: Write `.claude/collab/task-briefs/001-add-auth.md` (reference the research brief)
 
-3. **Spawn worker**:
+4. **Spawn worker**:
    ```
    Task tool → subagent_type: worker
    prompt: "Implement the task in .claude/collab/task-briefs/001-add-auth.md"
    ```
 
-4. **Worker completes and runs gates**: Worker calls `check_all_gates()` before completion
+5. **Worker completes and runs gates**: Worker calls `check_all_gates()` before completion
 
-5. **Review work**:
+6. **Review work**:
    ```
    Task tool → subagent_type: quality-reviewer
    prompt: "Review the diff for task 001-add-auth"
    ```
 
-6. **Address findings**: If findings exist, route back to worker for resolution
+7. **Address findings**: If findings exist, route back to worker for resolution
 
-7. **Curate memory**:
+8. **Curate memory**:
    ```
    Task tool → subagent_type: kg-librarian
    prompt: "Curate the knowledge graph after task 001-add-auth"
    ```
 
-8. **Merge and checkpoint**:
+9. **Merge and checkpoint**:
    ```bash
    git merge task/001-add-auth
    git tag checkpoint-001
    ```
+
+## Research Example: Monitoring External Dependencies
+
+**Task**: Set up periodic monitoring for Claude Code updates
+
+1. **Create research prompt** (via dashboard or manually):
+   ```yaml
+   type: periodic
+   topic: "Claude Code CLI updates and new features"
+   context: "This project depends on Claude Code. We need to track new features, breaking changes, and best practices."
+   scope: "Check official Anthropic documentation, changelog, and release notes"
+   model_hint: sonnet
+   output: change_report
+   schedule:
+     type: weekly
+     day_of_week: 1
+     time: "09:00"
+   ```
+
+2. **Research runs automatically** on schedule or on-demand
+
+3. **Review change reports** in `.avt/research-briefs/`
+
+4. **Act on findings**: Create task briefs for any required updates
 
 ## Guidelines for Success
 
@@ -300,6 +390,8 @@ All servers will be available to all Claude Code sessions and subagents.
 - **Workers are focused**: Give workers clear, scoped task briefs. Don't let them drift.
 - **Review is constructive**: The quality-reviewer is a teammate, not a gatekeeper.
 - **Dismissals are justified**: Never silently dismiss a finding. Every dismissal needs a rationale.
+- **Research before implementing**: For unfamiliar domains or architectural decisions, spawn the researcher first. Workers should implement, not research.
+- **Track external dependencies**: Set up periodic research prompts to monitor APIs, frameworks, and tools the project depends on.
 
 ## Vision Standards (Examples)
 

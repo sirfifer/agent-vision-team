@@ -7,6 +7,7 @@ const typeFilters: { label: string; value: ActivityType | null; tooltip: string 
   { label: 'Decision', value: 'decision', tooltip: 'Governance decisions submitted by agents via submit_decision()' },
   { label: 'Review', value: 'review', tooltip: 'Governance review verdicts (approved, blocked, needs human review)' },
   { label: 'Finding', value: 'finding', tooltip: 'Quality findings from validation, linting, or code review' },
+  { label: 'Research', value: 'research', tooltip: 'Research activities: prompt creation, execution, and completion' },
   { label: 'Guidance', value: 'guidance', tooltip: 'Guidance provided to agents by reviewers or governance' },
   { label: 'Response', value: 'response', tooltip: 'Agent responses and acknowledgments' },
   { label: 'Drift', value: 'drift', tooltip: 'Drift detection alerts (time, loop, scope, or quality drift)' },

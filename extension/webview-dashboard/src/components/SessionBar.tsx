@@ -1,5 +1,12 @@
 import { useDashboard } from '../context/DashboardContext';
 
+const ResearchIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 7v6m3-3H7" />
+  </svg>
+);
+
 const statusColors: Record<string, string> = {
   connected: 'bg-tier-quality',
   disconnected: 'bg-agent-idle',
@@ -13,7 +20,7 @@ const statusTooltips: Record<string, string> = {
 };
 
 export function SessionBar() {
-  const { data, sendCommand, setShowSettings, setShowWizard } = useDashboard();
+  const { data, sendCommand, setShowSettings, setShowWizard, setShowResearchPrompts, researchPrompts } = useDashboard();
   const { connectionStatus, sessionPhase, tasks } = data;
 
   return (
@@ -68,6 +75,18 @@ export function SessionBar() {
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
+        </button>
+        <button
+          onClick={() => setShowResearchPrompts(true)}
+          className="p-1.5 rounded hover:bg-vscode-widget-bg transition-colors relative"
+          title="Research Prompts - Track external changes and research new features"
+        >
+          <ResearchIcon />
+          {researchPrompts.length > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-purple-500 text-[9px] font-bold rounded-full flex items-center justify-center">
+              {researchPrompts.length}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setShowSettings(true)}
