@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { DashboardData, WebviewMessage } from '../types';
+import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult } from '../types';
 import { useVsCodeApi } from '../hooks/useVsCodeApi';
 
 const defaultData: DashboardData = {
@@ -16,12 +16,23 @@ const defaultData: DashboardData = {
 interface DashboardContextValue {
   data: DashboardData;
   sendCommand: (type: WebviewMessage['type']) => void;
+  sendMessage: (msg: WebviewMessage) => void;
   agentFilter: string | null;
   setAgentFilter: (agent: string | null) => void;
   governanceFilter: string | null;
   setGovernanceFilter: (ref: string | null) => void;
   typeFilter: string | null;
   setTypeFilter: (type: string | null) => void;
+  // Wizard and settings state
+  showWizard: boolean;
+  setShowWizard: (show: boolean) => void;
+  showSettings: boolean;
+  setShowSettings: (show: boolean) => void;
+  projectConfig: ProjectConfig | null;
+  setupReadiness: SetupReadiness | null;
+  visionDocs: DocumentInfo[];
+  architectureDocs: DocumentInfo[];
+  lastIngestionResult: IngestionResult | null;
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
@@ -41,33 +52,104 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [governanceFilter, setGovernanceFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
 
+  // Wizard and settings state
+  const [showWizard, setShowWizard] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [projectConfig, setProjectConfig] = useState<ProjectConfig | null>(null);
+  const [setupReadiness, setSetupReadiness] = useState<SetupReadiness | null>(null);
+  const [visionDocs, setVisionDocs] = useState<DocumentInfo[]>([]);
+  const [architectureDocs, setArchitectureDocs] = useState<DocumentInfo[]>([]);
+  const [lastIngestionResult, setLastIngestionResult] = useState<IngestionResult | null>(null);
+
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const msg = event.data;
-      if (msg.type === 'update') {
-        setData(msg.data);
-      } else if (msg.type === 'activityAdd') {
-        setData(prev => ({
-          ...prev,
-          activities: [msg.entry, ...prev.activities],
-        }));
+      switch (msg.type) {
+        case 'update':
+          setData(msg.data);
+          // Extract setup readiness and config from update if present
+          if (msg.data.setupReadiness) {
+            setSetupReadiness(msg.data.setupReadiness);
+          }
+          if (msg.data.projectConfig) {
+            setProjectConfig(msg.data.projectConfig);
+          }
+          if (msg.data.visionDocs) {
+            setVisionDocs(msg.data.visionDocs);
+          }
+          if (msg.data.architectureDocs) {
+            setArchitectureDocs(msg.data.architectureDocs);
+          }
+          break;
+        case 'activityAdd':
+          setData(prev => ({
+            ...prev,
+            activities: [msg.entry, ...prev.activities],
+          }));
+          break;
+        case 'setupReadiness':
+          setSetupReadiness(msg.readiness);
+          break;
+        case 'projectConfig':
+          setProjectConfig(msg.config);
+          break;
+        case 'visionDocs':
+          setVisionDocs(msg.docs);
+          break;
+        case 'architectureDocs':
+          setArchitectureDocs(msg.docs);
+          break;
+        case 'ingestionResult':
+          setLastIngestionResult(msg.result);
+          break;
+        case 'documentCreated':
+          if (msg.docType === 'vision') {
+            setVisionDocs(prev => [...prev, msg.doc]);
+          } else {
+            setArchitectureDocs(prev => [...prev, msg.doc]);
+          }
+          break;
       }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
   }, []);
 
+  // Auto-show wizard when setup is incomplete
+  useEffect(() => {
+    if (setupReadiness && !setupReadiness.isComplete && !showWizard) {
+      // Auto-show wizard if setup is incomplete
+      // Only auto-show once on initial load
+      const hasSeenWizard = sessionStorage.getItem('avt-wizard-dismissed');
+      if (!hasSeenWizard) {
+        setShowWizard(true);
+      }
+    }
+  }, [setupReadiness, showWizard]);
+
   const sendCommand = useCallback((type: WebviewMessage['type']) => {
     vscodeApi.postMessage({ type });
+  }, [vscodeApi]);
+
+  const sendMessage = useCallback((msg: WebviewMessage) => {
+    vscodeApi.postMessage(msg);
   }, [vscodeApi]);
 
   return (
     <DashboardContext.Provider value={{
       data,
       sendCommand,
+      sendMessage,
       agentFilter, setAgentFilter,
       governanceFilter, setGovernanceFilter,
       typeFilter, setTypeFilter,
+      showWizard, setShowWizard,
+      showSettings, setShowSettings,
+      projectConfig,
+      setupReadiness,
+      visionDocs,
+      architectureDocs,
+      lastIngestionResult,
     }}>
       {children}
     </DashboardContext.Provider>

@@ -16,7 +16,7 @@ from .models import (
 )
 
 
-DEFAULT_DB_PATH = Path(".claude/collab/governance.db")
+DEFAULT_DB_PATH = Path(".avt/governance.db")
 
 
 class GovernanceStore:

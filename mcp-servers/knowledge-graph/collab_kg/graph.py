@@ -8,7 +8,7 @@ from .storage import JSONLStorage
 
 
 class KnowledgeGraph:
-    def __init__(self, storage_path: str = ".claude/collab/knowledge-graph.jsonl") -> None:
+    def __init__(self, storage_path: str = ".avt/knowledge-graph.jsonl") -> None:
         self.storage = JSONLStorage(storage_path)
         self._entities: dict[str, Entity] = {}
         self._relations: list[Relation] = []

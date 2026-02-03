@@ -1,0 +1,69 @@
+import { WIZARD_STEPS, WIZARD_STEP_LABELS, type WizardStep } from '../../types';
+
+interface WizardStepIndicatorProps {
+  currentStep: WizardStep;
+  onStepClick?: (step: WizardStep) => void;
+  completedSteps: Set<WizardStep>;
+}
+
+export function WizardStepIndicator({
+  currentStep,
+  onStepClick,
+  completedSteps,
+}: WizardStepIndicatorProps) {
+  const currentIndex = WIZARD_STEPS.indexOf(currentStep);
+
+  return (
+    <div className="flex items-center gap-1 px-4 py-3 border-b border-vscode-border bg-vscode-widget-bg overflow-x-auto">
+      {WIZARD_STEPS.map((step, index) => {
+        const isCompleted = completedSteps.has(step);
+        const isCurrent = step === currentStep;
+        const isPast = index < currentIndex;
+        const isClickable = onStepClick && (isCompleted || isPast);
+
+        return (
+          <div key={step} className="flex items-center">
+            {index > 0 && (
+              <div
+                className={`w-8 h-0.5 mx-1 ${
+                  isPast || isCompleted ? 'bg-tier-quality' : 'bg-vscode-border'
+                }`}
+              />
+            )}
+            <button
+              onClick={() => isClickable && onStepClick(step)}
+              disabled={!isClickable}
+              className={`
+                flex items-center gap-1.5 px-2 py-1 rounded text-xs whitespace-nowrap
+                transition-colors
+                ${isCurrent ? 'bg-vscode-btn-bg text-vscode-btn-fg' : ''}
+                ${isCompleted && !isCurrent ? 'text-tier-quality' : ''}
+                ${!isCurrent && !isCompleted ? 'text-vscode-muted' : ''}
+                ${isClickable ? 'hover:bg-vscode-btn-bg/50 cursor-pointer' : 'cursor-default'}
+              `}
+              title={WIZARD_STEP_LABELS[step]}
+            >
+              <span
+                className={`
+                  flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold
+                  ${isCurrent ? 'bg-vscode-btn-fg text-vscode-btn-bg' : ''}
+                  ${isCompleted && !isCurrent ? 'bg-tier-quality text-white' : ''}
+                  ${!isCurrent && !isCompleted ? 'bg-vscode-border text-vscode-muted' : ''}
+                `}
+              >
+                {isCompleted && !isCurrent ? (
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  index + 1
+                )}
+              </span>
+              <span className="hidden sm:inline">{WIZARD_STEP_LABELS[step]}</span>
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

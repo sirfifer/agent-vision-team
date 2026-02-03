@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "setupComplete": false,
+  "languages": [],
+  "settings": {
+    "mockTests": false,
+    "mockTestsForCostlyOps": true,
+    "coverageThreshold": 80,
+    "autoGovernance": true,
+    "qualityGates": {
+      "build": true,
+      "lint": true,
+      "tests": true,
+      "coverage": true,
+      "findings": true
+    },
+    "kgAutoCuration": true
+  },
+  "quality": {
+    "testCommands": {
+      "python": "uv run pytest",
+      "typescript": "npm run test",
+      "javascript": "npm run test"
+    },
+    "lintCommands": {
+      "python": "uv run ruff check",
+      "typescript": "npm run lint",
+      "javascript": "npm run lint"
+    },
+    "buildCommands": {
+      "typescript": "npm run build",
+      "javascript": "npm run build"
+    },
+    "formatCommands": {
+      "python": "uv run ruff format",
+      "typescript": "npx prettier --write",
+      "javascript": "npx prettier --write"
+    }
+  },
+  "permissions": [],
+  "ingestion": {
+    "lastVisionIngest": null,
+    "lastArchitectureIngest": null,
+    "visionDocCount": 0,
+    "architectureDocCount": 0
+  }
+}

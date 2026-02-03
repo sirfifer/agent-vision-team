@@ -1,7 +1,5 @@
 """Knowledge Graph MCP server."""
 
-from typing import Optional
-
 from fastmcp import FastMCP
 
 from .graph import KnowledgeGraph
@@ -97,6 +95,26 @@ def delete_relations(relations: list[dict]) -> dict:
     """Delete specific relations from the graph."""
     deleted = graph.delete_relations(relations)
     return {"deleted": deleted}
+
+
+@mcp.tool()
+def ingest_documents(folder: str, tier: str) -> dict:
+    """Ingest markdown documents from a folder into KG entities.
+
+    Args:
+        folder: Path to folder containing .md files (default: .avt/vision/ or .avt/architecture/)
+        tier: 'vision' or 'architecture'
+
+    Returns:
+        {ingested: count, entities: [names], errors: [messages], skipped: [files]}
+    """
+    from .ingestion import ingest_folder
+
+    # Default folders based on tier
+    if not folder:
+        folder = f".avt/{tier}/" if tier in ("vision", "architecture") else folder
+
+    return ingest_folder(graph, folder, tier)
 
 
 @mcp.tool()

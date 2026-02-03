@@ -13,7 +13,7 @@ const statusTooltips: Record<string, string> = {
 };
 
 export function SessionBar() {
-  const { data, sendCommand } = useDashboard();
+  const { data, sendCommand, setShowSettings, setShowWizard } = useDashboard();
   const { connectionStatus, sessionPhase, tasks } = data;
 
   return (
@@ -25,7 +25,7 @@ export function SessionBar() {
 
       <div className="w-px h-4 bg-vscode-border" />
 
-      <div className="flex items-center gap-1.5" title={`${tasks.active} active task briefs out of ${tasks.total} total in .claude/collab/task-briefs/`}>
+      <div className="flex items-center gap-1.5" title={`${tasks.active} active task briefs out of ${tasks.total} total in .avt/task-briefs/`}>
         <span className="text-vscode-muted uppercase tracking-wider">Tasks</span>
         <span className="font-semibold">{tasks.active}/{tasks.total}</span>
       </div>
@@ -58,6 +58,26 @@ export function SessionBar() {
           title="Run all quality gates (build, lint, tests, coverage, findings) via the Quality MCP server"
         >
           Validate
+        </button>
+        <div className="w-px h-6 bg-vscode-border mx-1" />
+        <button
+          onClick={() => setShowWizard(true)}
+          className="p-1.5 rounded hover:bg-vscode-widget-bg transition-colors"
+          title="Open Setup Wizard"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </button>
+        <button
+          onClick={() => setShowSettings(true)}
+          className="p-1.5 rounded hover:bg-vscode-widget-bg transition-colors"
+          title="Open Settings"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
         </button>
       </div>
     </div>

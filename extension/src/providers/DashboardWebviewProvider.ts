@@ -1,7 +1,16 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
+import * as path from 'path';
 import { Entity } from '../models/Entity';
 import { AgentStatus, ActivityEntry } from '../models/Activity';
+import { ProjectConfig, SetupReadiness } from '../models/ProjectConfig';
+import { ProjectConfigService } from '../services/ProjectConfigService';
+
+interface DocumentInfo {
+  name: string;
+  path: string;
+  title?: string;
+}
 
 interface DashboardData {
   connectionStatus: 'connected' | 'disconnected' | 'error';
@@ -12,6 +21,11 @@ interface DashboardData {
   activities: ActivityEntry[];
   tasks: { active: number; total: number };
   sessionPhase: string;
+  // Setup wizard and config
+  setupReadiness?: SetupReadiness;
+  projectConfig?: ProjectConfig;
+  visionDocs?: DocumentInfo[];
+  architectureDocs?: DocumentInfo[];
 }
 
 function getNonce(): string {
@@ -23,6 +37,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
   private view?: vscode.WebviewView;
   private panel?: vscode.WebviewPanel;
+  private configService?: ProjectConfigService;
   private data: DashboardData = {
     connectionStatus: 'disconnected',
     serverPorts: { kg: 3101, quality: 3102, governance: 3103 },
@@ -35,6 +50,47 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   };
 
   constructor(private readonly extensionUri: vscode.Uri) {}
+
+  /**
+   * Set the project config service. Called after workspace is determined.
+   */
+  setConfigService(configService: ProjectConfigService): void {
+    this.configService = configService;
+    this.refreshConfigData();
+  }
+
+  /**
+   * Refresh setup readiness and config data
+   */
+  refreshConfigData(): void {
+    if (!this.configService) return;
+
+    const setupReadiness = this.configService.getReadiness();
+    const projectConfig = this.configService.load();
+    const visionDocs = this.getDocumentInfoList('vision');
+    const architectureDocs = this.getDocumentInfoList('architecture');
+
+    this.updateData({
+      setupReadiness,
+      projectConfig,
+      visionDocs,
+      architectureDocs,
+    });
+  }
+
+  private getDocumentInfoList(tier: 'vision' | 'architecture'): DocumentInfo[] {
+    if (!this.configService) return [];
+
+    const docs = tier === 'vision'
+      ? this.configService.listVisionDocs()
+      : this.configService.listArchitectureDocs();
+
+    const avtRoot = this.configService.getAvtRoot();
+    return docs.map(name => ({
+      name,
+      path: path.join(avtRoot, tier, name),
+    }));
+  }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
@@ -84,16 +140,189 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage(msg);
   }
 
+  private postMessage(msg: unknown): void {
+    this.panel?.webview.postMessage(msg);
+    this.view?.webview.postMessage(msg);
+  }
+
   private registerMessageHandler(webview: vscode.Webview): void {
-    webview.onDidReceiveMessage((message) => {
-      if (message.type === 'refresh') {
-        vscode.commands.executeCommand('collab.refreshMemory');
-      } else if (message.type === 'connect') {
-        vscode.commands.executeCommand('collab.connectMcpServers');
-      } else if (message.type === 'validate') {
-        vscode.commands.executeCommand('collab.validateAll');
+    webview.onDidReceiveMessage(async (message) => {
+      switch (message.type) {
+        case 'refresh':
+          vscode.commands.executeCommand('collab.refreshMemory');
+          break;
+
+        case 'connect':
+          vscode.commands.executeCommand('collab.connectMcpServers');
+          break;
+
+        case 'validate':
+          vscode.commands.executeCommand('collab.validateAll');
+          break;
+
+        case 'checkSetup':
+          this.handleCheckSetup();
+          break;
+
+        case 'saveProjectConfig':
+          this.handleSaveProjectConfig(message.config);
+          break;
+
+        case 'createVisionDoc':
+          this.handleCreateVisionDoc(message.name, message.content);
+          break;
+
+        case 'createArchDoc':
+          this.handleCreateArchDoc(message.name, message.content);
+          break;
+
+        case 'ingestDocs':
+          await this.handleIngestDocs(message.tier);
+          break;
+
+        case 'listVisionDocs':
+          this.handleListDocs('vision');
+          break;
+
+        case 'listArchDocs':
+          this.handleListDocs('architecture');
+          break;
+
+        case 'openSettings':
+          this.handleOpenSettings();
+          break;
+
+        case 'savePermissions':
+          this.handleSavePermissions(message.permissions);
+          break;
       }
     });
+  }
+
+  private handleCheckSetup(): void {
+    if (!this.configService) return;
+
+    const readiness = this.configService.getReadiness();
+    this.postMessage({ type: 'setupReadiness', readiness });
+  }
+
+  private handleSaveProjectConfig(config: ProjectConfig): void {
+    if (!this.configService) return;
+
+    this.configService.save(config);
+
+    // Sync permissions to .claude/settings.local.json
+    if (config.permissions && config.permissions.length > 0) {
+      this.configService.syncPermissionsToClaudeSettings(config.permissions);
+    }
+
+    // Update dashboard data
+    this.refreshConfigData();
+
+    // Notify webview
+    this.postMessage({ type: 'projectConfig', config });
+  }
+
+  private handleCreateVisionDoc(name: string, content: string): void {
+    if (!this.configService) return;
+
+    const filepath = this.configService.createVisionDoc(name, content);
+    const doc: DocumentInfo = {
+      name: path.basename(filepath),
+      path: filepath,
+    };
+
+    this.postMessage({ type: 'documentCreated', docType: 'vision', doc });
+
+    // Refresh doc lists
+    this.refreshConfigData();
+  }
+
+  private handleCreateArchDoc(name: string, content: string): void {
+    if (!this.configService) return;
+
+    const filepath = this.configService.createArchitectureDoc(name, content);
+    const doc: DocumentInfo = {
+      name: path.basename(filepath),
+      path: filepath,
+    };
+
+    this.postMessage({ type: 'documentCreated', docType: 'architecture', doc });
+
+    // Refresh doc lists
+    this.refreshConfigData();
+  }
+
+  private async handleIngestDocs(tier: 'vision' | 'architecture'): Promise<void> {
+    // This will call the KG server's ingest_documents tool
+    // For now, we'll execute a command that the extension.ts can handle
+    try {
+      const result = await vscode.commands.executeCommand<{
+        ingested: number;
+        entities: string[];
+        errors: string[];
+        skipped: string[];
+      }>('collab.ingestDocuments', tier);
+
+      if (result) {
+        this.postMessage({
+          type: 'ingestionResult',
+          result: { tier, ...result },
+        });
+
+        // Update ingestion status in config
+        if (this.configService) {
+          const config = this.configService.load();
+          const now = new Date().toISOString();
+          if (tier === 'vision') {
+            config.ingestion.lastVisionIngest = now;
+            config.ingestion.visionDocCount = result.ingested;
+          } else {
+            config.ingestion.lastArchitectureIngest = now;
+            config.ingestion.architectureDocCount = result.ingested;
+          }
+          this.configService.save(config);
+          this.refreshConfigData();
+        }
+      }
+    } catch (err) {
+      this.postMessage({
+        type: 'ingestionResult',
+        result: {
+          tier,
+          ingested: 0,
+          entities: [],
+          errors: [String(err)],
+          skipped: [],
+        },
+      });
+    }
+  }
+
+  private handleListDocs(tier: 'vision' | 'architecture'): void {
+    const docs = this.getDocumentInfoList(tier);
+    this.postMessage({
+      type: tier === 'vision' ? 'visionDocs' : 'architectureDocs',
+      docs,
+    });
+  }
+
+  private handleOpenSettings(): void {
+    if (!this.configService) return;
+
+    const config = this.configService.load();
+    this.postMessage({ type: 'projectConfig', config });
+  }
+
+  private handleSavePermissions(permissions: string[]): void {
+    if (!this.configService) return;
+
+    this.configService.syncPermissionsToClaudeSettings(permissions);
+
+    // Also update the project config
+    const config = this.configService.load();
+    config.permissions = permissions;
+    this.configService.save(config);
   }
 
   private getHtmlContent(webview: vscode.Webview): string {

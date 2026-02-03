@@ -9,7 +9,7 @@ from .models import Entity, Relation
 class JSONLStorage:
     """Handles loading and saving the knowledge graph to a JSONL file."""
 
-    def __init__(self, filepath: str = ".claude/collab/knowledge-graph.jsonl"):
+    def __init__(self, filepath: str = ".avt/knowledge-graph.jsonl"):
         self.filepath = Path(filepath)
         self.filepath.parent.mkdir(parents=True, exist_ok=True)
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 
-DEFAULT_KG_PATH = Path(".claude/collab/knowledge-graph.jsonl")
+DEFAULT_KG_PATH = Path(".avt/knowledge-graph.jsonl")
 
 
 class KGClient:

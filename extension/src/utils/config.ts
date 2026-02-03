@@ -45,7 +45,7 @@ export function getCollabRoot(): string | undefined {
   if (!workspaceFolder) {
     return undefined;
   }
-  return path.join(workspaceFolder.uri.fsPath, '.claude', 'collab');
+  return path.join(workspaceFolder.uri.fsPath, '.avt');
 }
 
 export function loadConfig(): CollabConfig {

@@ -67,4 +67,29 @@ export class KnowledgeGraphClient {
       callerRole,
     })) as { allowed: boolean; reason?: string };
   }
+
+  /**
+   * Ingest markdown documents from a folder into KG entities.
+   * @param tier 'vision' or 'architecture'
+   * @returns Ingestion result with counts and any errors
+   */
+  async ingestDocuments(
+    tier: 'vision' | 'architecture'
+  ): Promise<{
+    ingested: number;
+    entities: string[];
+    errors: string[];
+    skipped: string[];
+  }> {
+    const folder = `.avt/${tier}/`;
+    return (await this.mcp.callTool('knowledge-graph', 'ingest_documents', {
+      folder,
+      tier,
+    })) as {
+      ingested: number;
+      entities: string[];
+      errors: string[];
+      skipped: string[];
+    };
+  }
 }

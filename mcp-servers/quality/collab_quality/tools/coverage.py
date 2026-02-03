@@ -3,6 +3,8 @@
 import subprocess
 from typing import Optional
 
+from ..config import get_coverage_threshold
+
 
 COVERAGE_TOOLS = {
     "python": ["pytest", "--cov", "--cov-report=term"],
@@ -15,6 +17,9 @@ def check_coverage(
     language: Optional[str] = None,
 ) -> dict:
     """Check test coverage using the appropriate coverage tool."""
+    # Get threshold from project config (defaults to 80 if not set)
+    target = get_coverage_threshold()
+
     if language is None:
         # Default to python for this project
         language = "python"
@@ -22,7 +27,7 @@ def check_coverage(
     if language not in COVERAGE_TOOLS:
         return {
             "percentage": 0.0,
-            "target": 80.0,
+            "target": target,
             "met": False,
             "uncovered_files": [],
             "error": f"Coverage checking not supported for {language}",
@@ -54,20 +59,19 @@ def check_coverage(
                             except ValueError:
                                 pass
 
-                # Look for files with low coverage
+                # Look for files with low coverage (below configured threshold)
                 if "%" in line and "TOTAL" not in line:
                     parts = line.split()
                     for i, part in enumerate(parts):
                         if "%" in part:
                             try:
                                 file_cov = float(part.rstrip("%"))
-                                if file_cov < 80.0 and i > 0:
+                                if file_cov < target and i > 0:
                                     # First part is usually the filename
                                     uncovered_files.append(parts[0])
                             except ValueError:
                                 pass
 
-        target = 80.0
         met = percentage >= target
 
         return {
@@ -80,7 +84,7 @@ def check_coverage(
     except subprocess.TimeoutExpired:
         return {
             "percentage": 0.0,
-            "target": 80.0,
+            "target": target,
             "met": False,
             "uncovered_files": [],
             "error": "Coverage check timed out after 5 minutes",
@@ -88,7 +92,7 @@ def check_coverage(
     except FileNotFoundError:
         return {
             "percentage": 0.0,
-            "target": 80.0,
+            "target": target,
             "met": False,
             "uncovered_files": [],
             "error": f"Coverage tool '{coverage_cmd[0]}' not found.",

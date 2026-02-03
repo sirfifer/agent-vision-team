@@ -4,6 +4,7 @@ import * as path from 'path';
 import { McpClientService } from './services/McpClientService';
 import { FileWatcherService } from './services/FileWatcherService';
 import { StatusBarService } from './services/StatusBarService';
+import { ProjectConfigService } from './services/ProjectConfigService';
 import { KnowledgeGraphClient } from './mcp/KnowledgeGraphClient';
 import { QualityClient } from './mcp/QualityClient';
 import { GovernanceClient } from './mcp/GovernanceClient';
@@ -67,7 +68,7 @@ function detectAgents(root: string): AgentStatus[] {
 
 function getSessionPhase(root: string): string {
   try {
-    const statePath = path.join(root, '.claude', 'collab', 'session-state.md');
+    const statePath = path.join(root, '.avt', 'session-state.md');
     if (fs.existsSync(statePath)) {
       const content = fs.readFileSync(statePath, 'utf-8');
       const match = content.match(/##\s*Current Phase[:\s]*(.+)/i)
@@ -80,7 +81,7 @@ function getSessionPhase(root: string): string {
 
 function getTaskCounts(root: string): { active: number; total: number } {
   try {
-    const briefsDir = path.join(root, '.claude', 'collab', 'task-briefs');
+    const briefsDir = path.join(root, '.avt', 'task-briefs');
     if (fs.existsSync(briefsDir)) {
       const files = fs.readdirSync(briefsDir).filter(f => f.endsWith('.md'));
       return { active: 0, total: files.length };
@@ -136,6 +137,15 @@ export function activate(context: vscode.ExtensionContext): void {
   const tasksProvider = new TasksTreeProvider();
   const memoryProvider = new MemoryTreeProvider();
   const dashboardProvider = new DashboardWebviewProvider(context.extensionUri);
+
+  // Initialize project config service if workspace exists
+  const workspaceRoot = getWorkspaceRoot();
+  let configService: ProjectConfigService | undefined;
+  if (workspaceRoot) {
+    configService = new ProjectConfigService(workspaceRoot);
+    configService.ensureFolderStructure();
+    dashboardProvider.setConfigService(configService);
+  }
 
   // Register tree views
   context.subscriptions.push(
@@ -300,6 +310,29 @@ export function activate(context: vscode.ExtensionContext): void {
         }
       } catch (error) {
         vscode.window.showErrorMessage(`Validation failed: ${error}`);
+      }
+    })
+  );
+
+  // Ingest documents command (called by dashboard wizard)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('collab.ingestDocuments', async (tier: 'vision' | 'architecture') => {
+      try {
+        const result = await kgClient.ingestDocuments(tier);
+        dashboardProvider.addActivity(
+          makeActivity('kg-librarian', 'status', `Ingested ${result.ingested} ${tier} documents into KG`, {
+            tier: tier === 'vision' ? 'vision' : 'architecture',
+          })
+        );
+        return result;
+      } catch (error) {
+        vscode.window.showErrorMessage(`Document ingestion failed: ${error}`);
+        return {
+          ingested: 0,
+          entities: [],
+          errors: [String(error)],
+          skipped: [],
+        };
       }
     })
   );

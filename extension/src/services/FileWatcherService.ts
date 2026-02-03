@@ -11,7 +11,7 @@ export class FileWatcherService {
 
   initialize(): void {
     const taskBriefWatcher = vscode.workspace.createFileSystemWatcher(
-      '**/.claude/collab/task-briefs/**'
+      '**/.avt/task-briefs/**'
     );
     taskBriefWatcher.onDidChange(() => {
       logSystem('Task brief changed');
@@ -28,7 +28,7 @@ export class FileWatcherService {
     this.watchers.push(taskBriefWatcher);
 
     const sessionStateWatcher = vscode.workspace.createFileSystemWatcher(
-      '**/.claude/collab/session-state.md'
+      '**/.avt/session-state.md'
     );
     sessionStateWatcher.onDidChange(() => {
       logSystem('Session state changed');

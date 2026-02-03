@@ -52,8 +52,8 @@
     }
   },
   "workspace": {
-    "taskBriefsPath": ".claude/collab/task-briefs",
-    "memoryPath": ".claude/collab/memory",
-    "sessionStatePath": ".claude/collab/session-state.md"
+    "taskBriefsPath": ".avt/task-briefs",
+    "memoryPath": ".avt/memory",
+    "sessionStatePath": ".avt/session-state.md"
   }
 }

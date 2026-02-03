@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-DB_PATH="${CLAUDE_PROJECT_DIR:-.}/.claude/collab/governance.db"
+DB_PATH="${CLAUDE_PROJECT_DIR:-.}/.avt/governance.db"
 
 # If governance DB doesn't exist, allow (server may not be running yet)
 if [ ! -f "$DB_PATH" ]; then

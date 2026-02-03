@@ -9,7 +9,7 @@ from .models import TrustDecision, DismissalRecord
 
 
 class TrustEngine:
-    def __init__(self, db_path: str = ".claude/collab/trust-engine.db") -> None:
+    def __init__(self, db_path: str = ".avt/trust-engine.db") -> None:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
