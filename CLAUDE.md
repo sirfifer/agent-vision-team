@@ -5,7 +5,8 @@
 This project uses a collaborative intelligence system with:
 - **Knowledge Graph MCP server** — persistent institutional memory with tier protection
 - **Quality MCP server** — deterministic quality verification with trust engine
-- **Custom subagents** — worker, quality-reviewer, kg-librarian (defined in `.claude/agents/`)
+- **Governance MCP server** — transactional review checkpoints for agent decisions
+- **Custom subagents** — worker, quality-reviewer, kg-librarian, governance-reviewer (defined in `.claude/agents/`)
 
 ## Your Role as Orchestrator
 
@@ -79,6 +80,52 @@ The system enforces a protection hierarchy via tier metadata:
 
 **Key principle**: Lower tiers cannot modify higher tiers. Vision conflicts override all other work.
 
+## Transactional Governance Checkpoints
+
+The system enforces governance through **transactional MCP tool calls** — agents call the Governance server, block waiting for a response, and act on the verdict. This is not fire-and-forget; every checkpoint is a synchronous round-trip.
+
+### The Governance MCP Server (port 3103)
+
+The Governance server provides these transactional tools:
+
+| Tool | When | What Happens |
+|------|------|-------------|
+| `submit_decision` | Before implementing any key decision | Stores decision → loads KG standards → runs AI review via `claude --print` → returns verdict |
+| `submit_plan_for_review` | Before presenting a plan | Reviews entire plan against all standards and prior decisions → returns verdict |
+| `submit_completion_review` | Before reporting task completion | Verifies all decisions reviewed, no blocks unresolved → returns verdict |
+| `get_decision_history` | Querying past decisions | Returns filtered decision/verdict history |
+| `get_governance_status` | Dashboard overview | Returns counts and recent activity |
+
+### Verdicts
+
+- **approved**: Proceed. The response includes which standards were verified.
+- **blocked**: Stop. The response includes `guidance` explaining what to change. The agent must revise and resubmit.
+- **needs_human_review**: Include the review context when presenting to the human. Automatically assigned for `deviation` and `scope_change` categories.
+
+### Worker Decision Protocol
+
+Workers MUST call `submit_decision` before implementing any key choice:
+- Choosing an implementation pattern (`pattern_choice`)
+- Designing a component's interface (`component_design`, `api_design`)
+- Deviating from established patterns (`deviation`)
+- Working outside task brief scope (`scope_change`)
+
+The tool call blocks until the review completes. The worker then acts on the verdict.
+
+### Safety Net: ExitPlanMode Hook
+
+A `PreToolUse` hook on `ExitPlanMode` runs `scripts/hooks/verify-governance-review.sh` as a backup check. If the agent tries to present a plan without having called `submit_plan_for_review`, the hook blocks the action. This is the safety net, not the primary mechanism.
+
+### Internal Review Flow
+
+Inside each governance tool call:
+1. Decision/plan stored in SQLite (`.claude/collab/governance.db`)
+2. Vision standards loaded from KG JSONL
+3. `claude --print` runs with the governance-reviewer agent for full AI reasoning
+4. Verdict stored in SQLite
+5. Decision recorded in KG for institutional memory
+6. Verdict returned to the calling agent
+
 ## Checkpoints
 
 After each meaningful unit of work:
@@ -127,6 +174,15 @@ Available tools:
 - `get_trust_decision(finding_id)` — get trust decision for a finding (BLOCK, INVESTIGATE, TRACK)
 - `record_dismissal(finding_id, justification, dismissed_by)` — dismiss a finding with justification
 
+### Governance Server
+
+Available tools:
+- `submit_decision(task_id, agent, category, summary, ...)` — submit a decision for transactional review (blocks until verdict)
+- `submit_plan_for_review(task_id, agent, plan_summary, plan_content, ...)` — submit a plan for full governance review
+- `submit_completion_review(task_id, agent, summary_of_work, files_changed)` — final governance check before completion
+- `get_decision_history(task_id?, agent?, verdict?)` — query past decisions and verdicts
+- `get_governance_status()` — dashboard overview (counts, recent activity)
+
 ## Quality Gates
 
 Workers must pass all gates before completion:
@@ -161,7 +217,8 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 ├── agents/                          # Custom subagent definitions
 │   ├── worker.md
 │   ├── quality-reviewer.md
-│   └── kg-librarian.md
+│   ├── kg-librarian.md
+│   └── governance-reviewer.md
 ├── collab/
 │   ├── task-briefs/                 # Task briefs for workers
 │   ├── session-state.md             # Current session progress
@@ -170,13 +227,14 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 │   │   ├── troubleshooting-log.md
 │   │   └── solution-patterns.md
 │   ├── knowledge-graph.jsonl        # KG persistence (managed by server)
-│   └── trust-engine.db              # Trust engine SQLite DB (managed by server)
+│   ├── trust-engine.db              # Trust engine SQLite DB (managed by server)
+│   └── governance.db                # Governance SQLite DB (managed by server)
 └── settings.json                    # Claude Code settings and hooks
 ```
 
 ## Starting MCP Servers
 
-Before using the system, ensure both MCP servers are running:
+Before using the system, ensure all MCP servers are running:
 
 ```bash
 # Terminal 1: Knowledge Graph server (SSE on port 3101)
@@ -186,9 +244,13 @@ uv run python -m collab_kg.server
 # Terminal 2: Quality server (SSE on port 3102)
 cd mcp-servers/quality
 uv run python -m collab_quality.server
+
+# Terminal 3: Governance server (SSE on port 3103)
+cd mcp-servers/governance
+uv run python -m collab_governance.server
 ```
 
-Both servers will be available to all Claude Code sessions and subagents.
+All servers will be available to all Claude Code sessions and subagents.
 
 ## End-to-End Example
 

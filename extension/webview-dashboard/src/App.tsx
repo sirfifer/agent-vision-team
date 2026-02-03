@@ -1,18 +1,20 @@
-import { SessionTimeline } from './components/SessionTimeline';
-import { MessageFeed } from './components/MessageFeed';
-import { QualityGates } from './components/QualityGates';
+import { DashboardProvider } from './context/DashboardContext';
+import { SessionBar } from './components/SessionBar';
 import { AgentCards } from './components/AgentCards';
+import { GovernancePanel } from './components/GovernancePanel';
+import { ActivityFeed } from './components/ActivityFeed';
 
 export default function App() {
   return (
-    <div className="p-4 space-y-4">
-      <h1 className="text-xl font-bold">Collab Intelligence Dashboard</h1>
-      <div className="grid grid-cols-2 gap-4">
+    <DashboardProvider>
+      <div className="h-screen flex flex-col bg-vscode-bg text-vscode-fg text-sm">
+        <SessionBar />
         <AgentCards />
-        <QualityGates />
+        <div className="flex-1 flex min-h-0">
+          <GovernancePanel className="w-2/5 overflow-y-auto" />
+          <ActivityFeed className="w-3/5 overflow-y-auto" />
+        </div>
       </div>
-      <SessionTimeline />
-      <MessageFeed />
-    </div>
+    </DashboardProvider>
   );
 }

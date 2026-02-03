@@ -13,6 +13,7 @@ export interface CollabConfig {
   servers: {
     'knowledge-graph': McpServerConfig;
     quality: McpServerConfig;
+    governance: McpServerConfig;
   };
 }
 
@@ -28,6 +29,12 @@ const DEFAULT_CONFIG: CollabConfig = {
       command: 'python',
       args: ['-m', 'collab_quality.server'],
       port: 3102,
+      env: {},
+    },
+    governance: {
+      command: 'python',
+      args: ['-m', 'collab_governance.server'],
+      port: 3103,
       env: {},
     },
   },

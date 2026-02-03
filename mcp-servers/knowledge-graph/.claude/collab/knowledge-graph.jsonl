@@ -8,3 +8,4 @@
 {"type": "entity", "name": "V1", "entityType": "vision_standard", "observations": ["protection_tier: vision"]}
 {"type": "entity", "name": "A1", "entityType": "component", "observations": ["protection_tier: architecture"]}
 {"type": "entity", "name": "Q1", "entityType": "problem", "observations": ["protection_tier: quality"]}
+{"type": "entity", "name": "test_vision", "entityType": "vision_standard", "observations": ["protection_tier: vision", "All tests must pass"]}

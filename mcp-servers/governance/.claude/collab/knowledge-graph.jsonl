@@ -1,0 +1,3 @@
+{"type": "entity", "name": "governance_decision_cc823d91c593", "entityType": "solution_pattern", "observations": ["Governance decision by worker-1: Deviate from DI pattern", "Verdict: needs_human_review"]}
+{"type": "entity", "name": "governance_decision_e5bc0a8868c0", "entityType": "solution_pattern", "observations": ["Governance decision by worker-1: Expand to include caching", "Verdict: needs_human_review"]}
+{"type": "entity", "name": "governance_decision_plan_t1", "entityType": "solution_pattern", "observations": ["Governance decision by worker-1: Plan review for t1: Auth implementation plan", "Verdict: needs_human_review"]}

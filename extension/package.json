@@ -9,7 +9,7 @@
   },
   "categories": ["Other"],
   "activationEvents": [
-    "workspaceContains:**/.claude/collab"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -108,7 +108,8 @@
     }
   },
   "scripts": {
-    "build": "node esbuild.config.js",
+    "build:webview": "cd webview-dashboard && npm run build",
+    "build": "npm run build:webview && node esbuild.config.js",
     "watch": "node esbuild.config.js --watch",
     "lint": "eslint src --ext ts",
     "pretest": "npm run build"
