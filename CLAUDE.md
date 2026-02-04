@@ -6,7 +6,7 @@ This project uses a collaborative intelligence system with:
 - **Knowledge Graph MCP server** — persistent institutional memory with tier protection
 - **Quality MCP server** — deterministic quality verification with trust engine
 - **Governance MCP server** — transactional review checkpoints for agent decisions
-- **Custom subagents** — worker, quality-reviewer, kg-librarian, governance-reviewer, researcher (defined in `.claude/agents/`)
+- **Custom subagents** — worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward (defined in `.claude/agents/`)
 
 ## Your Role as Orchestrator
 
@@ -116,6 +116,45 @@ When spawning the researcher, specify `model: opus` or `model: sonnet` based on 
 
 - **Change Reports**: Structured reports for periodic/maintenance research with actionable items
 - **Research Briefs**: Comprehensive analysis for exploratory research with recommendations
+
+## Project Hygiene Protocol
+
+The project-steward subagent maintains project organization, naming conventions, and completeness across the codebase.
+
+### What the Steward Monitors
+
+1. **Project-Level Files**: LICENSE, README, CONTRIBUTING, CHANGELOG, CODE_OF_CONDUCT, SECURITY
+2. **Naming Conventions**: Consistent casing across files, directories, variables, and types
+3. **Folder Organization**: Logical grouping, appropriate depth, no orphaned files
+4. **Documentation Completeness**: README sections, API docs, configuration documentation
+5. **Cruft Detection**: Unused files, duplicates, outdated configs, dead links
+6. **Consistency**: Indentation, line endings, encoding, import ordering
+
+### When to Use the Steward
+
+- **Periodic reviews**: Weekly cruft detection, monthly naming audits, quarterly deep reviews
+- **Before releases**: Ensure all project files are complete and up-to-date
+- **After major refactoring**: Verify organization still makes sense
+- **New project setup**: Establish conventions and create missing essential files
+
+### Spawning the Steward
+
+```
+Task tool → subagent_type: project-steward
+prompt: "Perform a full project hygiene review" | "Check naming conventions in src/" | "Verify all essential project files exist"
+```
+
+### Steward Outputs
+
+- **Review Reports**: Structured reports with findings categorized by priority
+- **KG Entities**: Naming conventions and project structure patterns recorded for future reference
+- **Direct Fixes**: Mechanical fixes (renaming, cruft removal) when non-controversial
+
+### Integration with Other Agents
+
+- **Before worker tasks**: Steward can verify project structure before major work begins
+- **After kg-librarian**: Steward can review if memory files are properly organized
+- **Quality gates**: Steward findings can be included in quality reviews
 
 ## Three-Tier Governance Hierarchy
 
@@ -268,7 +307,8 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 │   ├── quality-reviewer.md
 │   ├── kg-librarian.md
 │   ├── governance-reviewer.md
-│   └── researcher.md
+│   ├── researcher.md
+│   └── project-steward.md
 ├── collab/
 │   ├── task-briefs/                 # Task briefs for workers
 │   ├── session-state.md             # Current session progress
@@ -392,6 +432,7 @@ All servers will be available to all Claude Code sessions and subagents.
 - **Dismissals are justified**: Never silently dismiss a finding. Every dismissal needs a rationale.
 - **Research before implementing**: For unfamiliar domains or architectural decisions, spawn the researcher first. Workers should implement, not research.
 - **Track external dependencies**: Set up periodic research prompts to monitor APIs, frameworks, and tools the project depends on.
+- **Maintain project hygiene**: Periodically spawn the project-steward for consistency reviews. Clean projects are maintainable projects.
 
 ## Vision Standards (Examples)
 
