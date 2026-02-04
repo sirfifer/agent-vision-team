@@ -24,7 +24,7 @@ Scheduled or triggered research to track external changes:
 - Track security advisories for dependencies
 - Update the team on relevant ecosystem changes
 
-**Output**: Structured change reports stored in the KG and synced to `.claude/collab/memory/research-findings.md`
+**Output**: Structured change reports stored in the KG and synced to `.avt/memory/research-findings.md`
 
 ### 2. Exploratory/Design Research
 
@@ -38,7 +38,7 @@ Deep investigation to inform new development:
 
 ## Startup Protocol
 
-1. Read your research prompt (provided in the task prompt or in `.claude/collab/research-prompts/`)
+1. Read your research prompt (provided in the task prompt or in `.avt/research-prompts/`)
 2. Determine your research mode (periodic or exploratory)
 3. Query the Knowledge Graph for existing knowledge:
    - `search_nodes("<research topic>")` — find what's already known
@@ -163,14 +163,27 @@ Indicators for **Sonnet**:
 
 ## Knowledge Graph Integration
 
+**Critical**: Research findings establish baseline knowledge for future research. Always record key discoveries so future research can determine if findings represent genuine new information or already-known facts.
+
 ### Entities to Create/Update:
 
 - **technology_dependency**: External tools, libraries, APIs the project uses
   - Observations: version info, known issues, update status
 - **research_finding**: Significant discoveries from research
   - Relations: `affects` → component entities, `informs` → decisions
+  - **Always create these for key discoveries** — they become the baseline for future research
 - **solution_pattern**: Patterns discovered through research
   - Observations: source, applicability, adoption considerations
+
+### Establishing Baseline Knowledge:
+
+When you discover something significant:
+1. Check if it's already in the KG (via `search_nodes`)
+2. If new, create a `research_finding` entity with clear observations
+3. If updating existing knowledge, add observations showing what changed and when
+4. Key findings are synced to `.avt/memory/research-findings.md` by the KG Librarian
+
+This baseline ensures subsequent research produces net-new insights rather than rediscovering what's already known.
 
 ### Recording Research:
 
@@ -231,7 +244,7 @@ related_entities: [KG entities this relates to]
 ## Handoff to Workers
 
 After exploratory research, you produce a research brief that:
-1. Is stored in `.claude/collab/research-briefs/`
+1. Is stored in `.avt/research-briefs/`
 2. Is referenced in subsequent task briefs for workers
 3. Provides the context workers need without requiring them to redo research
 

@@ -8,6 +8,7 @@ const roleLabels: Record<string, string> = {
   'kg-librarian': 'KG-Lib',
   'governance-reviewer': 'Gov',
   researcher: 'Research',
+  'project-steward': 'Steward',
 };
 
 const roleDescriptions: Record<string, string> = {
@@ -17,6 +18,7 @@ const roleDescriptions: Record<string, string> = {
   'kg-librarian': 'KG Librarian: curates institutional memory, consolidates observations, promotes solution patterns',
   'governance-reviewer': 'Governance Reviewer: AI-powered review of decisions and plans against vision and architecture standards',
   researcher: 'Researcher: gathers intelligence for architectural decisions and tracks external changes affecting the project',
+  'project-steward': 'Project Steward: maintains project hygiene, naming conventions, organization, and essential file completeness',
 };
 
 const statusDotClass: Record<string, string> = {
@@ -72,7 +74,7 @@ export function AgentCards() {
   if (agents.length === 0) {
     return (
       <div className="flex gap-2 px-4 py-2" title="Agent cards appear here after connecting. Each card shows an agent's status and current task.">
-        {['Orchestrator', 'Worker', 'Quality Reviewer', 'KG Librarian', 'Researcher'].map(name => (
+        {['Orchestrator', 'Worker', 'Quality Reviewer', 'KG Librarian', 'Researcher', 'Steward'].map(name => (
           <div key={name} className="flex-1 p-2.5 rounded border border-vscode-border bg-vscode-widget-bg opacity-50" title={`${name}: no data yet. Connect to MCP servers to detect agents.`}>
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full border border-agent-idle" />

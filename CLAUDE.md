@@ -22,7 +22,7 @@ You coordinate multiple specialized subagents to accomplish complex development 
 When given a complex task:
 
 1. **Break it down**: Divide into discrete, scopeable units of work
-2. **Write task briefs**: Create a task brief for each unit in `.claude/collab/task-briefs/`
+2. **Write task briefs**: Create a task brief for each unit in `.avt/task-briefs/`
 3. **Create isolation**: Use git worktrees for parallel worker isolation:
    ```bash
    git worktree add ../project-worker-N -b task/NNN-description
@@ -66,7 +66,7 @@ search_nodes("<task type> pattern")
    - Consolidate redundant observations
    - Promote recurring solutions to patterns
    - Remove stale entries
-   - Sync important entries to archival files in `.claude/collab/memory/`
+   - Sync important entries to archival files in `.avt/memory/`
 
 ## Research Protocol
 
@@ -218,7 +218,7 @@ Inside each governance tool call:
 
 After each meaningful unit of work:
 
-1. **Update session state**: Write progress to `.claude/collab/session-state.md`
+1. **Update session state**: Write progress to `.avt/session-state.md`
 2. **Tag the state**: Create a git tag for recovery:
    ```bash
    git tag checkpoint-NNN
@@ -310,18 +310,19 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 │   ├── researcher.md
 │   └── project-steward.md
 ├── collab/
-│   ├── task-briefs/                 # Task briefs for workers
-│   ├── session-state.md             # Current session progress
-│   ├── memory/                      # Archival memory files
-│   │   ├── architectural-decisions.md
-│   │   ├── troubleshooting-log.md
-│   │   └── solution-patterns.md
 │   ├── knowledge-graph.jsonl        # KG persistence (managed by server)
 │   ├── trust-engine.db              # Trust engine SQLite DB (managed by server)
 │   └── governance.db                # Governance SQLite DB (managed by server)
 └── settings.json                    # Claude Code settings and hooks
 
-.avt/
+.avt/                                # Agent Vision Team project config
+├── task-briefs/                     # Task briefs for workers
+├── session-state.md                 # Current session progress
+├── memory/                          # Archival memory files (synced by KG Librarian)
+│   ├── architectural-decisions.md   # Significant decisions and rationale
+│   ├── troubleshooting-log.md       # Problems, attempts, solutions
+│   ├── solution-patterns.md         # Promoted patterns with implementations
+│   └── research-findings.md         # Key research discoveries (baseline knowledge)
 ├── research-prompts.json            # Research prompt registry
 ├── research-prompts/                # Individual research prompt files
 │   └── rp-xxx.md                    # Research prompt definitions
@@ -368,12 +369,12 @@ All servers will be available to all Claude Code sessions and subagents.
    get_entities_by_tier("vision")
    ```
 
-3. **Create task brief**: Write `.claude/collab/task-briefs/001-add-auth.md` (reference the research brief)
+3. **Create task brief**: Write `.avt/task-briefs/001-add-auth.md` (reference the research brief)
 
 4. **Spawn worker**:
    ```
    Task tool → subagent_type: worker
-   prompt: "Implement the task in .claude/collab/task-briefs/001-add-auth.md"
+   prompt: "Implement the task in .avt/task-briefs/001-add-auth.md"
    ```
 
 5. **Worker completes and runs gates**: Worker calls `check_all_gates()` before completion

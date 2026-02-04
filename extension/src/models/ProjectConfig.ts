@@ -41,10 +41,18 @@ export interface IngestionStatus {
   architectureDocCount: number;
 }
 
+export interface ProjectMetadata {
+  name?: string;
+  description?: string;
+  isOpenSource: boolean;
+  license?: string;
+}
+
 export interface ProjectConfig {
   version: number;
   setupComplete: boolean;
   languages: string[];
+  metadata: ProjectMetadata;
   settings: ProjectSettings;
   quality: QualityConfig;
   permissions: string[];
@@ -96,10 +104,15 @@ export const DEFAULT_QUALITY_CONFIG: QualityConfig = {
   },
 };
 
+export const DEFAULT_PROJECT_METADATA: ProjectMetadata = {
+  isOpenSource: false,
+};
+
 export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   version: 1,
   setupComplete: false,
   languages: [],
+  metadata: DEFAULT_PROJECT_METADATA,
   settings: DEFAULT_PROJECT_SETTINGS,
   quality: DEFAULT_QUALITY_CONFIG,
   permissions: [],

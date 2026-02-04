@@ -32,6 +32,13 @@ export interface ProjectSettings {
   kgAutoCuration: boolean;
 }
 
+export interface ProjectMetadata {
+  name?: string;
+  description?: string;
+  isOpenSource: boolean;
+  license?: string;
+}
+
 export interface QualityConfig {
   testCommands: Record<string, string>;
   lintCommands: Record<string, string>;
@@ -50,6 +57,7 @@ export interface ProjectConfig {
   version: number;
   setupComplete: boolean;
   languages: string[];
+  metadata: ProjectMetadata;
   settings: ProjectSettings;
   quality: QualityConfig;
   permissions: string[];
@@ -122,7 +130,7 @@ export interface Entity {
   relations: { from: string; to: string; relationType: string }[];
 }
 
-export type AgentRole = 'orchestrator' | 'worker' | 'quality-reviewer' | 'kg-librarian' | 'governance-reviewer' | 'researcher';
+export type AgentRole = 'orchestrator' | 'worker' | 'quality-reviewer' | 'kg-librarian' | 'governance-reviewer' | 'researcher' | 'project-steward';
 export type AgentStatusValue = 'active' | 'idle' | 'not-configured';
 export type ActivityType = 'finding' | 'guidance' | 'response' | 'status' | 'drift' | 'decision' | 'review' | 'research';
 
