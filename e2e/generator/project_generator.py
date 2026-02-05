@@ -1,8 +1,9 @@
 """E2E test harness project generator.
 
 Generates a realistic project workspace by randomly selecting a domain,
-filling in vision/architecture templates, and writing out the full ``.avt/``
-directory structure together with a seeded ``knowledge-graph.jsonl``.
+filling in vision/architecture templates, and writing out the ``.avt/``
+system directory and ``docs/`` project directory structures together with
+a seeded ``knowledge-graph.jsonl``.
 
 Usage::
 
@@ -154,22 +155,26 @@ def _materialise_architecture_patterns(
 # ---------------------------------------------------------------------------
 
 def _write_directory_structure(workspace: Path) -> dict[str, Path]:
-    """Create the ``.avt/`` and ``.claude/collab/`` directory trees.
+    """Create the ``.avt/``, ``docs/``, and ``.claude/collab/`` directory trees.
 
     Returns a dict mapping logical names to their created paths.
     """
     dirs: dict[str, Path] = {}
 
-    # .avt directories
+    # .avt directories (system internals)
     for subdir in (
         "task-briefs",
         "memory",
-        "vision",
-        "architecture",
         "research-prompts",
         "research-briefs",
     ):
         p = workspace / ".avt" / subdir
+        p.mkdir(parents=True, exist_ok=True)
+        dirs[subdir] = p
+
+    # docs/ directories (project-level artifacts)
+    for subdir in ("vision", "architecture"):
+        p = workspace / "docs" / subdir
         p.mkdir(parents=True, exist_ok=True)
         dirs[subdir] = p
 

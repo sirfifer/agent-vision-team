@@ -102,7 +102,7 @@ def ingest_documents(folder: str, tier: str) -> dict:
     """Ingest markdown documents from a folder into KG entities.
 
     Args:
-        folder: Path to folder containing .md files (default: .avt/vision/ or .avt/architecture/)
+        folder: Path to folder containing .md files (default: docs/vision/ or docs/architecture/)
         tier: 'vision' or 'architecture'
 
     Returns:
@@ -112,7 +112,7 @@ def ingest_documents(folder: str, tier: str) -> dict:
 
     # Default folders based on tier
     if not folder:
-        folder = f".avt/{tier}/" if tier in ("vision", "architecture") else folder
+        folder = f"docs/{tier}/" if tier in ("vision", "architecture") else folder
 
     return ingest_folder(graph, folder, tier)
 

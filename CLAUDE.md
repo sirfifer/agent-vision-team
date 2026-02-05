@@ -443,7 +443,7 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 │   └── governance.db                # Governance SQLite DB (managed by server)
 └── settings.json                    # Claude Code settings and hooks
 
-.avt/                                # Agent Vision Team project config
+.avt/                                # Agent Vision Team system config
 ├── task-briefs/                     # Task briefs for workers
 ├── session-state.md                 # Current session progress
 ├── memory/                          # Archival memory files (synced by KG Librarian)
@@ -456,9 +456,12 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 │   └── rp-xxx.md                    # Research prompt definitions
 ├── research-briefs/                 # Research output briefs
 │   └── rb-xxx.md                    # Completed research briefs
-├── vision/                          # Vision standard documents
-├── architecture/                    # Architecture documents
 └── project-config.json              # Project configuration
+
+docs/                                    # Project-level documentation
+├── vision/                              # Vision standard documents (project artifacts)
+├── architecture/                        # Architecture documents (project artifacts)
+└── project-overview.md                  # Project overview
 
 e2e/                                     # Autonomous E2E testing harness
 ├── run-e2e.sh                           # Shell entry point (workspace + cleanup)

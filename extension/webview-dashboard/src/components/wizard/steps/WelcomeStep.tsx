@@ -69,8 +69,8 @@ export function WelcomeStep(_props: WelcomeStepProps) {
       <div className="p-4 rounded-lg border border-blue-500/30 bg-blue-500/10">
         <h4 className="font-semibold mb-2">What this wizard will configure:</h4>
         <ul className="list-disc list-inside space-y-1 text-sm text-vscode-muted">
-          <li>Vision standards documents in <code className="bg-vscode-widget-bg px-1 rounded">.avt/vision/</code></li>
-          <li>Architecture documents in <code className="bg-vscode-widget-bg px-1 rounded">.avt/architecture/</code></li>
+          <li>Vision standards documents in <code className="bg-vscode-widget-bg px-1 rounded">docs/vision/</code></li>
+          <li>Architecture documents in <code className="bg-vscode-widget-bg px-1 rounded">docs/architecture/</code></li>
           <li>Quality commands (test, lint, build) for your languages</li>
           <li>Claude Code permissions for autonomous operation</li>
           <li>Settings for mock tests, governance, and coverage thresholds</li>

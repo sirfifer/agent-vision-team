@@ -70,7 +70,7 @@ export function IngestionStep({ config, updateConfig }: IngestionStepProps) {
           <div>
             <h4 className="font-medium">Vision Documents</h4>
             <p className="text-sm text-vscode-muted">
-              {visionDocs.length} document{visionDocs.length !== 1 ? 's' : ''} in .avt/vision/
+              {visionDocs.length} document{visionDocs.length !== 1 ? 's' : ''} in docs/vision/
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -128,7 +128,7 @@ export function IngestionStep({ config, updateConfig }: IngestionStepProps) {
           <div>
             <h4 className="font-medium">Architecture Documents</h4>
             <p className="text-sm text-vscode-muted">
-              {architectureDocs.length} document{architectureDocs.length !== 1 ? 's' : ''} in .avt/architecture/
+              {architectureDocs.length} document{architectureDocs.length !== 1 ? 's' : ''} in docs/architecture/
             </p>
           </div>
           <div className="flex items-center gap-2">

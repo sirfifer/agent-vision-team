@@ -88,10 +88,10 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       ? this.configService.listVisionDocs()
       : this.configService.listArchitectureDocs();
 
-    const avtRoot = this.configService.getAvtRoot();
+    const docsRoot = this.configService.getDocsRoot();
     return docs.map(name => ({
       name,
-      path: path.join(avtRoot, tier, name),
+      path: path.join(docsRoot, tier, name),
     }));
   }
 

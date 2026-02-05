@@ -18,9 +18,11 @@ export class ProjectConfigService {
   private configPath: string;
   private claudeSettingsPath: string;
   private avtRoot: string;
+  private docsRoot: string;
 
   constructor(workspaceRoot: string) {
     this.avtRoot = path.join(workspaceRoot, '.avt');
+    this.docsRoot = path.join(workspaceRoot, 'docs');
     this.configPath = path.join(this.avtRoot, 'project-config.json');
     this.claudeSettingsPath = path.join(workspaceRoot, '.claude', 'settings.local.json');
   }
@@ -30,6 +32,13 @@ export class ProjectConfigService {
    */
   getAvtRoot(): string {
     return this.avtRoot;
+  }
+
+  /**
+   * Get the docs root directory path
+   */
+  getDocsRoot(): string {
+    return this.docsRoot;
   }
 
   /**
@@ -84,8 +93,8 @@ export class ProjectConfigService {
    * Get detailed setup readiness status
    */
   getReadiness(): SetupReadiness {
-    const visionDir = path.join(this.avtRoot, 'vision');
-    const archDir = path.join(this.avtRoot, 'architecture');
+    const visionDir = path.join(this.docsRoot, 'vision');
+    const archDir = path.join(this.docsRoot, 'architecture');
 
     const hasVisionDocs = this.hasDocsInFolder(visionDir);
     const hasArchitectureDocs = this.hasDocsInFolder(archDir);
@@ -162,10 +171,10 @@ export class ProjectConfigService {
   }
 
   /**
-   * Create a vision document in .avt/vision/
+   * Create a vision document in docs/vision/
    */
   createVisionDoc(name: string, content: string): string {
-    const visionDir = path.join(this.avtRoot, 'vision');
+    const visionDir = path.join(this.docsRoot, 'vision');
     if (!fs.existsSync(visionDir)) {
       fs.mkdirSync(visionDir, { recursive: true });
     }
@@ -177,10 +186,10 @@ export class ProjectConfigService {
   }
 
   /**
-   * Create an architecture document in .avt/architecture/
+   * Create an architecture document in docs/architecture/
    */
   createArchitectureDoc(name: string, content: string): string {
-    const archDir = path.join(this.avtRoot, 'architecture');
+    const archDir = path.join(this.docsRoot, 'architecture');
     if (!fs.existsSync(archDir)) {
       fs.mkdirSync(archDir, { recursive: true });
     }
@@ -195,7 +204,7 @@ export class ProjectConfigService {
    * List vision documents
    */
   listVisionDocs(): string[] {
-    const visionDir = path.join(this.avtRoot, 'vision');
+    const visionDir = path.join(this.docsRoot, 'vision');
     return this.listDocsInFolder(visionDir);
   }
 
@@ -203,7 +212,7 @@ export class ProjectConfigService {
    * List architecture documents
    */
   listArchitectureDocs(): string[] {
-    const archDir = path.join(this.avtRoot, 'architecture');
+    const archDir = path.join(this.docsRoot, 'architecture');
     return this.listDocsInFolder(archDir);
   }
 
@@ -242,12 +251,12 @@ export class ProjectConfigService {
   ensureFolderStructure(): void {
     const dirs = [
       this.avtRoot,
-      path.join(this.avtRoot, 'vision'),
-      path.join(this.avtRoot, 'architecture'),
       path.join(this.avtRoot, 'task-briefs'),
       path.join(this.avtRoot, 'memory'),
       path.join(this.avtRoot, 'research-prompts'),
       path.join(this.avtRoot, 'research-briefs'),
+      path.join(this.docsRoot, 'vision'),
+      path.join(this.docsRoot, 'architecture'),
     ];
 
     for (const dir of dirs) {
@@ -256,26 +265,26 @@ export class ProjectConfigService {
       }
     }
 
-    // Create README files if they don't exist
-    this.createReadmeIfMissing(
-      path.join(this.avtRoot, 'vision', 'README.md'),
-      VISION_README
+    // Create starter documents if they don't exist
+    this.createFileIfMissing(
+      path.join(this.docsRoot, 'vision', 'vision.md'),
+      VISION_STARTER
     );
-    this.createReadmeIfMissing(
-      path.join(this.avtRoot, 'architecture', 'README.md'),
-      ARCHITECTURE_README
+    this.createFileIfMissing(
+      path.join(this.docsRoot, 'architecture', 'architecture.md'),
+      ARCHITECTURE_STARTER
     );
-    this.createReadmeIfMissing(
+    this.createFileIfMissing(
       path.join(this.avtRoot, 'research-prompts', 'README.md'),
       RESEARCH_PROMPTS_README
     );
-    this.createReadmeIfMissing(
+    this.createFileIfMissing(
       path.join(this.avtRoot, 'research-briefs', 'README.md'),
       RESEARCH_BRIEFS_README
     );
   }
 
-  private createReadmeIfMissing(filepath: string, content: string): void {
+  private createFileIfMissing(filepath: string, content: string): void {
     if (!fs.existsSync(filepath)) {
       fs.writeFileSync(filepath, content, 'utf-8');
     }
@@ -412,83 +421,60 @@ export class ProjectConfigService {
   }
 }
 
-const VISION_README = `# Vision Standards
+const VISION_STARTER = `# Vision Standards
 
-This folder contains vision standard documents. Each \`.md\` file defines one vision standard that will be ingested into the Knowledge Graph.
+Define your project's core principles below. Each standard is an inviolable rule that governs all development. Once ingested into the Knowledge Graph, vision standards are immutable — only humans can modify them.
 
-## Format
+For larger projects, you can split standards into separate files in this folder (e.g. \`no-singletons.md\`, \`error-handling.md\`). For smaller projects, listing them all here works well.
 
-Each document should follow this format:
+## Standards
 
-\`\`\`markdown
-# <Standard Name>
+<!-- Replace these examples with your project's actual vision standards -->
 
-## Statement
-<Clear, actionable statement of the standard>
+### Example: Protocol-Based Dependency Injection
 
-## Rationale
-<Why this standard exists>
+**Statement:** All services use protocol-based dependency injection.
 
-## Examples
-- Compliant: <example of code/behavior that follows the standard>
-- Violation: <example of code/behavior that violates the standard>
-\`\`\`
+**Rationale:** Enables testability and loose coupling between components.
 
-## Important Notes
+### Example: No Singletons in Production Code
 
-- Vision standards are **immutable** once ingested — only humans can modify them
-- Violations of vision standards **block all related work**
-- Standards should be clear, specific, and actionable
-- One file per standard
+**Statement:** No singletons in production code (test mocks are OK).
 
-## Examples
-
-- \`protocol-based-di.md\` — "All services use protocol-based dependency injection"
-- \`no-singletons.md\` — "No singletons in production code"
-- \`error-handling.md\` — "Error handling uses Result types, not exceptions"
+**Rationale:** Singletons create hidden coupling and make testing difficult.
 `;
 
-const ARCHITECTURE_README = `# Architecture Documents
+const ARCHITECTURE_STARTER = `# Architecture
 
-This folder contains architecture documents. Each \`.md\` file defines an architectural standard, pattern, or component that will be ingested into the Knowledge Graph.
+Define your project's architectural standards, patterns, and key components below. These are ingested into the Knowledge Graph and used by agents to make design decisions. Architecture documents can be modified with human approval; deviations require governance review.
 
-## Format
+For larger projects, you can break this into separate files in this folder (e.g. \`service-registry.md\`, \`auth-service.md\`, \`api-versioning.md\`). For smaller projects, a single document works well.
 
-Each document should follow this format:
+## Architectural Standards
 
-\`\`\`markdown
-# <Name>
+<!-- Replace these examples with your project's actual architecture -->
 
-## Type
-<One of: architectural_standard, pattern, component>
+### Example: API Versioning
 
-## Description
-<What this represents>
+**Description:** All public APIs use URL-based versioning (e.g. \`/v1/users\`).
 
-## Rationale
-<Why this exists or why this pattern was chosen>
+**Rationale:** Enables backward-compatible evolution without breaking existing clients.
 
-## Usage
-<How to use this pattern or interact with this component>
-\`\`\`
+## Patterns
 
-## Document Types
+### Example: Service Registry
 
-- **Architectural Standard**: Design rules enforced across the codebase
-- **Pattern**: Established implementation patterns agents should follow
-- **Component**: Tracked system components with state and behavior
+**Description:** Services register themselves at startup and are discovered via a central registry.
 
-## Important Notes
+**Usage:** Inject \`ServiceRegistry\` and call \`registry.resolve(ServiceProtocol)\`.
 
-- Architecture documents can be modified with human approval
-- Deviations require governance review
-- Components track state through observations in the Knowledge Graph
+## Components
 
-## Examples
+### Example: AuthService
 
-- \`service-registry.md\` — Pattern for service discovery and registration
-- \`auth-service.md\` — Component definition for authentication service
-- \`api-versioning.md\` — Architectural standard for API versioning
+**Description:** Handles JWT-based authentication with refresh token rotation.
+
+**State:** Tracked via observations in the Knowledge Graph.
 `;
 
 const RESEARCH_PROMPTS_README = `# Research Prompts

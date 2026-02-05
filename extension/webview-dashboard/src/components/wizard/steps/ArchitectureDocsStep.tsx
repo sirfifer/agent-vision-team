@@ -112,7 +112,7 @@ export function ArchitectureDocsStep(_props: ArchitectureDocsStepProps) {
               className="w-full px-3 py-2 rounded bg-vscode-input-bg border border-vscode-border text-vscode-fg placeholder:text-vscode-muted focus:outline-none focus:border-vscode-btn-bg"
             />
             <p className="text-xs text-vscode-muted mt-1">
-              Will be saved as <code>.avt/architecture/{newDocName || '[name]'}.md</code>
+              Will be saved as <code>docs/architecture/{newDocName || '[name]'}.md</code>
             </p>
           </div>
 

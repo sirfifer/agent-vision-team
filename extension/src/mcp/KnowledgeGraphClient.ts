@@ -81,7 +81,7 @@ export class KnowledgeGraphClient {
     errors: string[];
     skipped: string[];
   }> {
-    const folder = `.avt/${tier}/`;
+    const folder = `docs/${tier}/`;
     return (await this.mcp.callTool('knowledge-graph', 'ingest_documents', {
       folder,
       tier,

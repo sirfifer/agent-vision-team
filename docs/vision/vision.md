@@ -1,34 +1,21 @@
 # Vision Standards
 
-This folder contains vision standard documents. Each `.md` file defines one vision standard that will be ingested into the Knowledge Graph.
+Define your project's core principles below. Each standard is an inviolable rule that governs all development. Once ingested into the Knowledge Graph, vision standards are immutable — only humans can modify them.
 
-## Format
+For larger projects, you can split standards into separate files in this folder (e.g. `no-singletons.md`, `error-handling.md`). For smaller projects, listing them all here works well.
 
-Each document should follow this format:
+## Standards
 
-```markdown
-# <Standard Name>
+<!-- Replace these examples with your project's actual vision standards -->
 
-## Statement
-<Clear, actionable statement of the standard>
+### Example: Protocol-Based Dependency Injection
 
-## Rationale
-<Why this standard exists>
+**Statement:** All services use protocol-based dependency injection.
 
-## Examples
-- Compliant: <example of code/behavior that follows the standard>
-- Violation: <example of code/behavior that violates the standard>
-```
+**Rationale:** Enables testability and loose coupling between components.
 
-## Important Notes
+### Example: No Singletons in Production Code
 
-- Vision standards are **immutable** once ingested — only humans can modify them
-- Violations of vision standards **block all related work**
-- Standards should be clear, specific, and actionable
-- One file per standard
+**Statement:** No singletons in production code (test mocks are OK).
 
-## Examples
-
-- `protocol-based-di.md` — "All services use protocol-based dependency injection"
-- `no-singletons.md` — "No singletons in production code"
-- `error-handling.md` — "Error handling uses Result types, not exceptions"
+**Rationale:** Singletons create hidden coupling and make testing difficult.

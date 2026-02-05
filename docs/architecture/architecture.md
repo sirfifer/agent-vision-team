@@ -1,41 +1,31 @@
-# Architecture Documents
+# Architecture
 
-This folder contains architecture documents. Each `.md` file defines an architectural standard, pattern, or component that will be ingested into the Knowledge Graph.
+Define your project's architectural standards, patterns, and key components below. These are ingested into the Knowledge Graph and used by agents to make design decisions. Architecture documents can be modified with human approval; deviations require governance review.
 
-## Format
+For larger projects, you can break this into separate files in this folder (e.g. `service-registry.md`, `auth-service.md`, `api-versioning.md`). For smaller projects, a single document works well.
 
-Each document should follow this format:
+## Architectural Standards
 
-```markdown
-# <Name>
+<!-- Replace these examples with your project's actual architecture -->
 
-## Type
-<One of: architectural_standard, pattern, component>
+### Example: API Versioning
 
-## Description
-<What this represents>
+**Description:** All public APIs use URL-based versioning (e.g. `/v1/users`).
 
-## Rationale
-<Why this exists or why this pattern was chosen>
+**Rationale:** Enables backward-compatible evolution without breaking existing clients.
 
-## Usage
-<How to use this pattern or interact with this component>
-```
+## Patterns
 
-## Document Types
+### Example: Service Registry
 
-- **Architectural Standard**: Design rules enforced across the codebase
-- **Pattern**: Established implementation patterns agents should follow
-- **Component**: Tracked system components with state and behavior
+**Description:** Services register themselves at startup and are discovered via a central registry.
 
-## Important Notes
+**Usage:** Inject `ServiceRegistry` and call `registry.resolve(ServiceProtocol)`.
 
-- Architecture documents can be modified with human approval
-- Deviations require governance review
-- Components track state through observations in the Knowledge Graph
+## Components
 
-## Examples
+### Example: AuthService
 
-- `service-registry.md` — Pattern for service discovery and registration
-- `auth-service.md` — Component definition for authentication service
-- `api-versioning.md` — Architectural standard for API versioning
+**Description:** Handles JWT-based authentication with refresh token rotation.
+
+**State:** Tracked via observations in the Knowledge Graph.
