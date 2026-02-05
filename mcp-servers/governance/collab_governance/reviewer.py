@@ -1,6 +1,7 @@
 """Governance reviewer — orchestrates AI review via claude --print."""
 
 import json
+import os
 import subprocess
 from typing import Optional
 
@@ -60,7 +61,19 @@ class GovernanceReviewer:
         return self._parse_verdict(raw, plan_id=task_id)
 
     def _run_claude(self, prompt: str, timeout: int = 60) -> str:
-        """Run claude --print and return the raw output."""
+        """Run claude --print and return the raw output.
+
+        When the ``GOVERNANCE_MOCK_REVIEW`` environment variable is set,
+        returns a deterministic "approved" verdict without invoking the
+        ``claude`` binary.  Used by the E2E test harness.
+        """
+        if os.environ.get("GOVERNANCE_MOCK_REVIEW"):
+            return json.dumps({
+                "verdict": "approved",
+                "findings": [],
+                "guidance": "Mock review: auto-approved for E2E testing.",
+                "standards_verified": ["mock"],
+            })
         try:
             result = subprocess.run(
                 ["claude", "--print", "-p", prompt],

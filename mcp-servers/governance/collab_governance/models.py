@@ -74,3 +74,61 @@ class GovernanceRecord(BaseModel):
 
     decision: Decision
     review: Optional[ReviewVerdict] = None
+
+
+# =============================================================================
+# Task Governance Models
+# =============================================================================
+
+
+class ReviewType(str, Enum):
+    """Types of governance reviews."""
+    GOVERNANCE = "governance"  # Standard governance review
+    SECURITY = "security"      # Security-focused review
+    ARCHITECTURE = "architecture"  # Architecture review
+    MEMORY = "memory"          # Check against past failures/patterns
+    VISION = "vision"          # Vision alignment check
+    CUSTOM = "custom"          # Custom review type
+
+
+class TaskReviewStatus(str, Enum):
+    """Status of a task governance review."""
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    APPROVED = "approved"
+    BLOCKED = "blocked"
+    NEEDS_HUMAN_REVIEW = "needs_human_review"
+
+
+class TaskReviewRecord(BaseModel):
+    """Record of a governance review for a Claude Code task."""
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    review_task_id: str  # The review task in Claude Code's task system
+    implementation_task_id: str  # The implementation task being reviewed
+    review_type: ReviewType = ReviewType.GOVERNANCE
+    status: TaskReviewStatus = TaskReviewStatus.PENDING
+    context: str = ""  # Context provided for the review
+    verdict: Optional[Verdict] = None
+    guidance: str = ""
+    findings: list[Finding] = Field(default_factory=list)
+    standards_verified: list[str] = Field(default_factory=list)
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+    completed_at: Optional[str] = None
+    reviewer: str = "governance-reviewer"
+
+
+class GovernedTaskRecord(BaseModel):
+    """Record tracking a governed task and its reviews."""
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    implementation_task_id: str  # Claude Code task ID
+    subject: str
+    description: str = ""
+    context: str = ""  # Original context for governance
+    reviews: list[str] = Field(default_factory=list)  # List of TaskReviewRecord IDs
+    current_status: str = "pending_review"  # pending_review, approved, blocked
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+    released_at: Optional[str] = None

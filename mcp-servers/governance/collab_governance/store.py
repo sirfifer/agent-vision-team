@@ -11,7 +11,11 @@ from .models import (
     DecisionCategory,
     Confidence,
     Finding,
+    GovernedTaskRecord,
+    ReviewType,
     ReviewVerdict,
+    TaskReviewRecord,
+    TaskReviewStatus,
     Verdict,
 )
 
@@ -68,6 +72,41 @@ class GovernanceStore:
                 ON reviews(decision_id);
             CREATE INDEX IF NOT EXISTS idx_reviews_plan
                 ON reviews(plan_id);
+
+            -- Task governance tables
+            CREATE TABLE IF NOT EXISTS governed_tasks (
+                id TEXT PRIMARY KEY,
+                implementation_task_id TEXT UNIQUE NOT NULL,
+                subject TEXT NOT NULL,
+                description TEXT,
+                context TEXT,
+                current_status TEXT NOT NULL DEFAULT 'pending_review',
+                created_at TEXT NOT NULL,
+                released_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS task_reviews (
+                id TEXT PRIMARY KEY,
+                review_task_id TEXT NOT NULL,
+                implementation_task_id TEXT NOT NULL REFERENCES governed_tasks(implementation_task_id),
+                review_type TEXT NOT NULL DEFAULT 'governance',
+                status TEXT NOT NULL DEFAULT 'pending',
+                context TEXT,
+                verdict TEXT,
+                guidance TEXT,
+                findings TEXT,
+                standards_verified TEXT,
+                reviewer TEXT NOT NULL DEFAULT 'governance-reviewer',
+                created_at TEXT NOT NULL,
+                completed_at TEXT
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_governed_tasks_impl
+                ON governed_tasks(implementation_task_id);
+            CREATE INDEX IF NOT EXISTS idx_task_reviews_impl
+                ON task_reviews(implementation_task_id);
+            CREATE INDEX IF NOT EXISTS idx_task_reviews_review
+                ON task_reviews(review_task_id);
             """
         )
         conn.commit()
@@ -286,3 +325,186 @@ class GovernanceStore:
         if self._conn:
             self._conn.close()
             self._conn = None
+
+    # =========================================================================
+    # Task Governance Methods
+    # =========================================================================
+
+    def store_governed_task(self, task: GovernedTaskRecord) -> GovernedTaskRecord:
+        """Store a governed task record."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO governed_tasks
+               (id, implementation_task_id, subject, description, context,
+                current_status, created_at, released_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                task.id,
+                task.implementation_task_id,
+                task.subject,
+                task.description,
+                task.context,
+                task.current_status,
+                task.created_at,
+                task.released_at,
+            ),
+        )
+        conn.commit()
+        return task
+
+    def store_task_review(self, review: TaskReviewRecord) -> TaskReviewRecord:
+        """Store a task review record."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO task_reviews
+               (id, review_task_id, implementation_task_id, review_type, status,
+                context, verdict, guidance, findings, standards_verified,
+                reviewer, created_at, completed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                review.id,
+                review.review_task_id,
+                review.implementation_task_id,
+                review.review_type.value,
+                review.status.value,
+                review.context,
+                review.verdict.value if review.verdict else None,
+                review.guidance,
+                json.dumps([f.model_dump() for f in review.findings]),
+                json.dumps(review.standards_verified),
+                review.reviewer,
+                review.created_at,
+                review.completed_at,
+            ),
+        )
+        conn.commit()
+        return review
+
+    def update_task_review(self, review: TaskReviewRecord) -> TaskReviewRecord:
+        """Update a task review record."""
+        conn = self._get_conn()
+        conn.execute(
+            """UPDATE task_reviews SET
+               status = ?, verdict = ?, guidance = ?, findings = ?,
+               standards_verified = ?, completed_at = ?
+               WHERE id = ?""",
+            (
+                review.status.value,
+                review.verdict.value if review.verdict else None,
+                review.guidance,
+                json.dumps([f.model_dump() for f in review.findings]),
+                json.dumps(review.standards_verified),
+                review.completed_at,
+                review.id,
+            ),
+        )
+        conn.commit()
+        return review
+
+    def update_governed_task_status(
+        self, implementation_task_id: str, status: str, released_at: Optional[str] = None
+    ) -> None:
+        """Update the status of a governed task."""
+        conn = self._get_conn()
+        conn.execute(
+            """UPDATE governed_tasks SET current_status = ?, released_at = ?
+               WHERE implementation_task_id = ?""",
+            (status, released_at, implementation_task_id),
+        )
+        conn.commit()
+
+    def get_governed_task(self, implementation_task_id: str) -> Optional[GovernedTaskRecord]:
+        """Get a governed task by implementation task ID."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM governed_tasks WHERE implementation_task_id = ?",
+            (implementation_task_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return GovernedTaskRecord(
+            id=row["id"],
+            implementation_task_id=row["implementation_task_id"],
+            subject=row["subject"],
+            description=row["description"] or "",
+            context=row["context"] or "",
+            current_status=row["current_status"],
+            created_at=row["created_at"],
+            released_at=row["released_at"],
+        )
+
+    def get_task_reviews(self, implementation_task_id: str) -> list[TaskReviewRecord]:
+        """Get all reviews for a governed task."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM task_reviews WHERE implementation_task_id = ? ORDER BY created_at",
+            (implementation_task_id,),
+        ).fetchall()
+        return [self._row_to_task_review(r) for r in rows]
+
+    def get_task_review_by_review_task_id(self, review_task_id: str) -> Optional[TaskReviewRecord]:
+        """Get a task review by its review task ID (Claude Code task ID)."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM task_reviews WHERE review_task_id = ?",
+            (review_task_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return self._row_to_task_review(row)
+
+    def get_pending_task_reviews(self) -> list[TaskReviewRecord]:
+        """Get all pending task reviews."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM task_reviews WHERE status = 'pending' ORDER BY created_at",
+        ).fetchall()
+        return [self._row_to_task_review(r) for r in rows]
+
+    def get_task_governance_stats(self) -> dict:
+        """Get statistics about task governance."""
+        conn = self._get_conn()
+        total_tasks = conn.execute(
+            "SELECT COUNT(*) as c FROM governed_tasks"
+        ).fetchone()["c"]
+        pending = conn.execute(
+            "SELECT COUNT(*) as c FROM governed_tasks WHERE current_status = 'pending_review'"
+        ).fetchone()["c"]
+        approved = conn.execute(
+            "SELECT COUNT(*) as c FROM governed_tasks WHERE current_status = 'approved'"
+        ).fetchone()["c"]
+        blocked = conn.execute(
+            "SELECT COUNT(*) as c FROM governed_tasks WHERE current_status = 'blocked'"
+        ).fetchone()["c"]
+
+        pending_reviews = conn.execute(
+            "SELECT COUNT(*) as c FROM task_reviews WHERE status = 'pending'"
+        ).fetchone()["c"]
+
+        return {
+            "total_governed_tasks": total_tasks,
+            "pending_review": pending,
+            "approved": approved,
+            "blocked": blocked,
+            "pending_reviews": pending_reviews,
+        }
+
+    def _row_to_task_review(self, row: sqlite3.Row) -> TaskReviewRecord:
+        """Convert a database row to a TaskReviewRecord."""
+        findings_raw = json.loads(row["findings"] or "[]")
+        verdict = Verdict(row["verdict"]) if row["verdict"] else None
+        return TaskReviewRecord(
+            id=row["id"],
+            review_task_id=row["review_task_id"],
+            implementation_task_id=row["implementation_task_id"],
+            review_type=ReviewType(row["review_type"]),
+            status=TaskReviewStatus(row["status"]),
+            context=row["context"] or "",
+            verdict=verdict,
+            guidance=row["guidance"] or "",
+            findings=[Finding(**f) for f in findings_raw],
+            standards_verified=json.loads(row["standards_verified"] or "[]"),
+            reviewer=row["reviewer"],
+            created_at=row["created_at"],
+            completed_at=row["completed_at"],
+        )

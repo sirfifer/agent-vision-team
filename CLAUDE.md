@@ -32,6 +32,127 @@ When given a complex task:
 6. **Route findings**: Send findings back to workers for resolution
 7. **Merge and cleanup**: When all findings are resolved and gates pass, merge and clean up
 
+## Task Governance Protocol — "Intercept Early, Redirect Early"
+
+The system uses Claude Code's Task System with governance-gated execution. Every implementation task is blocked from birth until governance review approves it.
+
+### Why This Matters
+
+- **No race conditions**: Tasks cannot be picked up before review
+- **Vision alignment**: Every task is checked against vision standards before execution
+- **Memory integration**: Failed approaches from the past are flagged
+- **Deterministic flow**: Review → Approve/Block → Execute (in that order, always)
+
+### Creating Governed Tasks
+
+**NEVER use TaskCreate directly.** Instead, use the governance MCP server:
+
+```
+create_governed_task(
+    subject: "Implement authentication service",
+    description: "Create JWT-based auth with refresh tokens",
+    context: "Part of user management epic. Must follow security patterns.",
+    review_type: "governance"  // or: security, architecture, memory, vision
+)
+```
+
+This atomically creates:
+1. **Review task**: `[GOVERNANCE] Review: Implement authentication service` (pending)
+2. **Implementation task**: `Implement authentication service` (blocked by review)
+
+### The Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Orchestrator: create_governed_task("Implement auth service", ...)           │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+        ┌───────────────────┐           ┌───────────────────┐
+        │ review-abc123     │           │ impl-xyz789       │
+        │ [GOVERNANCE]      │  blocks   │ Implement auth    │
+        │ Review: auth      │─────────▶ │ blockedBy:        │
+        │ status: pending   │           │   [review-abc123] │
+        └───────────────────┘           │ ❌ CANNOT RUN     │
+                    │                   └───────────────────┘
+                    ▼
+        ┌───────────────────────────────────────────────────┐
+        │ Governance Review (manual or automated):          │
+        │ • Check vision standards                          │
+        │ • Check memory for failed approaches              │
+        │ • Check architecture patterns                     │
+        └───────────────────────────────────────────────────┘
+                    │
+        ┌───────────┴───────────┬───────────────────┐
+        ▼                       ▼                   ▼
+    APPROVED                BLOCKED             NEEDS_SECURITY
+        │                       │                   │
+        │                       │                   ▼
+        │                       │           add_review_blocker(
+        │                       │               impl-xyz789,
+        │                       │               "security", ...
+        │                       │           )
+        │                       │                   │
+        ▼                       ▼                   ▼
+complete_task_review(       Task stays         impl-xyz789 now
+    review-abc123,          blocked with       blocked by TWO
+    "approved", ...         guidance           reviews
+)                               │
+        │                       │
+        ▼                       │
+impl-xyz789 unblocks           │
+        │                       │
+        ▼                       │
+Worker picks up task            │
+```
+
+### Adding Additional Reviews
+
+If initial review passes but flags need for specialized review:
+
+```
+add_review_blocker(
+    implementation_task_id: "impl-xyz789",
+    review_type: "security",
+    context: "Auth handling requires security review"
+)
+```
+
+The task now has TWO blockers. Both must complete before execution.
+
+### Completing Reviews
+
+```
+complete_task_review(
+    review_task_id: "review-abc123",
+    verdict: "approved",  // or: blocked, needs_human_review
+    guidance: "Approved. Use JWT pattern from KG.",
+    findings: [...],
+    standards_verified: ["auth-patterns", "security-baseline"]
+)
+```
+
+If this is the last blocker and verdict is "approved", the task becomes available.
+
+### Checking Status
+
+```
+get_task_review_status(implementation_task_id: "impl-xyz789")
+```
+
+Returns: all blockers, their status, whether task can execute.
+
+### Environment Setup
+
+Enable Task System persistence for your project:
+
+```bash
+export CLAUDE_CODE_TASK_LIST_ID="agent-vision-team"
+```
+
+This ensures tasks persist across sessions and are shared across agents.
+
 ## Quality Review Protocol
 
 After any significant code change:
@@ -270,6 +391,13 @@ Available tools:
 - `submit_completion_review(task_id, agent, summary_of_work, files_changed)` — final governance check before completion
 - `get_decision_history(task_id?, agent?, verdict?)` — query past decisions and verdicts
 - `get_governance_status()` — dashboard overview (counts, recent activity)
+
+**Task Governance Tools** (for Claude Code Task System integration):
+- `create_governed_task(subject, description, context, review_type)` — atomically create an implementation task with its governance review blocker
+- `add_review_blocker(implementation_task_id, review_type, context)` — add additional review blocker to existing task
+- `complete_task_review(review_task_id, verdict, guidance, findings)` — complete a review, potentially releasing the blocked task
+- `get_task_review_status(implementation_task_id)` — get review status and blockers for a task
+- `get_pending_reviews()` — list all reviews awaiting attention
 
 ## Quality Gates
 
