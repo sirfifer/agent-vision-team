@@ -11,6 +11,8 @@ const defaultData: DashboardData = {
   activities: [],
   tasks: { active: 0, total: 0 },
   sessionPhase: 'inactive',
+  governedTasks: [],
+  governanceStats: { totalDecisions: 0, approved: 0, blocked: 0, pending: 0, pendingReviews: 0, totalGovernedTasks: 0 },
 };
 
 interface DashboardContextValue {
@@ -136,6 +138,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           break;
         case 'researchPromptDeleted':
           setResearchPrompts(prev => prev.filter(p => p.id !== msg.id));
+          break;
+        case 'governedTasks':
+          setData(prev => ({ ...prev, governedTasks: msg.tasks }));
+          break;
+        case 'governanceStats':
+          setData(prev => ({ ...prev, governanceStats: msg.stats }));
           break;
       }
     };

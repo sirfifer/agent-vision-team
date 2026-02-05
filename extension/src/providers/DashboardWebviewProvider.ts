@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import * as path from 'path';
 import { Entity } from '../models/Entity';
-import { AgentStatus, ActivityEntry } from '../models/Activity';
+import { AgentStatus, ActivityEntry, GovernedTask, GovernanceStats } from '../models/Activity';
 import { ProjectConfig, SetupReadiness } from '../models/ProjectConfig';
 import { ResearchPrompt } from '../models/ResearchPrompt';
 import { ProjectConfigService } from '../services/ProjectConfigService';
@@ -22,6 +22,9 @@ interface DashboardData {
   activities: ActivityEntry[];
   tasks: { active: number; total: number };
   sessionPhase: string;
+  // Governed tasks and governance stats
+  governedTasks: GovernedTask[];
+  governanceStats: GovernanceStats;
   // Setup wizard and config
   setupReadiness?: SetupReadiness;
   projectConfig?: ProjectConfig;
@@ -50,6 +53,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     activities: [],
     tasks: { active: 0, total: 0 },
     sessionPhase: 'inactive',
+    governedTasks: [],
+    governanceStats: { totalDecisions: 0, approved: 0, blocked: 0, pending: 0, pendingReviews: 0, totalGovernedTasks: 0 },
   };
 
   constructor(private readonly extensionUri: vscode.Uri) {}
@@ -209,6 +214,12 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         case 'deleteResearchPrompt':
           this.handleDeleteResearchPrompt(message.id);
+          break;
+
+        case 'requestGovernedTasks':
+          // Governed tasks are pushed via polling — send current state
+          this.postMessage({ type: 'governedTasks', tasks: this.data.governedTasks });
+          this.postMessage({ type: 'governanceStats', stats: this.data.governanceStats });
           break;
 
         case 'runResearchPrompt':

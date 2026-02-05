@@ -20,7 +20,7 @@ const statusTooltips: Record<string, string> = {
 };
 
 export function SessionBar() {
-  const { data, sendCommand, setShowSettings, setShowWizard, setShowResearchPrompts, researchPrompts } = useDashboard();
+  const { data, sendCommand, sendMessage, setShowSettings, setShowWizard, setShowResearchPrompts, researchPrompts } = useDashboard();
   const { connectionStatus, sessionPhase, tasks } = data;
 
   return (
@@ -89,7 +89,7 @@ export function SessionBar() {
           )}
         </button>
         <button
-          onClick={() => setShowSettings(true)}
+          onClick={() => { sendMessage({ type: 'openSettings' }); setShowSettings(true); }}
           className="p-1.5 rounded hover:bg-vscode-widget-bg transition-colors"
           title="Open Settings"
         >

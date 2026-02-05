@@ -157,8 +157,44 @@ export interface Entity {
 }
 
 export type AgentRole = 'orchestrator' | 'worker' | 'quality-reviewer' | 'kg-librarian' | 'governance-reviewer' | 'researcher' | 'project-steward';
-export type AgentStatusValue = 'active' | 'idle' | 'not-configured';
+export type AgentStatusValue = 'active' | 'idle' | 'blocked' | 'reviewing' | 'not-configured';
 export type ActivityType = 'finding' | 'guidance' | 'response' | 'status' | 'drift' | 'decision' | 'review' | 'research';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Governed Task Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type GovernedTaskStatus = 'pending_review' | 'approved' | 'blocked' | 'in_progress' | 'completed';
+export type TaskReviewStatusValue = 'pending' | 'approved' | 'blocked' | 'needs_human_review';
+
+export interface TaskReviewInfo {
+  id: string;
+  reviewType: string;
+  status: TaskReviewStatusValue;
+  verdict?: string;
+  guidance?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface GovernedTask {
+  id: string;
+  implementationTaskId: string;
+  subject: string;
+  status: GovernedTaskStatus;
+  reviews: TaskReviewInfo[];
+  createdAt: string;
+  releasedAt?: string;
+}
+
+export interface GovernanceStats {
+  totalDecisions: number;
+  approved: number;
+  blocked: number;
+  pending: number;
+  pendingReviews: number;
+  totalGovernedTasks: number;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Research Prompt Types
@@ -208,6 +244,8 @@ export interface AgentStatus {
   status: AgentStatusValue;
   currentTask?: string;
   lastActivity?: string;
+  governedTaskId?: string;
+  blockedBy?: string[];
 }
 
 export interface ActivityEntry {
@@ -230,6 +268,9 @@ export interface DashboardData {
   activities: ActivityEntry[];
   tasks: { active: number; total: number };
   sessionPhase: string;
+  // Governed tasks and governance stats
+  governedTasks: GovernedTask[];
+  governanceStats: GovernanceStats;
   // Setup wizard and config
   setupReadiness?: SetupReadiness;
   projectConfig?: ProjectConfig;
@@ -251,7 +292,9 @@ export type ExtensionMessage =
   | { type: 'documentCreated'; docType: 'vision' | 'architecture'; doc: DocumentInfo }
   | { type: 'researchPrompts'; prompts: ResearchPrompt[] }
   | { type: 'researchPromptUpdated'; prompt: ResearchPrompt }
-  | { type: 'researchPromptDeleted'; id: string };
+  | { type: 'researchPromptDeleted'; id: string }
+  | { type: 'governedTasks'; tasks: GovernedTask[] }
+  | { type: 'governanceStats'; stats: GovernanceStats };
 
 export type WebviewMessage =
   | { type: 'connect' }
@@ -269,7 +312,8 @@ export type WebviewMessage =
   | { type: 'listResearchPrompts' }
   | { type: 'saveResearchPrompt'; prompt: ResearchPrompt }
   | { type: 'deleteResearchPrompt'; id: string }
-  | { type: 'runResearchPrompt'; id: string };
+  | { type: 'runResearchPrompt'; id: string }
+  | { type: 'requestGovernedTasks' };
 
 export interface IngestionResult {
   tier: 'vision' | 'architecture';

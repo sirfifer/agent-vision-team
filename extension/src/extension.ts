@@ -18,7 +18,8 @@ import { registerMemoryCommands } from './commands/memoryCommands';
 import { registerTaskCommands } from './commands/taskCommands';
 import { initializeLoggers, disposeLoggers } from './utils/logger';
 import { Entity } from './models/Entity';
-import { AgentStatus, ActivityEntry } from './models/Activity';
+import { AgentStatus, ActivityEntry, GovernedTask, GovernanceStats } from './models/Activity';
+import type { GovernanceStatus, PendingReviewEntry } from './mcp/GovernanceClient';
 
 let activityCounter = 0;
 function makeActivity(
@@ -50,6 +51,9 @@ function detectAgents(root: string): AgentStatus[] {
     { file: 'worker.md', id: 'worker', name: 'Worker', role: 'worker' },
     { file: 'quality-reviewer.md', id: 'quality-reviewer', name: 'Quality Reviewer', role: 'quality-reviewer' },
     { file: 'kg-librarian.md', id: 'kg-librarian', name: 'KG Librarian', role: 'kg-librarian' },
+    { file: 'governance-reviewer.md', id: 'governance-reviewer', name: 'Governance Reviewer', role: 'governance-reviewer' },
+    { file: 'researcher.md', id: 'researcher', name: 'Researcher', role: 'researcher' },
+    { file: 'project-steward.md', id: 'project-steward', name: 'Project Steward', role: 'project-steward' },
   ];
 
   for (const def of agentDefs) {
@@ -64,6 +68,82 @@ function detectAgents(root: string): AgentStatus[] {
   }
 
   return agents;
+}
+
+/**
+ * Enrich agent status based on governance data.
+ * Infers runtime state from pending reviews, governed tasks, and recent activity.
+ */
+function enrichAgentStatus(
+  agents: AgentStatus[],
+  govStatus: GovernanceStatus | null,
+  pendingReviews: PendingReviewEntry[],
+): AgentStatus[] {
+  if (!govStatus) return agents;
+
+  return agents.map(agent => {
+    // Skip not-configured agents
+    if (agent.status === 'not-configured') return agent;
+
+    switch (agent.role) {
+      case 'governance-reviewer': {
+        if (pendingReviews.length > 0) {
+          return {
+            ...agent,
+            status: 'reviewing',
+            currentTask: `${pendingReviews.length} review(s) pending`,
+          };
+        }
+        break;
+      }
+      case 'worker': {
+        const taskStats = govStatus.task_governance;
+        if (taskStats) {
+          if (taskStats.blocked > 0) {
+            return {
+              ...agent,
+              status: 'blocked',
+              currentTask: `${taskStats.blocked} task(s) blocked`,
+            };
+          }
+          if (taskStats.approved > 0) {
+            return {
+              ...agent,
+              status: 'active',
+              currentTask: `${taskStats.approved} task(s) approved`,
+            };
+          }
+          if (taskStats.pending_review > 0) {
+            return {
+              ...agent,
+              status: 'idle',
+              currentTask: `${taskStats.pending_review} task(s) awaiting review`,
+            };
+          }
+        }
+        break;
+      }
+      case 'quality-reviewer': {
+        // Check recent activity for quality review events
+        const recentQR = govStatus.recent_activity.find(
+          a => a.agent === 'quality-reviewer'
+        );
+        if (recentQR) {
+          return {
+            ...agent,
+            status: 'active',
+            currentTask: recentQR.summary,
+            lastActivity: recentQR.summary,
+          };
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    return agent;
+  });
 }
 
 function getSessionPhase(root: string): string {
@@ -112,6 +192,71 @@ function classifyEntities(allEntities: Entity[]): { vision: Entity[]; architectu
   return { vision, architecture };
 }
 
+/**
+ * Fetch governance data and transform into dashboard-ready format.
+ */
+async function fetchGovernanceData(governanceClient: GovernanceClient): Promise<{
+  govStatus: GovernanceStatus | null;
+  pendingReviews: PendingReviewEntry[];
+  governanceStats: GovernanceStats;
+  governedTasks: GovernedTask[];
+}> {
+  const defaultStats: GovernanceStats = {
+    totalDecisions: 0,
+    approved: 0,
+    blocked: 0,
+    pending: 0,
+    pendingReviews: 0,
+    totalGovernedTasks: 0,
+  };
+
+  try {
+    const [govStatus, pendingResult] = await Promise.all([
+      governanceClient.getGovernanceStatus(),
+      governanceClient.getPendingReviews(),
+    ]);
+
+    const taskGov = govStatus.task_governance;
+    const governanceStats: GovernanceStats = {
+      totalDecisions: govStatus.total_decisions,
+      approved: govStatus.approved,
+      blocked: govStatus.blocked,
+      pending: govStatus.pending,
+      pendingReviews: pendingResult.count,
+      totalGovernedTasks: taskGov?.total_governed_tasks ?? 0,
+    };
+
+    // Transform pending reviews into governed task representations
+    const governedTasks: GovernedTask[] = pendingResult.pending_reviews.map(r => ({
+      id: r.id,
+      implementationTaskId: r.implementation_task_id,
+      subject: r.context.length > 80 ? r.context.substring(0, 80) + '...' : r.context,
+      status: 'pending_review' as const,
+      reviews: [{
+        id: r.id,
+        reviewType: r.type,
+        status: 'pending' as const,
+        createdAt: r.created_at,
+      }],
+      createdAt: r.created_at,
+    }));
+
+    return {
+      govStatus,
+      pendingReviews: pendingResult.pending_reviews,
+      governanceStats,
+      governedTasks,
+    };
+  } catch {
+    return {
+      govStatus: null,
+      pendingReviews: [],
+      governanceStats: defaultStats,
+      governedTasks: [],
+    };
+  }
+}
+
 export function activate(context: vscode.ExtensionContext): void {
   console.log('>>> Collab Intelligence extension is activating...');
   const outputChannel = vscode.window.createOutputChannel('Collab Intelligence');
@@ -138,6 +283,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const memoryProvider = new MemoryTreeProvider();
   const dashboardProvider = new DashboardWebviewProvider(context.extensionUri);
 
+  // Polling state
+  let pollInterval: ReturnType<typeof setInterval> | undefined;
+  let isConnected = false;
+
   // Initialize project config service if workspace exists
   const workspaceRoot = getWorkspaceRoot();
   let configService: ProjectConfigService | undefined;
@@ -158,6 +307,52 @@ export function activate(context: vscode.ExtensionContext): void {
   registerSystemCommands(context, mcpClient, statusBar);
   registerMemoryCommands(context, kgClient);
   registerTaskCommands(context);
+
+  /**
+   * Periodic dashboard refresh — fetches governance data and updates agent status.
+   */
+  async function pollDashboard(): Promise<void> {
+    if (!isConnected) return;
+
+    try {
+      const root = getWorkspaceRoot();
+      const baseAgents = root ? detectAgents(root) : [];
+      const tasks = root ? getTaskCounts(root) : { active: 0, total: 0 };
+      const sessionPhase = root ? getSessionPhase(root) : 'inactive';
+
+      const { govStatus, pendingReviews, governanceStats, governedTasks } =
+        await fetchGovernanceData(governanceClient);
+
+      const agents = enrichAgentStatus(baseAgents, govStatus, pendingReviews);
+
+      dashboardProvider.updateData({
+        agents,
+        tasks,
+        sessionPhase,
+        governedTasks,
+        governanceStats,
+      });
+    } catch {
+      // Polling failures are non-fatal — dashboard keeps last known state
+    }
+  }
+
+  function startPolling(): void {
+    stopPolling();
+    isConnected = true;
+    // Initial poll immediately
+    pollDashboard();
+    // Then every 10 seconds
+    pollInterval = setInterval(pollDashboard, 10_000);
+  }
+
+  function stopPolling(): void {
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = undefined;
+    }
+    isConnected = false;
+  }
 
   // Connect to MCP Servers command
   context.subscriptions.push(
@@ -185,24 +380,33 @@ export function activate(context: vscode.ExtensionContext): void {
           makeActivity('orchestrator', 'status', 'Connected to MCP servers')
         );
 
-        // Fetch governance status on connect
-        try {
-          const govStatus = await governanceClient.getGovernanceStatus();
-          if (govStatus.total_decisions > 0) {
-            dashboardProvider.addActivity(
-              makeActivity('governance-reviewer', 'review',
-                `Governance: ${govStatus.approved} approved, ${govStatus.blocked} blocked, ${govStatus.pending} pending`,
-                { tier: 'architecture' })
-            );
-          }
-        } catch {
-          // Governance server may not be running — non-fatal
+        // Fetch governance data and enrich agents
+        const { govStatus, pendingReviews, governanceStats, governedTasks } =
+          await fetchGovernanceData(governanceClient);
+
+        const enrichedAgents = enrichAgentStatus(agents, govStatus, pendingReviews);
+        dashboardProvider.updateData({
+          agents: enrichedAgents,
+          governedTasks,
+          governanceStats,
+        });
+
+        if (govStatus && govStatus.total_decisions > 0) {
+          dashboardProvider.addActivity(
+            makeActivity('governance-reviewer', 'review',
+              `Governance: ${govStatus.approved} approved, ${govStatus.blocked} blocked, ${govStatus.pending} pending`,
+              { tier: 'architecture' })
+          );
         }
+
+        // Start periodic polling
+        startPolling();
 
         vscode.window.showInformationMessage('Connected to MCP servers.');
         outputChannel.appendLine('Connected to MCP servers successfully.');
       } catch (error) {
         statusBar.setHealth('error');
+        stopPolling();
         dashboardProvider.updateData({ connectionStatus: 'error' });
         dashboardProvider.addActivity(
           makeActivity('orchestrator', 'status', `Connection failed: ${error}`)
@@ -259,6 +463,9 @@ export function activate(context: vscode.ExtensionContext): void {
         } catch {
           // Governance server may not be running — non-fatal
         }
+
+        // Also force a governance data refresh
+        await pollDashboard();
 
         vscode.window.showInformationMessage(`Memory Browser refreshed: ${allEntities.length} entities.`);
       } catch (error) {
@@ -357,6 +564,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register disposables
   context.subscriptions.push(
+    { dispose: () => stopPolling() },
     { dispose: () => serverManager.stopAll() },
     { dispose: () => mcpClient.disconnect() },
     { dispose: () => fileWatcher.dispose() },
@@ -377,15 +585,26 @@ export function activate(context: vscode.ExtensionContext): void {
       const sessionPhase = root ? getSessionPhase(root) : 'inactive';
       const tasks = root ? getTaskCounts(root) : { active: 0, total: 0 };
 
+      // Fetch governance data for enrichment
+      const { govStatus, pendingReviews, governanceStats, governedTasks } =
+        await fetchGovernanceData(governanceClient);
+
+      const enrichedAgents = enrichAgentStatus(agents, govStatus, pendingReviews);
+
       dashboardProvider.updateData({
         connectionStatus: 'connected',
-        agents,
+        agents: enrichedAgents,
         sessionPhase,
         tasks,
+        governedTasks,
+        governanceStats,
       });
       dashboardProvider.addActivity(
         makeActivity('orchestrator', 'status', 'MCP servers started and connected automatically')
       );
+
+      // Start periodic polling
+      startPolling();
 
       outputChannel.appendLine('Auto-connected to MCP servers on activation.');
     } catch (error) {
@@ -399,5 +618,5 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
-  // Cleanup handled by disposables (serverManager.stopAll + mcpClient.disconnect)
+  // Cleanup handled by disposables (serverManager.stopAll + mcpClient.disconnect + stopPolling)
 }

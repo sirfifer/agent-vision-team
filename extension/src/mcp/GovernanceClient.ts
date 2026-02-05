@@ -57,6 +57,48 @@ export interface GovernanceStatus {
     category: string;
     verdict: string | null;
   }>;
+  task_governance?: TaskGovernanceStats;
+}
+
+export interface TaskGovernanceStats {
+  total_governed_tasks: number;
+  pending_review: number;
+  approved: number;
+  blocked: number;
+  pending_reviews: number;
+}
+
+export interface PendingReviewEntry {
+  id: string;
+  review_task_id: string;
+  implementation_task_id: string;
+  type: string;
+  context: string;
+  created_at: string;
+}
+
+export interface GovernedTaskEntry {
+  task_id: string;
+  subject: string;
+  status: string;
+  is_blocked: boolean;
+  can_execute: boolean;
+  reviews: Array<{
+    id: string;
+    review_task_id: string;
+    type: string;
+    status: string;
+    verdict: string | null;
+    guidance: string;
+    created_at: string;
+    completed_at: string | null;
+  }>;
+  blockers_from_files: Array<{
+    id: string;
+    subject: string;
+    status: string;
+    review_type: string;
+  }>;
 }
 
 export class GovernanceClient {
@@ -74,5 +116,18 @@ export class GovernanceClient {
     return (await this.mcp.callTool('governance', 'get_decision_history', params ?? {})) as {
       decisions: DecisionHistoryEntry[];
     };
+  }
+
+  async getPendingReviews(): Promise<{ pending_reviews: PendingReviewEntry[]; count: number }> {
+    return (await this.mcp.callTool('governance', 'get_pending_reviews', {})) as {
+      pending_reviews: PendingReviewEntry[];
+      count: number;
+    };
+  }
+
+  async getTaskReviewStatus(implementationTaskId: string): Promise<GovernedTaskEntry> {
+    return (await this.mcp.callTool('governance', 'get_task_review_status', {
+      implementation_task_id: implementationTaskId,
+    })) as GovernedTaskEntry;
   }
 }
