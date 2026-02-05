@@ -8,6 +8,7 @@ import { ArchitectureDocsStep } from './steps/ArchitectureDocsStep';
 import { QualityConfigStep } from './steps/QualityConfigStep';
 import { PermissionsStep } from './steps/PermissionsStep';
 import { SettingsStep } from './steps/SettingsStep';
+import { RulesStep } from './steps/RulesStep';
 import { IngestionStep } from './steps/IngestionStep';
 import { CompleteStep } from './steps/CompleteStep';
 
@@ -145,6 +146,8 @@ export function SetupWizard() {
         return <ArchitectureDocsStep {...stepProps} />;
       case 'quality-config':
         return <QualityConfigStep {...stepProps} />;
+      case 'rules':
+        return <RulesStep {...stepProps} />;
       case 'permissions':
         return <PermissionsStep {...stepProps} />;
       case 'settings':

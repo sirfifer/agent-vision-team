@@ -48,6 +48,28 @@ export interface ProjectMetadata {
   license?: string;
 }
 
+export type RuleCategory = 'testing' | 'code-quality' | 'security' | 'performance' | 'patterns' | 'workflow' | 'custom';
+export type RuleEnforcement = 'enforce' | 'prefer' | 'guide';
+export type RuleScope = 'all' | 'worker' | 'quality-reviewer' | 'researcher' | 'steward';
+
+export interface RuleEntry {
+  id: string;
+  statement: string;
+  rationale: string;
+  category: RuleCategory;
+  enforcement: RuleEnforcement;
+  scope: RuleScope[];
+  enabled: boolean;
+  isDefault: boolean;
+}
+
+export interface RulesConfig {
+  version: number;
+  entries: RuleEntry[];
+  injectionMode: 'compact' | 'verbose';
+  maxTokenBudget: number;
+}
+
 export interface ProjectConfig {
   version: number;
   setupComplete: boolean;
@@ -57,6 +79,7 @@ export interface ProjectConfig {
   quality: QualityConfig;
   permissions: string[];
   ingestion: IngestionStatus;
+  rules?: RulesConfig;
 }
 
 export interface SetupReadiness {
@@ -187,3 +210,167 @@ export const OPTIONAL_PERMISSIONS: PermissionEntry[] = [
 ];
 
 export const ALL_PERMISSIONS: PermissionEntry[] = [...RECOMMENDED_PERMISSIONS, ...OPTIONAL_PERMISSIONS];
+
+/**
+ * Default rules - checked by default in the wizard.
+ *
+ * These address the most common AI coding quality failures:
+ * - Writing mocks instead of real tests
+ * - Skipping test coverage for new code
+ * - Not running build/tests before reporting completion
+ * - Ignoring existing patterns and inventing new ones
+ * - Suppressing warnings without justification
+ * - Making unfocused changes beyond task scope
+ * - Modifying code without reading it first
+ * - Iterating endlessly on failed approaches
+ */
+export const DEFAULT_RULES: RuleEntry[] = [
+  {
+    id: 'no-mocks',
+    statement: 'Write real integration and unit tests — never use mocks or stubs unless testing external service boundaries',
+    rationale: 'Mocks hide integration bugs and create false confidence in test suites',
+    category: 'testing',
+    enforcement: 'enforce',
+    scope: ['worker'],
+    enabled: true,
+    isDefault: true,
+  },
+  {
+    id: 'test-coverage',
+    statement: 'All new code must have test coverage. Target near-full coverage for business logic',
+    rationale: 'Untested code is a liability — agents should not ship code they cannot prove works',
+    category: 'testing',
+    enforcement: 'enforce',
+    scope: ['worker'],
+    enabled: true,
+    isDefault: true,
+  },
+  {
+    id: 'build-before-done',
+    statement: 'Run the build and all tests before reporting task completion',
+    rationale: 'Broken builds waste review cycles and erode trust in agent output',
+    category: 'testing',
+    enforcement: 'enforce',
+    scope: ['worker'],
+    enabled: true,
+    isDefault: true,
+  },
+  {
+    id: 'follow-patterns',
+    statement: 'Follow existing patterns in the codebase. Search for similar implementations before creating new patterns',
+    rationale: 'Consistency reduces cognitive load; new patterns require justification',
+    category: 'code-quality',
+    enforcement: 'enforce',
+    scope: ['worker'],
+    enabled: true,
+    isDefault: true,
+  },
+  {
+    id: 'no-suppress-warnings',
+    statement: 'Never suppress linter or compiler warnings without a documented justification',
+    rationale: 'Suppressed warnings hide real issues and accumulate technical debt',
+    category: 'code-quality',
+    enforcement: 'enforce',
+    scope: ['worker', 'quality-reviewer'],
+    enabled: true,
+    isDefault: true,
+  },
+  {
+    id: 'focused-changes',
+    statement: 'Keep changes focused. Don\'t refactor surrounding code unless it\'s part of the task',
+    rationale: 'Scope creep makes reviews harder and introduces unrelated risk',
+    category: 'workflow',
+    enforcement: 'prefer',
+    scope: ['worker'],
+    enabled: true,
+    isDefault: true,
+  },
+  {
+    id: 'read-before-modify',
+    statement: 'Read relevant code before modifying it. Never propose changes to code you haven\'t read',
+    rationale: 'Blind modifications break assumptions and miss existing constraints',
+    category: 'workflow',
+    enforcement: 'enforce',
+    scope: ['worker'],
+    enabled: true,
+    isDefault: true,
+  },
+  {
+    id: 'reassess-on-failure',
+    statement: 'When encountering repeated failures (3+ attempts), stop and reassess the approach rather than continuing to iterate',
+    rationale: 'Repeated failures signal a wrong approach — iteration without reflection wastes resources',
+    category: 'workflow',
+    enforcement: 'prefer',
+    scope: ['worker'],
+    enabled: true,
+    isDefault: true,
+  },
+];
+
+/**
+ * Optional rules - unchecked by default in the wizard.
+ *
+ * These are useful for specific project styles or stricter
+ * quality requirements, but not universally applicable.
+ */
+export const OPTIONAL_RULES: RuleEntry[] = [
+  {
+    id: 'no-singletons',
+    statement: 'No singletons in production code',
+    rationale: 'Singletons create hidden coupling and make testing difficult',
+    category: 'patterns',
+    enforcement: 'enforce',
+    scope: ['worker'],
+    enabled: false,
+    isDefault: true,
+  },
+  {
+    id: 'api-integration-tests',
+    statement: 'All public APIs must have integration tests',
+    rationale: 'Public APIs are contracts — integration tests verify the contract holds',
+    category: 'testing',
+    enforcement: 'enforce',
+    scope: ['worker'],
+    enabled: false,
+    isDefault: true,
+  },
+  {
+    id: 'result-types',
+    statement: 'Error handling uses Result/Either types, not exceptions',
+    rationale: 'Result types make error paths explicit and compiler-checked',
+    category: 'patterns',
+    enforcement: 'prefer',
+    scope: ['worker'],
+    enabled: false,
+    isDefault: true,
+  },
+  {
+    id: 'function-length',
+    statement: 'Every function over 30 lines should be considered for decomposition',
+    rationale: 'Long functions are harder to understand, test, and maintain',
+    category: 'code-quality',
+    enforcement: 'guide',
+    scope: ['quality-reviewer'],
+    enabled: false,
+    isDefault: true,
+  },
+  {
+    id: 'security-governance',
+    statement: 'Security-sensitive operations require governance review',
+    rationale: 'Authentication, authorization, and data handling need human oversight',
+    category: 'security',
+    enforcement: 'enforce',
+    scope: ['worker'],
+    enabled: false,
+    isDefault: true,
+  },
+];
+
+export const ALL_RULES: RuleEntry[] = [...DEFAULT_RULES, ...OPTIONAL_RULES];
+
+export const DEFAULT_RULES_CONFIG: RulesConfig = {
+  version: 1,
+  entries: DEFAULT_RULES,
+  injectionMode: 'compact',
+  maxTokenBudget: 400,
+};

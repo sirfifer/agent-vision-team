@@ -53,6 +53,28 @@ export interface IngestionStatus {
   architectureDocCount: number;
 }
 
+export type RuleCategory = 'testing' | 'code-quality' | 'security' | 'performance' | 'patterns' | 'workflow' | 'custom';
+export type RuleEnforcement = 'enforce' | 'prefer' | 'guide';
+export type RuleScope = 'all' | 'worker' | 'quality-reviewer' | 'researcher' | 'steward';
+
+export interface RuleEntry {
+  id: string;
+  statement: string;
+  rationale: string;
+  category: RuleCategory;
+  enforcement: RuleEnforcement;
+  scope: RuleScope[];
+  enabled: boolean;
+  isDefault: boolean;
+}
+
+export interface RulesConfig {
+  version: number;
+  entries: RuleEntry[];
+  injectionMode: 'compact' | 'verbose';
+  maxTokenBudget: number;
+}
+
 export interface ProjectConfig {
   version: number;
   setupComplete: boolean;
@@ -62,6 +84,7 @@ export interface ProjectConfig {
   quality: QualityConfig;
   permissions: string[];
   ingestion: IngestionStatus;
+  rules?: RulesConfig;
 }
 
 export interface SetupReadiness {
@@ -85,6 +108,7 @@ export type WizardStep =
   | 'vision-docs'
   | 'architecture-docs'
   | 'quality-config'
+  | 'rules'
   | 'permissions'
   | 'settings'
   | 'ingestion'
@@ -95,6 +119,7 @@ export const WIZARD_STEPS: WizardStep[] = [
   'vision-docs',
   'architecture-docs',
   'quality-config',
+  'rules',
   'permissions',
   'settings',
   'ingestion',
@@ -106,6 +131,7 @@ export const WIZARD_STEP_LABELS: Record<WizardStep, string> = {
   'vision-docs': 'Vision Docs',
   'architecture-docs': 'Architecture Docs',
   'quality-config': 'Quality Config',
+  'rules': 'Rules',
   'permissions': 'Permissions',
   'settings': 'Settings',
   'ingestion': 'Ingestion',

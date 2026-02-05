@@ -5,6 +5,7 @@ import {
   ProjectConfig,
   SetupReadiness,
   DEFAULT_PROJECT_CONFIG,
+  DEFAULT_RULES_CONFIG,
   RECOMMENDED_PERMISSIONS,
 } from '../models/ProjectConfig';
 import { ResearchPrompt, toPromptYaml } from '../models/ResearchPrompt';
@@ -60,6 +61,7 @@ export class ProjectConfigService {
         settings: { ...DEFAULT_PROJECT_CONFIG.settings, ...config.settings },
         quality: { ...DEFAULT_PROJECT_CONFIG.quality, ...config.quality },
         ingestion: { ...DEFAULT_PROJECT_CONFIG.ingestion, ...config.ingestion },
+        rules: config.rules ?? DEFAULT_RULES_CONFIG,
       };
     } catch {
       return { ...DEFAULT_PROJECT_CONFIG };

@@ -31,6 +31,7 @@ Apply the three-lens model in strict order:
 - Run `check_all_gates()` via the Quality server
 - Run `run_lint()` for specific language violations
 - Check test coverage via `check_coverage()`
+- **Verify compliance with project rules** injected in your task context (under "## Project Rules"). Flag violations of `enforce`-level rules as quality-tier findings. Note deviations from `prefer`-level rules if they lack justification.
 - Severity: `logic`, `style`, or `formatting`
 
 ## Finding Format

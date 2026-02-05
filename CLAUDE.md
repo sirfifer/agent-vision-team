@@ -164,6 +164,36 @@ After any significant code change:
    - **Quality findings**: Route to worker, auto-fixable issues can be fixed inline
 3. **Verify resolution**: Ensure findings are addressed before proceeding
 
+## Project Rules Protocol
+
+The system supports **project rules** — concise behavioral guidelines injected into every agent's context at spawn time. Rules live in `.avt/project-config.json` (not in CLAUDE.md) and are configured via the setup wizard.
+
+### How Rules Work
+
+When spawning any subagent, compile the enabled rules from `.avt/project-config.json` into a concise preamble and prepend it to the task prompt:
+
+```
+## Project Rules
+These rules govern how work is done in this project. Follow them.
+
+ENFORCE:
+- [enabled enforce-level rules, filtered by agent scope]
+
+PREFER (explain if deviating):
+- [enabled prefer-level rules, filtered by agent scope]
+
+---
+
+[actual task prompt]
+```
+
+### Key Design Principles
+
+- **Rules complement vision standards and architectural patterns** — they cover behavioral guidance that tier-protected entities and quality gates can't check
+- **Only inject rules relevant to the agent's scope** — a researcher doesn't get worker rules
+- **Keep the preamble compact** (~200-400 tokens) — more rules reduce agent effectiveness
+- **Rationale is not injected** — it lives in the KG for agents that need deeper context via `search_nodes("project rules")`
+
 ## Memory Protocol
 
 ### Before Starting Work

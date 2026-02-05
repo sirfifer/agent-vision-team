@@ -17,11 +17,12 @@ You are a Worker subagent in the Collaborative Intelligence System. You implemen
 ## Startup Protocol
 
 1. Read your task brief (provided in the task prompt or in `.avt/task-briefs/`)
-2. Query the Knowledge Graph for vision standards governing your task's components:
+2. **Check project rules** injected at the top of your task context (under "## Project Rules"). Rules marked `ENFORCE` are non-negotiable. Rules marked `PREFER` should be followed unless you document a specific reason to deviate.
+3. Query the Knowledge Graph for vision standards governing your task's components:
    - `get_entities_by_tier("vision")` — load all vision constraints
    - `search_nodes("<component name>")` — find architectural patterns and past solutions
-3. Note any `governed_by` relations linking your components to vision standards
-4. Check for solution patterns matching your task type
+4. Note any `governed_by` relations linking your components to vision standards
+5. Check for solution patterns matching your task type
 
 ## Task Creation Protocol (CRITICAL)
 
