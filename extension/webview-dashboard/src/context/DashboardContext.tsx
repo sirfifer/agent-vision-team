@@ -35,10 +35,19 @@ interface DashboardContextValue {
   visionDocs: DocumentInfo[];
   architectureDocs: DocumentInfo[];
   lastIngestionResult: IngestionResult | null;
+  // Document formatting
+  lastFormatResult: FormatDocResult | null;
   // Research prompts
   showResearchPrompts: boolean;
   setShowResearchPrompts: (show: boolean) => void;
   researchPrompts: ResearchPrompt[];
+}
+
+export interface FormatDocResult {
+  requestId: string;
+  success: boolean;
+  formattedContent?: string;
+  error?: string;
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
@@ -66,6 +75,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [visionDocs, setVisionDocs] = useState<DocumentInfo[]>([]);
   const [architectureDocs, setArchitectureDocs] = useState<DocumentInfo[]>([]);
   const [lastIngestionResult, setLastIngestionResult] = useState<IngestionResult | null>(null);
+  const [lastFormatResult, setLastFormatResult] = useState<FormatDocResult | null>(null);
 
   // Research prompts state
   const [showResearchPrompts, setShowResearchPrompts] = useState(false);
@@ -145,6 +155,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         case 'governanceStats':
           setData(prev => ({ ...prev, governanceStats: msg.stats }));
           break;
+        case 'formatDocContentResult':
+          setLastFormatResult({
+            requestId: msg.requestId,
+            success: msg.success,
+            formattedContent: msg.formattedContent,
+            error: msg.error,
+          });
+          break;
       }
     };
     window.addEventListener('message', handler);
@@ -186,6 +204,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       visionDocs,
       architectureDocs,
       lastIngestionResult,
+      lastFormatResult,
       showResearchPrompts, setShowResearchPrompts,
       researchPrompts,
     }}>

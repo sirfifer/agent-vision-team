@@ -1,5 +1,6 @@
-import { useState } from 'react';
 import { useDashboard } from '../../../context/DashboardContext';
+import { useDocEditor } from '../../../hooks/useDocEditor';
+import { DocEditorCard } from './DocEditorCard';
 import type { ProjectConfig } from '../../../types';
 
 interface VisionDocsStepProps {
@@ -12,42 +13,16 @@ interface VisionDocsStepProps {
   onSkip: () => void;
 }
 
-const TEMPLATE = `# [Standard Name]
-
-## Statement
-[Clear, actionable statement of the standard]
-
-## Rationale
-[Why this standard exists and what problem it solves]
-
-## Examples
-- Compliant: [Example of code/behavior that follows this standard]
-- Violation: [Example of code/behavior that violates this standard]
-`;
-
 export function VisionDocsStep(_props: VisionDocsStepProps) {
-  const { visionDocs, sendMessage } = useDashboard();
-  const [newDocName, setNewDocName] = useState('');
-  const [newDocContent, setNewDocContent] = useState(TEMPLATE);
-  const [isCreating, setIsCreating] = useState(false);
+  const { visionDocs, sendMessage, lastFormatResult } = useDashboard();
 
-  const handleCreate = () => {
-    if (!newDocName.trim()) return;
-
-    setIsCreating(true);
-    sendMessage({
-      type: 'createVisionDoc',
-      name: newDocName.trim(),
-      content: newDocContent,
-    });
-
-    // Reset form after a brief delay
-    setTimeout(() => {
-      setNewDocName('');
-      setNewDocContent(TEMPLATE);
-      setIsCreating(false);
-    }, 500);
-  };
+  const editor = useDocEditor({
+    tier: 'vision',
+    defaultName: 'vision',
+    sendMessage,
+    lastFormatResult,
+    docCount: visionDocs.length,
+  });
 
   return (
     <div className="space-y-6">
@@ -89,51 +64,20 @@ export function VisionDocsStep(_props: VisionDocsStepProps) {
       </div>
 
       {/* Create new document */}
-      <div className="p-4 rounded-lg border border-vscode-border bg-vscode-widget-bg">
-        <h4 className="font-medium mb-3">Create New Vision Document</h4>
-
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Document Name
-            </label>
-            <input
-              type="text"
-              value={newDocName}
-              onChange={e => setNewDocName(e.target.value)}
-              placeholder="e.g., dependency-injection"
-              className="w-full px-3 py-2 rounded bg-vscode-input-bg border border-vscode-border text-vscode-fg placeholder:text-vscode-muted focus:outline-none focus:border-vscode-btn-bg"
-            />
-            <p className="text-xs text-vscode-muted mt-1">
-              Will be saved as <code>docs/vision/{newDocName || '[name]'}.md</code>
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Content
-            </label>
-            <textarea
-              value={newDocContent}
-              onChange={e => setNewDocContent(e.target.value)}
-              rows={12}
-              className="w-full px-3 py-2 rounded bg-vscode-input-bg border border-vscode-border text-vscode-fg font-mono text-sm focus:outline-none focus:border-vscode-btn-bg"
-            />
-          </div>
-
-          <button
-            onClick={handleCreate}
-            disabled={!newDocName.trim() || isCreating}
-            className="px-4 py-2 rounded bg-tier-vision text-white hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isCreating ? 'Creating...' : 'Create Document'}
-          </button>
-        </div>
-      </div>
+      <DocEditorCard
+        tier="vision"
+        editor={editor}
+        tierColorClass="bg-tier-vision"
+        placeholderText={
+          'Type, paste, or narrate your vision standards here.\n' +
+          "Don't worry about formatting — just capture your ideas.\n\n" +
+          'Examples: bullet points, stream of consciousness, pasted notes, etc.'
+        }
+      />
 
       <div className="p-3 rounded bg-blue-500/10 border border-blue-500/30 text-sm">
-        <strong>Tip:</strong> Vision standards should be high-level principles that rarely change.
-        Examples: "All services use protocol-based dependency injection", "No singletons in production code".
+        <strong>Tip:</strong> Just dump your thoughts — bullet points, stream of consciousness, pasted text.
+        The AI formatter will organize it into proper vision standards.
       </div>
     </div>
   );

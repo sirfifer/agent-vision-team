@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import * as path from 'path';
+import { execFile } from 'child_process';
 import { Entity } from '../models/Entity';
 import { AgentStatus, ActivityEntry, GovernedTask, GovernanceStats } from '../models/Activity';
 import { ProjectConfig, SetupReadiness } from '../models/ProjectConfig';
@@ -224,6 +225,10 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         case 'runResearchPrompt':
           this.handleRunResearchPrompt(message.id);
+          break;
+
+        case 'formatDocContent':
+          this.handleFormatDocContent(message.tier, message.rawContent, message.requestId);
           break;
       }
     });
@@ -485,6 +490,64 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Document Content Formatting (Claude CLI)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  private async handleFormatDocContent(
+    tier: 'vision' | 'architecture',
+    rawContent: string,
+    requestId: string
+  ): Promise<void> {
+    try {
+      const formatted = await this.invokeClaudeFormat(tier, rawContent);
+      this.postMessage({
+        type: 'formatDocContentResult',
+        requestId,
+        success: true,
+        formattedContent: formatted,
+      });
+    } catch (err) {
+      this.postMessage({
+        type: 'formatDocContentResult',
+        requestId,
+        success: false,
+        error: String(err),
+      });
+    }
+  }
+
+  private invokeClaudeFormat(tier: 'vision' | 'architecture', rawContent: string): Promise<string> {
+    const prompt = tier === 'vision'
+      ? VISION_FORMAT_PROMPT
+      : ARCHITECTURE_FORMAT_PROMPT;
+
+    const fullPrompt = `${prompt}\n\n---\n\nHere is the raw content to format:\n\n${rawContent}`;
+
+    return new Promise((resolve, reject) => {
+      execFile(
+        'claude',
+        ['--print', '--model', 'sonnet', '-p', fullPrompt],
+        { timeout: 60000, maxBuffer: 1024 * 1024 },
+        (error, stdout, stderr) => {
+          if (error) {
+            const msg = (error as NodeJS.ErrnoException).code === 'ENOENT'
+              ? 'Claude CLI not found. Ensure "claude" is installed and on your PATH.'
+              : `Claude CLI failed: ${error.message}${stderr ? ` (${stderr.trim()})` : ''}`;
+            reject(new Error(msg));
+            return;
+          }
+          const output = stdout.trim();
+          if (!output) {
+            reject(new Error('Claude CLI returned empty output'));
+            return;
+          }
+          resolve(output);
+        }
+      );
+    });
+  }
+
   private getHtmlContent(webview: vscode.Webview): string {
     const distPath = vscode.Uri.joinPath(this.extensionUri, 'webview-dashboard', 'dist');
     const scriptUri = webview.asWebviewUri(
@@ -514,3 +577,43 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 </html>`;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Document Formatting Prompts
+// ─────────────────────────────────────────────────────────────────────────────
+
+const VISION_FORMAT_PROMPT = `You are a technical writing assistant. Your task is to take raw, unstructured notes about a software project's vision standards and format them into a clean, well-organized markdown document.
+
+Vision standards are the highest-level principles and invariants for a project. They are immutable rules that all development must follow. Examples include "All services use protocol-based dependency injection" or "No singletons in production code."
+
+Instructions:
+- Extract individual standards/principles from the raw content
+- For each standard, create a section with:
+  - A clear, concise Statement (one sentence, imperative)
+  - A Rationale explaining why this standard exists
+  - Optionally, Examples showing compliant and violating code/behavior
+- Use proper markdown formatting with ## headings for each standard
+- Add a top-level # heading summarizing the document
+- Remove redundancy, fix grammar, and organize logically
+- If the content is vague, do your best to extract actionable standards
+- Output ONLY the formatted markdown document, no preamble or explanation
+- Do not wrap the output in markdown code fences`;
+
+const ARCHITECTURE_FORMAT_PROMPT = `You are a technical writing assistant. Your task is to take raw, unstructured notes about a software project's architecture and format them into a clean, well-organized markdown document.
+
+Architecture documents describe patterns, components, technical standards, and design decisions. They inform AI agents and developers about how the system is built.
+
+Instructions:
+- Categorize content into sections as appropriate: Architectural Standards, Patterns, and Components
+- For each element, create a section with:
+  - A Type (standard, pattern, or component)
+  - A clear Description of what it is and its purpose
+  - Usage guidance (when and how to use it)
+  - Optionally, Examples with code snippets
+  - Optionally, Related links to other architectural elements
+- Use proper markdown formatting with ## headings for each element
+- Add a top-level # heading summarizing the document
+- Remove redundancy, fix grammar, and organize logically
+- If the content is vague, do your best to extract actionable architecture guidance
+- Output ONLY the formatted markdown document, no preamble or explanation
+- Do not wrap the output in markdown code fences`;

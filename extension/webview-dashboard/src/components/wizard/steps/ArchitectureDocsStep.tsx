@@ -1,5 +1,6 @@
-import { useState } from 'react';
 import { useDashboard } from '../../../context/DashboardContext';
+import { useDocEditor } from '../../../hooks/useDocEditor';
+import { DocEditorCard } from './DocEditorCard';
 import type { ProjectConfig } from '../../../types';
 
 interface ArchitectureDocsStepProps {
@@ -12,49 +13,16 @@ interface ArchitectureDocsStepProps {
   onSkip: () => void;
 }
 
-const TEMPLATE = `# [Document Title]
-
-## Type
-[standard | pattern | component]
-
-## Description
-[What this architectural element is and its purpose]
-
-## Usage
-[When and how to use this pattern/component/standard]
-
-## Examples
-\`\`\`typescript
-// Example code showing proper usage
-\`\`\`
-
-## Related
-- [Links to related architectural elements]
-`;
-
 export function ArchitectureDocsStep(_props: ArchitectureDocsStepProps) {
-  const { architectureDocs, sendMessage } = useDashboard();
-  const [newDocName, setNewDocName] = useState('');
-  const [newDocContent, setNewDocContent] = useState(TEMPLATE);
-  const [isCreating, setIsCreating] = useState(false);
+  const { architectureDocs, sendMessage, lastFormatResult } = useDashboard();
 
-  const handleCreate = () => {
-    if (!newDocName.trim()) return;
-
-    setIsCreating(true);
-    sendMessage({
-      type: 'createArchDoc',
-      name: newDocName.trim(),
-      content: newDocContent,
-    });
-
-    // Reset form after a brief delay
-    setTimeout(() => {
-      setNewDocName('');
-      setNewDocContent(TEMPLATE);
-      setIsCreating(false);
-    }, 500);
-  };
+  const editor = useDocEditor({
+    tier: 'architecture',
+    defaultName: 'architecture',
+    sendMessage,
+    lastFormatResult,
+    docCount: architectureDocs.length,
+  });
 
   return (
     <div className="space-y-6">
@@ -96,51 +64,20 @@ export function ArchitectureDocsStep(_props: ArchitectureDocsStepProps) {
       </div>
 
       {/* Create new document */}
-      <div className="p-4 rounded-lg border border-vscode-border bg-vscode-widget-bg">
-        <h4 className="font-medium mb-3">Create New Architecture Document</h4>
-
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Document Name
-            </label>
-            <input
-              type="text"
-              value={newDocName}
-              onChange={e => setNewDocName(e.target.value)}
-              placeholder="e.g., service-registry-pattern"
-              className="w-full px-3 py-2 rounded bg-vscode-input-bg border border-vscode-border text-vscode-fg placeholder:text-vscode-muted focus:outline-none focus:border-vscode-btn-bg"
-            />
-            <p className="text-xs text-vscode-muted mt-1">
-              Will be saved as <code>docs/architecture/{newDocName || '[name]'}.md</code>
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Content
-            </label>
-            <textarea
-              value={newDocContent}
-              onChange={e => setNewDocContent(e.target.value)}
-              rows={14}
-              className="w-full px-3 py-2 rounded bg-vscode-input-bg border border-vscode-border text-vscode-fg font-mono text-sm focus:outline-none focus:border-vscode-btn-bg"
-            />
-          </div>
-
-          <button
-            onClick={handleCreate}
-            disabled={!newDocName.trim() || isCreating}
-            className="px-4 py-2 rounded bg-tier-architecture text-white hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isCreating ? 'Creating...' : 'Create Document'}
-          </button>
-        </div>
-      </div>
+      <DocEditorCard
+        tier="architecture"
+        editor={editor}
+        tierColorClass="bg-tier-architecture"
+        placeholderText={
+          'Type, paste, or narrate your architecture decisions here.\n' +
+          "Don't worry about formatting — just capture your ideas.\n\n" +
+          'Examples: patterns used, component descriptions, technical standards, design decisions, etc.'
+        }
+      />
 
       <div className="p-3 rounded bg-blue-500/10 border border-blue-500/30 text-sm">
-        <strong>Tip:</strong> Architecture documents can be standards, patterns, or components.
-        Set the <code>## Type</code> section to categorize them properly.
+        <strong>Tip:</strong> Just dump your thoughts — patterns, component descriptions, technical decisions.
+        The AI formatter will organize it into a proper architecture document.
       </div>
     </div>
   );

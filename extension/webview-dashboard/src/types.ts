@@ -294,7 +294,8 @@ export type ExtensionMessage =
   | { type: 'researchPromptUpdated'; prompt: ResearchPrompt }
   | { type: 'researchPromptDeleted'; id: string }
   | { type: 'governedTasks'; tasks: GovernedTask[] }
-  | { type: 'governanceStats'; stats: GovernanceStats };
+  | { type: 'governanceStats'; stats: GovernanceStats }
+  | { type: 'formatDocContentResult'; requestId: string; success: boolean; formattedContent?: string; error?: string };
 
 export type WebviewMessage =
   | { type: 'connect' }
@@ -313,7 +314,8 @@ export type WebviewMessage =
   | { type: 'saveResearchPrompt'; prompt: ResearchPrompt }
   | { type: 'deleteResearchPrompt'; id: string }
   | { type: 'runResearchPrompt'; id: string }
-  | { type: 'requestGovernedTasks' };
+  | { type: 'requestGovernedTasks' }
+  | { type: 'formatDocContent'; tier: 'vision' | 'architecture'; rawContent: string; requestId: string };
 
 export interface IngestionResult {
   tier: 'vision' | 'architecture';
