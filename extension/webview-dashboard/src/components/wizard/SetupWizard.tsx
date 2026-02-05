@@ -15,6 +15,9 @@ const DEFAULT_CONFIG: ProjectConfig = {
   version: 1,
   setupComplete: false,
   languages: [],
+  metadata: {
+    isOpenSource: false,
+  },
   settings: {
     mockTests: false,
     mockTestsForCostlyOps: true,

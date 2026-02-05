@@ -101,10 +101,10 @@ This document specifies the engineering-level architecture for the Collaborative
 ┌──────▼────────────────▼──────────────────────────────────┐
 │                    PERSISTENT STATE                       │
 │  .claude/collab/knowledge-graph.jsonl  (KG data)         │
-│  .claude/collab/session-state.md       (goals, progress) │
-│  .claude/collab/task-briefs/           (assignments)     │
-│  .claude/collab/memory/               (archival files)   │
-│  Git                                  (code state)       │
+│  .avt/session-state.md                 (goals, progress) │
+│  .avt/task-briefs/                     (assignments)     │
+│  .avt/memory/                          (archival files)  │
+│  Git                                   (code state)      │
 └──────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────┐
@@ -123,7 +123,7 @@ This document specifies the engineering-level architecture for the Collaborative
 | **Worker** | Query patterns, write observations | Run checks | Branch, commit (in worktree) | Read briefs |
 | **Quality Reviewer** | Query vision/arch standards | Run all gates | Read diffs | — |
 | **KG Librarian** | Full CRUD (curate) | — | — | Sync to archival files |
-| **Extension** | Browse entities (read-only) | Display results (read-only) | — | Watch `.claude/collab/` |
+| **Extension** | Browse entities (read-only) | Display results (read-only) | — | Watch `.avt/` |
 
 ### Deployment Topology
 
@@ -198,13 +198,13 @@ Hooks in `.claude/settings.json` respond to subagent and tool events:
     "SubagentStart": [
       {
         "matcher": "*",
-        "command": "echo \"$(date -u +%Y-%m-%dT%H:%M:%SZ) START $SUBAGENT_NAME\" >> .claude/collab/agent-events.jsonl"
+        "command": "echo \"$(date -u +%Y-%m-%dT%H:%M:%SZ) START $SUBAGENT_NAME\" >> .avt/agent-events.jsonl"
       }
     ],
     "SubagentStop": [
       {
         "matcher": "*",
-        "command": "echo \"$(date -u +%Y-%m-%dT%H:%M:%SZ) STOP $SUBAGENT_NAME\" >> .claude/collab/agent-events.jsonl"
+        "command": "echo \"$(date -u +%Y-%m-%dT%H:%M:%SZ) STOP $SUBAGENT_NAME\" >> .avt/agent-events.jsonl"
       }
     ],
     "PreToolUse": [
@@ -527,7 +527,7 @@ You are a Worker subagent in the Collaborative Intelligence System. You implemen
 
 ## Startup Protocol
 
-1. Read your task brief (provided in the task prompt or in `.claude/collab/task-briefs/`)
+1. Read your task brief (provided in the task prompt or in `.avt/task-briefs/`)
 2. Query the Knowledge Graph for vision standards governing your task's components:
    - `get_entities_by_tier("vision")` — load all vision constraints
    - `search_nodes("<component name>")` — find architectural patterns and past solutions
@@ -647,7 +647,7 @@ You are the KG Librarian subagent in the Collaborative Intelligence System. You 
 3. **Promote patterns**: When the same fix or approach appears 3+ times, create a `solution_pattern` entity
 4. **Remove stale entries**: Delete observations that are no longer accurate (outdated component descriptions, resolved problems)
 5. **Validate tier consistency**: Ensure no vision-tier entities have been modified by agents. If found, report the violation.
-6. **Sync to archival files**: Update `.claude/collab/memory/` files with important KG entries:
+6. **Sync to archival files**: Update `.avt/memory/` files with important KG entries:
    - `architectural-decisions.md` — significant decisions and their rationale
    - `troubleshooting-log.md` — problems, what was tried, what worked
    - `solution-patterns.md` — promoted patterns with steps and reference implementations
@@ -688,7 +688,7 @@ This project uses a collaborative intelligence system with:
 
 When given a complex task:
 1. Break it into discrete, scopeable units of work
-2. Write a task brief for each unit in `.claude/collab/task-briefs/`
+2. Write a task brief for each unit in `.avt/task-briefs/`
 3. Create a git worktree for each worker: `git worktree add ../project-worker-N -b task/NNN-description`
 4. Spawn worker subagents via Task tool, one per task brief
 5. After each worker completes, spawn quality-reviewer with the worker's diff
@@ -713,7 +713,7 @@ After any significant code change:
 ## Checkpoints
 
 After each meaningful unit of work:
-1. Update `.claude/collab/session-state.md` with progress
+1. Update `.avt/session-state.md` with progress
 2. Git tag the state: `git tag checkpoint-NNN`
 3. If resuming after a failure, start from the last checkpoint
 
@@ -738,8 +738,8 @@ The extension's role has changed fundamentally from v1. It is now an **observabi
 |-----------|----------------|
 | Display KG entities (Memory Browser) | MCP client → KG server `search_nodes`, `get_entities_by_tier` |
 | Display quality findings | MCP client → Quality server `check_all_gates` |
-| Display task briefs | FileSystemWatcher on `.claude/collab/task-briefs/` |
-| Display session state | FileSystemWatcher on `.claude/collab/session-state.md` |
+| Display task briefs | FileSystemWatcher on `.avt/task-briefs/` |
+| Display session state | FileSystemWatcher on `.avt/session-state.md` |
 | Map findings to diagnostics | Quality findings → `vscode.Diagnostic` (squigglies in editor) |
 | Status bar summary | Aggregated health from MCP servers + filesystem |
 | Dashboard webview | React-based overview of all system state |
@@ -815,7 +815,7 @@ agent-vision-team/                       # This repo — the standalone product
 │   │   │   └── DashboardWebviewProvider.ts
 │   │   ├── services/
 │   │   │   ├── McpClientService.ts      # MCP connection management
-│   │   │   ├── FileWatcherService.ts    # .claude/collab/ watchers
+│   │   │   ├── FileWatcherService.ts    # .avt/ watchers
 │   │   │   └── StatusBarService.ts      # Status bar management
 │   │   ├── mcp/
 │   │   │   ├── KnowledgeGraphClient.ts  # Typed client for KG server
@@ -897,15 +897,21 @@ target-project/
 │   │   ├── quality-reviewer.md
 │   │   └── kg-librarian.md
 │   ├── collab/
-│   │   ├── session-state.md
-│   │   ├── task-briefs/
-│   │   ├── artifacts/
-│   │   ├── memory/
-│   │   │   ├── architectural-decisions.md
-│   │   │   ├── troubleshooting-log.md
-│   │   │   └── solution-patterns.md
-│   │   └── knowledge-graph.jsonl
+│   │   └── knowledge-graph.jsonl        # KG persistence (managed by server)
 │   └── settings.json                    # Hooks configuration
+├── .avt/
+│   ├── session-state.md
+│   ├── task-briefs/
+│   ├── memory/
+│   │   ├── architectural-decisions.md
+│   │   ├── troubleshooting-log.md
+│   │   ├── solution-patterns.md
+│   │   └── research-findings.md
+│   ├── research-prompts/
+│   ├── research-briefs/
+│   ├── vision/
+│   ├── architecture/
+│   └── project-config.json
 ├── .mcp.json                            # MCP server registration
 ├── CLAUDE.md                            # Orchestrator instructions
 └── (project files...)
@@ -921,7 +927,7 @@ target-project/
 Human gives orchestrator a complex task
   │
   ├── Orchestrator decomposes into subtasks
-  ├── Writes task briefs to .claude/collab/task-briefs/
+  ├── Writes task briefs to .avt/task-briefs/
   ├── Creates git worktrees for workers
   │
   ├── Orchestrator spawns Worker subagent (Task tool)
@@ -974,7 +980,7 @@ KG Librarian curates after session
   ├── Promotes recurring patterns to solution_pattern entities
   ├── Removes stale entries
   ├── Validates tier consistency
-  └── Syncs to .claude/collab/memory/ files
+  └── Syncs to .avt/memory/ files
 ```
 
 ### 10.3 Vision Conflict Flow

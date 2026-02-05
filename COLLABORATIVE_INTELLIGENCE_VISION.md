@@ -287,7 +287,7 @@ Next session queries KG → starts with institutional knowledge, not a blank sla
 Some content is naturally suited to files: task briefs, research reports, architecture reviews, and other artifacts that benefit from version control, human readability, and persistence independent of any running service:
 
 ```
-.claude/collab/
+.avt/
 ├── session-state.md          # Current goals, progress, blockers
 ├── task-briefs/              # Task assignments for worker sessions
 │   ├── task-001-auth-fix.md
@@ -296,7 +296,8 @@ Some content is naturally suited to files: task briefs, research reports, archit
 └── memory/                   # Archival copies of KG knowledge
     ├── architectural-decisions.md
     ├── troubleshooting-log.md
-    └── solution-patterns.md
+    ├── solution-patterns.md
+    └── research-findings.md  # Baseline knowledge from research
 ```
 
 **Quaternary: Git as Code State Protocol**
@@ -435,10 +436,11 @@ Example interactions via MCP tools:
 Some memory is better as files: version-controlled, human-reviewable, and readable without an MCP server running.
 
 ```
-.claude/collab/memory/
+.avt/memory/
 ├── architectural-decisions.md   # ADR-style decision log
 ├── troubleshooting-log.md       # Append-only problem/attempt/outcome log
-└── solution-patterns.md         # Curated patterns extracted from experience
+├── solution-patterns.md         # Curated patterns extracted from experience
+└── research-findings.md         # Key discoveries establishing baselines
 ```
 
 The KG is the live, queryable interface agents use during work. The files are the durable archive. The librarian subagent syncs between them.

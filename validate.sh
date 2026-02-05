@@ -203,9 +203,12 @@ check_dir() {
   fi
 }
 
-check_dir ".claude/collab/task-briefs"
-check_dir ".claude/collab/memory"
-check_file ".claude/collab/session-state.md"
+check_dir ".avt/task-briefs"
+check_dir ".avt/memory"
+check_file ".avt/session-state.md"
+check_dir ".avt/research-prompts"
+check_dir ".avt/research-briefs"
+check_file ".avt/project-config.json"
 
 # Phase 7: MCP Server Health (Optional)
 if [ "$SKIP_SERVERS" = false ]; then

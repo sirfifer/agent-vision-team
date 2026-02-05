@@ -71,7 +71,7 @@ _____________________________________________________________________________
 
 - [ ] Sidebar shows "Tasks" section
 - [ ] Task brief "example-001-add-feature.md" appears
-- [ ] Create new task brief: `.claude/collab/task-briefs/test-task.md`
+- [ ] Create new task brief: `.avt/task-briefs/test-task.md`
 - [ ] Tasks Panel auto-refreshes (new task appears)
 - [ ] Delete test task brief
 - [ ] Tasks Panel auto-refreshes (task disappears)

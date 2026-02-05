@@ -49,7 +49,7 @@ Expected: Server starts on port 3102
 In the Extension Development Host window:
 
 1. Open the `agent-vision-team` folder (the parent directory)
-2. The extension should activate automatically (it detects `.claude/collab/`)
+2. The extension should activate automatically (it detects `.avt/`)
 
 ## Step 5: Verify Extension Activated
 
@@ -89,11 +89,11 @@ Check these indicators:
 ## Step 8: Test Tasks Panel
 
 1. In the sidebar, expand **"Tasks"** section
-2. Should show task briefs from `.claude/collab/task-briefs/`
+2. Should show task briefs from `.avt/task-briefs/`
 3. Should see "example-001-add-feature.md"
 
 **Test Auto-Refresh**:
-- Create a new file in `.claude/collab/task-briefs/test-task.md`
+- Create a new file in `.avt/task-briefs/test-task.md`
 - Tasks panel should auto-update
 
 ## Step 9: Test Commands
@@ -205,7 +205,7 @@ curl -X POST http://localhost:3102/mcp/call \
 ### Common Issues
 
 **Extension doesn't activate**:
-- Check: Does workspace have `.claude/collab/` directory?
+- Check: Does workspace have `.avt/` directory?
 - Fix: Ensure you opened the `agent-vision-team` folder
 
 **"MCP servers not available" warning**:
@@ -255,7 +255,7 @@ After successful testing:
 
 1. **Package Extension**: `npm install -g @vscode/vsce && vsce package`
 2. **Install Locally**: Extensions → ... → Install from VSIX
-3. **Use in Real Workspace**: Open any project with `.claude/collab/` structure
+3. **Use in Real Workspace**: Open any project with `.avt/` structure
 
 ## Troubleshooting Tips
 

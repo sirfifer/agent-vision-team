@@ -103,7 +103,7 @@ The top bar shows system-wide status and provides action buttons.
 | Element | Description |
 |---------|-------------|
 | **Phase** | Current orchestration phase (planning, implementing, reviewing, inactive) |
-| **Tasks** | Active task briefs / total task briefs in `.claude/collab/task-briefs/` |
+| **Tasks** | Active task briefs / total task briefs in `.avt/task-briefs/` |
 | **Status dot** | Green = connected, gray = disconnected, red = error |
 | **Connect** | Start all MCP servers and establish connections |
 | **Refresh** | Reload KG entities, governance decisions, and task counts from servers |
@@ -207,18 +207,26 @@ The extension expects this directory structure in your workspace:
 │   ├── worker.md
 │   ├── quality-reviewer.md
 │   ├── kg-librarian.md
-│   └── governance-reviewer.md
+│   ├── governance-reviewer.md
+│   ├── researcher.md
+│   └── project-steward.md
 ├── collab/
-│   ├── task-briefs/                 # Task brief files
-│   ├── session-state.md             # Current session progress
-│   ├── memory/                      # Archival memory files
-│   │   ├── architectural-decisions.md
-│   │   ├── troubleshooting-log.md
-│   │   └── solution-patterns.md
 │   ├── knowledge-graph.jsonl        # KG persistence (managed by KG server)
 │   ├── trust-engine.db              # Trust engine DB (managed by Quality server)
 │   └── governance.db                # Governance decisions/reviews (managed by Governance server)
 └── settings.json                    # Claude Code settings, hooks, and MCP server config
+
+.avt/
+├── task-briefs/                     # Task brief files
+├── session-state.md                 # Current session progress
+├── memory/                          # Archival memory files
+│   ├── architectural-decisions.md
+│   ├── troubleshooting-log.md
+│   ├── solution-patterns.md
+│   └── research-findings.md
+├── research-prompts/                # Research prompt definitions
+├── research-briefs/                 # Research output briefs
+└── project-config.json              # Project configuration
 ```
 
 ## Configuration
@@ -233,7 +241,7 @@ The extension expects this directory structure in your workspace:
 
 ### Custom Configuration
 
-Create `.claude/collab/mcp-config.json` to override defaults:
+Create `.avt/mcp-config.json` to override defaults:
 
 ```json
 {
@@ -322,7 +330,7 @@ Every interactive element in the dashboard has a tooltip. Here's what you'll fin
 ## Troubleshooting
 
 ### Extension doesn't activate
-- **Check**: Does workspace contain `.claude/collab/` directory?
+- **Check**: Does workspace contain `.avt/` directory?
 - **Fix**: Create the directory structure (see Workspace Structure above)
 
 ### "Failed to connect to MCP servers"

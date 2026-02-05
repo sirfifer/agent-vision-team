@@ -162,7 +162,7 @@ npm test
 
 ### Extension Activation
 
-- [ ] Open workspace with `.claude/collab/` directory
+- [ ] Open workspace with `.avt/` directory
 - [ ] Extension activates automatically
 - [ ] Activity bar shows "Collab Intelligence" icon
 - [ ] Status bar shows "Collab: Inactive" (if servers not running)
@@ -201,7 +201,7 @@ npm test
 
 ### Tasks Panel TreeView
 
-- [ ] Shows task brief files from `.claude/collab/task-briefs/`
+- [ ] Shows task brief files from `.avt/task-briefs/`
 - [ ] Adding new task brief auto-refreshes view
 - [ ] Modifying task brief auto-refreshes view
 - [ ] Deleting task brief removes from view
@@ -367,3 +367,4 @@ setup(function() {
 - [../../mcp-servers/knowledge-graph/README.md](../../mcp-servers/knowledge-graph/README.md) - KG server documentation
 - [../../mcp-servers/quality/README.md](../../mcp-servers/quality/README.md) - Quality server documentation
 - [../../.claude/VALIDATION.md](../../.claude/VALIDATION.md) - System validation guide
+- [../../.avt/project-config.json](../../.avt/project-config.json) - Project configuration

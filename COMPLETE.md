@@ -69,12 +69,15 @@ Total:           44 tests ✅ (61% average coverage)
 - `.claude/settings.json` - MCP server configs, lifecycle hooks, agent tool mappings
 
 **Workspace Structure**:
-- `.claude/collab/task-briefs/` - Task briefs for workers (example included)
-- `.claude/collab/memory/` - Archival memory files:
+- `.avt/task-briefs/` - Task briefs for workers (example included)
+- `.avt/memory/` - Archival memory files:
   - `architectural-decisions.md`
   - `troubleshooting-log.md`
   - `solution-patterns.md`
-- `.claude/collab/session-state.md` - Current session tracking
+  - `research-findings.md`
+- `.avt/session-state.md` - Current session tracking
+- `.avt/research-prompts/` - Research prompt definitions
+- `.avt/research-briefs/` - Research output briefs
 
 **Documentation**:
 - `.claude/VALIDATION.md` - End-to-end validation guide
@@ -159,9 +162,9 @@ cd extension && npm test                          # 9 ✅
 
 ### Templates and Examples
 
-✅ **Example task brief**: `.claude/collab/task-briefs/example-001-add-feature.md`
-✅ **Archival memory templates**: architectural-decisions.md, troubleshooting-log.md, solution-patterns.md
-✅ **Session state template**: `.claude/collab/session-state.md`
+✅ **Example task brief**: `.avt/task-briefs/example-001-add-feature.md`
+✅ **Archival memory templates**: architectural-decisions.md, troubleshooting-log.md, solution-patterns.md, research-findings.md
+✅ **Session state template**: `.avt/session-state.md`
 
 ## Validation Results
 
@@ -199,9 +202,9 @@ Phase 5: Subagent Definitions
 ✓ .claude/settings.json exists
 
 Phase 6: Workspace Structure
-✓ .claude/collab/task-briefs exists
-✓ .claude/collab/memory exists
-✓ .claude/collab/session-state.md exists
+✓ .avt/task-briefs exists
+✓ .avt/memory exists
+✓ .avt/session-state.md exists
 
 Total checks: 21
 Passed: 21
@@ -244,7 +247,7 @@ curl http://localhost:3102/health  # Should return 200
 
 ### Use From Claude Code
 
-1. **Open workspace** containing `.claude/collab/`
+1. **Open workspace** containing `.avt/`
 2. **Spawn worker** subagent:
    ```
    Task tool → subagent: worker
@@ -281,10 +284,15 @@ agent-vision-team/
 │   │   ├── worker.md
 │   │   ├── quality-reviewer.md
 │   │   └── kg-librarian.md
-│   ├── collab/                     # Workspace structure
-│   │   ├── task-briefs/
-│   │   ├── memory/
-│   │   └── session-state.md
+│   └── collab/                     # KG persistence
+│       └── knowledge-graph.jsonl
+├── .avt/                            # Workspace structure
+│   ├── task-briefs/
+│   ├── memory/
+│   ├── research-prompts/
+│   ├── research-briefs/
+│   ├── session-state.md
+│   └── project-config.json
 │   ├── settings.json               # MCP and agent configs
 │   ├── VALIDATION.md              # Validation guide
 │   └── PHASE3-STATUS.md           # Phase 3 status

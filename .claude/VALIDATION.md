@@ -6,11 +6,11 @@ This document describes how to validate that the Collaborative Intelligence Syst
 
 ### ✅ MCP Servers (Phase 1)
 - **Knowledge Graph Server**: `mcp-servers/knowledge-graph/`
-  - JSONL persistence in `.claude/collab/knowledge-graph.jsonl`
+  - JSONL persistence in `.claude/collab/knowledge-graph.jsonl` (MCP server manages this)
   - Tier protection (Vision > Architecture > Quality)
   - 18 tests passing, 74% coverage
 - **Quality Server**: `mcp-servers/quality/`
-  - SQLite trust engine in `.claude/collab/trust-engine.db`
+  - SQLite trust engine in `.claude/collab/trust-engine.db` (MCP server manages this)
   - Language-agnostic tool wrapping (ruff, eslint, pytest, etc.)
   - 26 tests passing, 48% coverage
 
@@ -46,18 +46,25 @@ This document describes how to validate that the Collaborative Intelligence Syst
 ├── agents/                          # Subagent definitions
 │   ├── worker.md
 │   ├── quality-reviewer.md
-│   └── kg-librarian.md
+│   ├── kg-librarian.md
+│   ├── researcher.md
+│   └── project-steward.md
 ├── collab/
-│   ├── task-briefs/                 # Task briefs for workers
-│   │   └── example-001-add-feature.md
-│   ├── memory/                      # Archival memory files
-│   │   ├── architectural-decisions.md
-│   │   ├── troubleshooting-log.md
-│   │   └── solution-patterns.md
-│   ├── session-state.md             # Current session progress
-│   ├── knowledge-graph.jsonl        # KG persistence (created on first use)
-│   └── trust-engine.db              # Trust engine DB (created on first use)
+│   └── knowledge-graph.jsonl        # KG persistence (created on first use)
 └── settings.json                    # MCP and agent configuration
+
+.avt/
+├── task-briefs/                     # Task briefs for workers
+│   └── example-001-add-feature.md
+├── memory/                          # Archival memory files
+│   ├── architectural-decisions.md
+│   ├── troubleshooting-log.md
+│   ├── solution-patterns.md
+│   └── research-findings.md
+├── research-prompts/                # Research prompt definitions
+├── research-briefs/                 # Research output briefs
+├── session-state.md                 # Current session progress
+└── project-config.json              # Project configuration
 ```
 
 ## Validation Steps
@@ -136,7 +143,7 @@ Create a vision standard entity in the KG:
 #### Step 3: Spawn a Worker
 ```
 Task tool → subagent_type: worker
-prompt: "Read the task brief in .claude/collab/task-briefs/example-001-add-feature.md and query the KG for vision standards"
+prompt: "Read the task brief in .avt/task-briefs/example-001-add-feature.md and query the KG for vision standards"
 ```
 
 Expected: Worker should:
@@ -164,7 +171,7 @@ prompt: "Curate the KG after the session. Consolidate observations and sync to a
 Expected: Librarian should:
 1. Query recent KG entities
 2. Consolidate observations
-3. Update memory files in `.claude/collab/memory/`
+3. Update memory files in `.avt/memory/`
 
 ## Success Criteria
 

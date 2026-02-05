@@ -45,7 +45,7 @@
 - Updates via `updateFindings()` method
 
 #### Tasks Panel (`TasksTreeProvider.ts`)
-- Watches `.claude/collab/task-briefs/` directory
+- Watches `.avt/task-briefs/` directory
 - Shows task brief files from filesystem
 - Auto-refreshes on file changes
 
@@ -91,7 +91,7 @@ npm run build
 ```
 
 ### 3. Open Workspace
-- Open a workspace containing `.claude/collab/` directory
+- Open a workspace containing `.avt/` directory
 - Extension auto-activates and connects to MCP servers
 - Sidebar shows "Collab Intelligence" view container
 
@@ -114,7 +114,7 @@ Activity Bar: "Collab Intelligence" icon
 ├── Findings
 │   └── [lint/test findings grouped by severity]
 └── Tasks
-    └── [task brief files from .claude/collab/task-briefs/]
+    └── [task brief files from .avt/task-briefs/]
 
 Status Bar (left): $(shield) Collab: Active
 Status Bar (center): N findings · Phase: active
@@ -162,7 +162,7 @@ npm run build
 ### Runtime Test (Manual)
 1. Start both MCP servers
 2. Launch Extension Development Host (F5)
-3. Open workspace with `.claude/collab/`
+3. Open workspace with `.avt/`
 4. Check status bar shows "Collab: Active"
 5. Open "Collab Intelligence" sidebar
 6. Click refresh buttons
