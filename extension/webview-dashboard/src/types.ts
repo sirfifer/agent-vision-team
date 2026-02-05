@@ -6,7 +6,7 @@ export type ProtectionTier = 'vision' | 'architecture' | 'quality';
 // Project Configuration Types (mirrors extension/src/models/ProjectConfig.ts)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type PermissionCategory = 'build' | 'test' | 'lint' | 'mcp' | 'git' | 'other';
+export type PermissionCategory = 'build' | 'test' | 'lint' | 'deps' | 'mcp' | 'git' | 'other';
 
 export interface PermissionEntry {
   pattern: string;

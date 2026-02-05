@@ -69,4 +69,4 @@ trap cleanup EXIT
 # Run from the e2e/ directory so uv picks up e2e/pyproject.toml (which has
 # pydantic as a dependency used by the MCP server libraries).
 cd "$SCRIPT_DIR"
-uv run python "$SCRIPT_DIR/run-e2e.py" --workspace "$WORKSPACE" "${FORWARD_ARGS[@]}"
+uv run python "$SCRIPT_DIR/run-e2e.py" --workspace "$WORKSPACE" ${FORWARD_ARGS[@]+"${FORWARD_ARGS[@]}"}
