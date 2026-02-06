@@ -138,6 +138,48 @@ export const WIZARD_STEP_LABELS: Record<WizardStep, string> = {
   'complete': 'Complete',
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Tutorial Step Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type TutorialStep =
+  | 'welcome'
+  | 'big-picture'
+  | 'setup'
+  | 'starting-work'
+  | 'behind-scenes'
+  | 'monitoring'
+  | 'knowledge-graph'
+  | 'quality-gates'
+  | 'tips'
+  | 'ready';
+
+export const TUTORIAL_STEPS: TutorialStep[] = [
+  'welcome',
+  'big-picture',
+  'setup',
+  'starting-work',
+  'behind-scenes',
+  'monitoring',
+  'knowledge-graph',
+  'quality-gates',
+  'tips',
+  'ready',
+];
+
+export const TUTORIAL_STEP_LABELS: Record<TutorialStep, string> = {
+  'welcome': 'Welcome',
+  'big-picture': 'Big Picture',
+  'setup': 'Run Setup',
+  'starting-work': 'Start Work',
+  'behind-scenes': 'Behind the Scenes',
+  'monitoring': 'Monitoring',
+  'knowledge-graph': 'Knowledge Graph',
+  'quality-gates': 'Quality Gates',
+  'tips': 'Tips',
+  'ready': 'Ready!',
+};
+
 export const SUPPORTED_LANGUAGES = ['python', 'typescript', 'javascript', 'swift', 'rust'] as const;
 export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
 
@@ -296,7 +338,8 @@ export type ExtensionMessage =
   | { type: 'governedTasks'; tasks: GovernedTask[] }
   | { type: 'governanceStats'; stats: GovernanceStats }
   | { type: 'formatDocContentResult'; requestId: string; success: boolean; formattedContent?: string; error?: string }
-  | { type: 'showWizard' };
+  | { type: 'showWizard' }
+  | { type: 'showTutorial' };
 
 export type WebviewMessage =
   | { type: 'connect' }

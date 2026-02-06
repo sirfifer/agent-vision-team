@@ -67,6 +67,23 @@
         "title": "Getting Started",
         "category": "Collab Intelligence",
         "icon": "$(question)"
+      },
+      {
+        "command": "collab.openWorkflowTutorial",
+        "title": "Open Workflow Tutorial",
+        "category": "Collab Intelligence",
+        "icon": "$(mortar-board)"
+      },
+      {
+        "command": "collab.runResearch",
+        "title": "Run Research Prompt",
+        "category": "Collab Intelligence"
+      },
+      {
+        "command": "collab.createTaskBrief",
+        "title": "Create Task Brief",
+        "category": "Collab Intelligence",
+        "icon": "$(new-file)"
       }
     ],
     "viewsContainers": {
@@ -102,7 +119,7 @@
     "viewsWelcome": [
       {
         "view": "collab.actions",
-        "contents": "$(dashboard) [Open Dashboard](command:collab.viewDashboard)\n\n$(plug) [Connect to Servers](command:collab.connectMcpServers)\n\n$(lightbulb) [Setup Wizard](command:collab.openSetupWizard)\n\n$(question) [Getting Started](command:collab.openWalkthrough)"
+        "contents": "$(dashboard) [Open Dashboard](command:collab.viewDashboard)\n\n$(plug) [Connect to Servers](command:collab.connectMcpServers)\n\n$(lightbulb) [Setup Wizard](command:collab.openSetupWizard)\n\n$(mortar-board) [Workflow Tutorial](command:collab.openWorkflowTutorial)"
       }
     ],
     "menus": {

@@ -9,6 +9,7 @@ import { TaskBoard } from './components/TaskBoard';
 import { SetupWizard } from './components/wizard/SetupWizard';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ResearchPromptsPanel } from './components/ResearchPromptsPanel';
+import { WorkflowTutorial } from './components/tutorial/WorkflowTutorial';
 
 type RightTab = 'tasks' | 'activity';
 
@@ -104,6 +105,7 @@ export default function App() {
       <SetupWizard />
       <SettingsPanel />
       <ResearchPromptsPanel />
+      <WorkflowTutorial />
     </DashboardProvider>
   );
 }

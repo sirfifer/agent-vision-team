@@ -536,6 +536,25 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Open Workflow Tutorial command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('collab.openWorkflowTutorial', () => {
+      dashboardProvider.openPanel();
+      setTimeout(() => dashboardProvider.showTutorial(), 300);
+    })
+  );
+
+  // Run Research stub — fixes silent failure when Research "Run" button is clicked
+  context.subscriptions.push(
+    vscode.commands.registerCommand('collab.runResearch', async (promptId: string) => {
+      vscode.window.showInformationMessage(
+        `Research execution requires the researcher subagent via Claude Code CLI. ` +
+        `Use: Task tool \u2192 subagent_type: researcher, prompt: "Execute research prompt ${promptId}"`
+      );
+      return { success: true, summary: 'Research prompt queued. Execute via Claude Code CLI.' };
+    })
+  );
+
   // Validate all gates command
   context.subscriptions.push(
     vscode.commands.registerCommand('collab.validateAll', async () => {

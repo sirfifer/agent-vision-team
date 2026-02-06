@@ -41,6 +41,9 @@ interface DashboardContextValue {
   showResearchPrompts: boolean;
   setShowResearchPrompts: (show: boolean) => void;
   researchPrompts: ResearchPrompt[];
+  // Tutorial
+  showTutorial: boolean;
+  setShowTutorial: (show: boolean) => void;
 }
 
 export interface FormatDocResult {
@@ -80,6 +83,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   // Research prompts state
   const [showResearchPrompts, setShowResearchPrompts] = useState(false);
   const [researchPrompts, setResearchPrompts] = useState<ResearchPrompt[]>([]);
+
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -166,6 +172,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         case 'showWizard':
           setShowWizard(true);
           break;
+        case 'showTutorial':
+          setShowTutorial(true);
+          break;
       }
     };
     window.addEventListener('message', handler);
@@ -205,6 +214,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       lastFormatResult,
       showResearchPrompts, setShowResearchPrompts,
       researchPrompts,
+      showTutorial, setShowTutorial,
     }}>
       {children}
     </DashboardContext.Provider>
