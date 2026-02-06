@@ -163,23 +163,21 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
             error: msg.error,
           });
           break;
+        case 'showWizard':
+          setShowWizard(true);
+          break;
       }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  // Auto-show wizard when setup is incomplete
-  useEffect(() => {
-    if (setupReadiness && !setupReadiness.isComplete && !showWizard) {
-      // Auto-show wizard if setup is incomplete
-      // Only auto-show once on initial load
-      const hasSeenWizard = sessionStorage.getItem('avt-wizard-dismissed');
-      if (!hasSeenWizard) {
-        setShowWizard(true);
-      }
-    }
-  }, [setupReadiness, showWizard]);
+  // Wizard is triggered explicitly via:
+  // - VS Code walkthrough "Run the Setup Wizard" link
+  // - Sidebar toolbar lightbulb button (collab.openSetupWizard command)
+  // - SetupBanner "Run Setup Wizard" button
+  // - SessionBar lightning bolt icon
+  // - Extension sends 'showWizard' message
 
   const sendCommand = useCallback((type: WebviewMessage['type']) => {
     vscodeApi.postMessage({ type });

@@ -55,6 +55,18 @@
         "title": "Connect to MCP Servers",
         "category": "Collab Intelligence",
         "icon": "$(plug)"
+      },
+      {
+        "command": "collab.openSetupWizard",
+        "title": "Open Setup Wizard",
+        "category": "Collab Intelligence",
+        "icon": "$(lightbulb)"
+      },
+      {
+        "command": "collab.openWalkthrough",
+        "title": "Getting Started",
+        "category": "Collab Intelligence",
+        "icon": "$(question)"
       }
     ],
     "viewsContainers": {
@@ -104,8 +116,90 @@
           "when": "view == collab.tasks",
           "group": "navigation"
         }
+      ],
+      "viewContainer/title": [
+        {
+          "command": "collab.viewDashboard",
+          "when": "viewContainer == collab-intelligence",
+          "group": "navigation@1"
+        },
+        {
+          "command": "collab.connectMcpServers",
+          "when": "viewContainer == collab-intelligence",
+          "group": "navigation@2"
+        },
+        {
+          "command": "collab.openSetupWizard",
+          "when": "viewContainer == collab-intelligence",
+          "group": "navigation@3"
+        },
+        {
+          "command": "collab.openWalkthrough",
+          "when": "viewContainer == collab-intelligence",
+          "group": "navigation@4"
+        }
       ]
-    }
+    },
+    "walkthroughs": [
+      {
+        "id": "avt-getting-started",
+        "title": "Get Started with Collab Intelligence",
+        "description": "Learn how the Collaborative Intelligence System helps you build software with AI agents.",
+        "steps": [
+          {
+            "id": "welcome-overview",
+            "title": "Welcome to AVT",
+            "description": "The **Collaborative Intelligence System** coordinates specialized AI agents to help you develop software.\n\nIt provides:\n- **Institutional Memory** via a persistent Knowledge Graph\n- **Quality Enforcement** through deterministic quality gates\n- **Governance** ensuring agent decisions align with your project standards\n\nYour project's principles are protected by a three-tier hierarchy. Agents query this context before every decision.\n\n[Open the Dashboard](command:collab.viewDashboard)",
+            "media": {
+              "markdown": "media/walkthrough/01-welcome.md"
+            }
+          },
+          {
+            "id": "three-tier-hierarchy",
+            "title": "The Three-Tier Hierarchy",
+            "description": "The system enforces a protection hierarchy:\n\n**Vision (Tier 1)** — Core principles and invariants. Only humans can modify these.\n\n**Architecture (Tier 2)** — Patterns, components, and design decisions. Modifiable with orchestrator approval.\n\n**Quality (Tier 3)** — Observations, findings, and troubleshooting notes. Any agent can create these.\n\nLower tiers cannot override higher tiers. A quality finding can never contradict a vision standard.",
+            "media": {
+              "markdown": "media/walkthrough/02-three-tiers.md"
+            }
+          },
+          {
+            "id": "agent-team",
+            "title": "Your Agent Team",
+            "description": "Seven specialized agents collaborate on your project:\n\n- **Orchestrator** — Decomposes tasks and coordinates agents\n- **Worker** — Implements scoped tasks from task briefs\n- **Quality Reviewer** — Reviews diffs for standard violations\n- **KG Librarian** — Curates the Knowledge Graph\n- **Governance Reviewer** — Checks decisions against standards\n- **Researcher** — Investigates technologies and monitors dependencies\n- **Project Steward** — Maintains naming, organization, and hygiene\n\n[See agents in the Dashboard](command:collab.viewDashboard)",
+            "media": {
+              "markdown": "media/walkthrough/03-agents.md"
+            }
+          },
+          {
+            "id": "work-cycle",
+            "title": "How Work Gets Done",
+            "description": "The development cycle follows a governed flow:\n\n1. **Decompose** — Break complex tasks into discrete units\n2. **Create Governed Tasks** — Each task gets a governance review blocker\n3. **Review** — Governance reviewer checks against vision and architecture\n4. **Implement** — Worker agents execute approved tasks\n5. **Quality Gates** — Build, lint, test, coverage, and findings checks\n6. **Merge** — Approved work is merged with checkpoints\n\nEvery task is **blocked from birth** until governance review approves it.",
+            "media": {
+              "markdown": "media/walkthrough/04-work-cycle.md"
+            }
+          },
+          {
+            "id": "knowledge-graph",
+            "title": "Institutional Memory",
+            "description": "The Knowledge Graph is your project's persistent memory:\n\n- **Vision standards** are ingested from `docs/vision/` and become immutable\n- **Architecture patterns** are ingested from `docs/architecture/`\n- **Observations** accumulate as agents work — problems, solutions, decisions\n- **The KG Librarian** curates entries, promotes patterns, removes stale data\n\nAgents query the KG before starting work to understand context and constraints.\n\n[Browse the Knowledge Graph](command:collab.searchMemory)",
+            "media": {
+              "markdown": "media/walkthrough/05-knowledge-graph.md"
+            }
+          },
+          {
+            "id": "setup-project",
+            "title": "Set Up Your Project",
+            "description": "Ready to configure your project? The **Setup Wizard** will guide you through:\n\n- Creating vision and architecture documents\n- Configuring quality commands (test, lint, build)\n- Setting up project rules and permissions\n- Ingesting documents into the Knowledge Graph\n\nYou can re-run the wizard anytime from the sidebar toolbar or the dashboard.\n\n[Run the Setup Wizard](command:collab.openSetupWizard)",
+            "completionEvents": [
+              "onCommand:collab.openSetupWizard"
+            ],
+            "media": {
+              "markdown": "media/walkthrough/06-setup.md"
+            }
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "build:webview": "cd webview-dashboard && npm run build",

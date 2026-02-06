@@ -1,7 +1,9 @@
 {
   "version": 1,
-  "setupComplete": false,
-  "languages": [],
+  "setupComplete": true,
+  "languages": [
+    "typescript"
+  ],
   "metadata": {
     "isOpenSource": false
   },
@@ -21,133 +23,23 @@
   },
   "quality": {
     "testCommands": {
-      "python": "uv run pytest",
-      "typescript": "npm run test",
-      "javascript": "npm run test"
+      "typescript": "npm run test"
     },
     "lintCommands": {
-      "python": "uv run ruff check",
-      "typescript": "npm run lint",
-      "javascript": "npm run lint"
+      "typescript": "npm run lint"
     },
     "buildCommands": {
-      "typescript": "npm run build",
-      "javascript": "npm run build"
+      "typescript": "npm run build"
     },
     "formatCommands": {
-      "python": "uv run ruff format",
-      "typescript": "npx prettier --write",
-      "javascript": "npx prettier --write"
+      "typescript": "npm run format"
     }
   },
   "permissions": [],
   "ingestion": {
-    "lastVisionIngest": "2026-02-06T02:08:37.659Z",
+    "lastVisionIngest": null,
     "lastArchitectureIngest": null,
+    "visionDocCount": 0,
     "architectureDocCount": 0
-  },
-  "rules": {
-    "version": 1,
-    "entries": [
-      {
-        "id": "no-mocks",
-        "statement": "Write real integration and unit tests — never use mocks or stubs unless testing external service boundaries",
-        "rationale": "Mocks hide integration bugs and create false confidence in test suites",
-        "category": "testing",
-        "enforcement": "enforce",
-        "scope": [
-          "worker"
-        ],
-        "enabled": true,
-        "isDefault": true
-      },
-      {
-        "id": "test-coverage",
-        "statement": "All new code must have test coverage. Target near-full coverage for business logic",
-        "rationale": "Untested code is a liability — agents should not ship code they cannot prove works",
-        "category": "testing",
-        "enforcement": "enforce",
-        "scope": [
-          "worker"
-        ],
-        "enabled": true,
-        "isDefault": true
-      },
-      {
-        "id": "build-before-done",
-        "statement": "Run the build and all tests before reporting task completion",
-        "rationale": "Broken builds waste review cycles and erode trust in agent output",
-        "category": "testing",
-        "enforcement": "enforce",
-        "scope": [
-          "worker"
-        ],
-        "enabled": true,
-        "isDefault": true
-      },
-      {
-        "id": "follow-patterns",
-        "statement": "Follow existing patterns in the codebase. Search for similar implementations before creating new patterns",
-        "rationale": "Consistency reduces cognitive load; new patterns require justification",
-        "category": "code-quality",
-        "enforcement": "enforce",
-        "scope": [
-          "worker"
-        ],
-        "enabled": true,
-        "isDefault": true
-      },
-      {
-        "id": "no-suppress-warnings",
-        "statement": "Never suppress linter or compiler warnings without a documented justification",
-        "rationale": "Suppressed warnings hide real issues and accumulate technical debt",
-        "category": "code-quality",
-        "enforcement": "enforce",
-        "scope": [
-          "worker",
-          "quality-reviewer"
-        ],
-        "enabled": true,
-        "isDefault": true
-      },
-      {
-        "id": "focused-changes",
-        "statement": "Keep changes focused. Don't refactor surrounding code unless it's part of the task",
-        "rationale": "Scope creep makes reviews harder and introduces unrelated risk",
-        "category": "workflow",
-        "enforcement": "prefer",
-        "scope": [
-          "worker"
-        ],
-        "enabled": true,
-        "isDefault": true
-      },
-      {
-        "id": "read-before-modify",
-        "statement": "Read relevant code before modifying it. Never propose changes to code you haven't read",
-        "rationale": "Blind modifications break assumptions and miss existing constraints",
-        "category": "workflow",
-        "enforcement": "enforce",
-        "scope": [
-          "worker"
-        ],
-        "enabled": true,
-        "isDefault": true
-      },
-      {
-        "id": "reassess-on-failure",
-        "statement": "When encountering repeated failures (3+ attempts), stop and reassess the approach rather than continuing to iterate",
-        "rationale": "Repeated failures signal a wrong approach — iteration without reflection wastes resources",
-        "category": "workflow",
-        "enforcement": "prefer",
-        "scope": [
-          "worker"
-        ],
-        "enabled": true,
-        "isDefault": true
-      }
-    ],
-    "injectionMode": "compact",
-    "maxTokenBudget": 600
   }
 }

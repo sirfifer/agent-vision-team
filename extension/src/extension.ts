@@ -510,6 +510,26 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Open Setup Wizard command — opens dashboard then shows wizard overlay
+  context.subscriptions.push(
+    vscode.commands.registerCommand('collab.openSetupWizard', () => {
+      dashboardProvider.openPanel();
+      // Small delay to let webview initialize if panel was just created
+      setTimeout(() => dashboardProvider.showSetupWizard(), 300);
+    })
+  );
+
+  // Open Walkthrough command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('collab.openWalkthrough', () => {
+      vscode.commands.executeCommand(
+        'workbench.action.openWalkthrough',
+        'collab-intelligence.avt-getting-started',
+        false
+      );
+    })
+  );
+
   // Validate all gates command
   context.subscriptions.push(
     vscode.commands.registerCommand('collab.validateAll', async () => {

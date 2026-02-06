@@ -295,7 +295,8 @@ export type ExtensionMessage =
   | { type: 'researchPromptDeleted'; id: string }
   | { type: 'governedTasks'; tasks: GovernedTask[] }
   | { type: 'governanceStats'; stats: GovernanceStats }
-  | { type: 'formatDocContentResult'; requestId: string; success: boolean; formattedContent?: string; error?: string };
+  | { type: 'formatDocContentResult'; requestId: string; success: boolean; formattedContent?: string; error?: string }
+  | { type: 'showWizard' };
 
 export type WebviewMessage =
   | { type: 'connect' }
