@@ -372,5 +372,5 @@ export const DEFAULT_RULES_CONFIG: RulesConfig = {
   version: 1,
   entries: DEFAULT_RULES,
   injectionMode: 'compact',
-  maxTokenBudget: 400,
+  maxTokenBudget: 600,
 };

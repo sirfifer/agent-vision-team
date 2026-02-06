@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDashboard } from '../../context/DashboardContext';
 import { WIZARD_STEPS, WIZARD_STEP_LABELS, type WizardStep, type ProjectConfig } from '../../types';
 import { WizardStepIndicator } from './WizardStepIndicator';
@@ -55,8 +55,14 @@ export function SetupWizard() {
   const [draftConfig, setDraftConfig] = useState<ProjectConfig>(
     projectConfig ?? DEFAULT_CONFIG
   );
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const currentIndex = WIZARD_STEPS.indexOf(currentStep);
+
+  // Scroll step content to top whenever the current step changes
+  useEffect(() => {
+    contentRef.current?.scrollTo(0, 0);
+  }, [currentStep]);
   const isFirstStep = currentIndex === 0;
   const isLastStep = currentIndex === WIZARD_STEPS.length - 1;
 
@@ -188,7 +194,7 @@ export function SetupWizard() {
         />
 
         {/* Step content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div ref={contentRef} className="flex-1 overflow-y-auto p-6">
           {renderStep()}
         </div>
 

@@ -14,7 +14,7 @@ export function WizardStepIndicator({
   const currentIndex = WIZARD_STEPS.indexOf(currentStep);
 
   return (
-    <div className="flex items-center gap-1 px-4 py-3 border-b border-vscode-border bg-vscode-widget-bg overflow-x-auto">
+    <div className="flex items-center justify-center px-3 py-3 border-b border-vscode-border bg-vscode-widget-bg">
       {WIZARD_STEPS.map((step, index) => {
         const isCompleted = completedSteps.has(step);
         const isCurrent = step === currentStep;
@@ -25,7 +25,7 @@ export function WizardStepIndicator({
           <div key={step} className="flex items-center">
             {index > 0 && (
               <div
-                className={`w-8 h-0.5 mx-1 ${
+                className={`w-4 h-0.5 ${
                   isPast || isCompleted ? 'bg-tier-quality' : 'bg-vscode-border'
                 }`}
               />
@@ -34,8 +34,8 @@ export function WizardStepIndicator({
               onClick={() => isClickable && onStepClick(step)}
               disabled={!isClickable}
               className={`
-                flex items-center gap-1.5 px-2 py-1 rounded text-xs whitespace-nowrap
-                transition-colors
+                flex items-center gap-1 px-1 py-1 rounded text-xs whitespace-nowrap
+                transition-colors flex-shrink-0
                 ${isCurrent ? 'bg-vscode-btn-bg text-vscode-btn-fg' : ''}
                 ${isCompleted && !isCurrent ? 'text-tier-quality' : ''}
                 ${!isCurrent && !isCompleted ? 'text-vscode-muted' : ''}
@@ -45,7 +45,7 @@ export function WizardStepIndicator({
             >
               <span
                 className={`
-                  flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold
+                  flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold flex-shrink-0
                   ${isCurrent ? 'bg-vscode-btn-fg text-vscode-btn-bg' : ''}
                   ${isCompleted && !isCurrent ? 'bg-tier-quality text-white' : ''}
                   ${!isCurrent && !isCompleted ? 'bg-vscode-border text-vscode-muted' : ''}
@@ -59,7 +59,9 @@ export function WizardStepIndicator({
                   index + 1
                 )}
               </span>
-              <span className="hidden sm:inline">{WIZARD_STEP_LABELS[step]}</span>
+              {isCurrent && (
+                <span className="text-[11px]">{WIZARD_STEP_LABELS[step]}</span>
+              )}
             </button>
           </div>
         );

@@ -42,9 +42,8 @@
   },
   "permissions": [],
   "ingestion": {
-    "lastVisionIngest": null,
+    "lastVisionIngest": "2026-02-06T02:08:37.659Z",
     "lastArchitectureIngest": null,
-    "visionDocCount": 0,
     "architectureDocCount": 0
   },
   "rules": {
@@ -56,7 +55,9 @@
         "rationale": "Mocks hide integration bugs and create false confidence in test suites",
         "category": "testing",
         "enforcement": "enforce",
-        "scope": ["worker"],
+        "scope": [
+          "worker"
+        ],
         "enabled": true,
         "isDefault": true
       },
@@ -66,7 +67,9 @@
         "rationale": "Untested code is a liability — agents should not ship code they cannot prove works",
         "category": "testing",
         "enforcement": "enforce",
-        "scope": ["worker"],
+        "scope": [
+          "worker"
+        ],
         "enabled": true,
         "isDefault": true
       },
@@ -76,7 +79,9 @@
         "rationale": "Broken builds waste review cycles and erode trust in agent output",
         "category": "testing",
         "enforcement": "enforce",
-        "scope": ["worker"],
+        "scope": [
+          "worker"
+        ],
         "enabled": true,
         "isDefault": true
       },
@@ -86,7 +91,9 @@
         "rationale": "Consistency reduces cognitive load; new patterns require justification",
         "category": "code-quality",
         "enforcement": "enforce",
-        "scope": ["worker"],
+        "scope": [
+          "worker"
+        ],
         "enabled": true,
         "isDefault": true
       },
@@ -96,7 +103,10 @@
         "rationale": "Suppressed warnings hide real issues and accumulate technical debt",
         "category": "code-quality",
         "enforcement": "enforce",
-        "scope": ["worker", "quality-reviewer"],
+        "scope": [
+          "worker",
+          "quality-reviewer"
+        ],
         "enabled": true,
         "isDefault": true
       },
@@ -106,7 +116,9 @@
         "rationale": "Scope creep makes reviews harder and introduces unrelated risk",
         "category": "workflow",
         "enforcement": "prefer",
-        "scope": ["worker"],
+        "scope": [
+          "worker"
+        ],
         "enabled": true,
         "isDefault": true
       },
@@ -116,7 +128,9 @@
         "rationale": "Blind modifications break assumptions and miss existing constraints",
         "category": "workflow",
         "enforcement": "enforce",
-        "scope": ["worker"],
+        "scope": [
+          "worker"
+        ],
         "enabled": true,
         "isDefault": true
       },
@@ -126,12 +140,14 @@
         "rationale": "Repeated failures signal a wrong approach — iteration without reflection wastes resources",
         "category": "workflow",
         "enforcement": "prefer",
-        "scope": ["worker"],
+        "scope": [
+          "worker"
+        ],
         "enabled": true,
         "isDefault": true
       }
     ],
     "injectionMode": "compact",
-    "maxTokenBudget": 400
+    "maxTokenBudget": 600
   }
 }

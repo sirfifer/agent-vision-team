@@ -187,14 +187,14 @@ function estimateTokens(rules: RuleEntry[]): number {
 }
 
 function getTokenBudgetColor(tokens: number): string {
-  if (tokens < 300) return 'text-tier-quality';
-  if (tokens < 500) return 'text-amber-400';
+  if (tokens < 400) return 'text-tier-quality';
+  if (tokens < 550) return 'text-amber-400';
   return 'text-red-400';
 }
 
 function getTokenBudgetBarColor(tokens: number): string {
-  if (tokens < 300) return 'bg-tier-quality';
-  if (tokens < 500) return 'bg-amber-400';
+  if (tokens < 400) return 'bg-tier-quality';
+  if (tokens < 550) return 'bg-amber-400';
   return 'bg-red-400';
 }
 
@@ -214,7 +214,7 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
       version: 1,
       entries,
       injectionMode: config.rules?.injectionMode ?? 'compact',
-      maxTokenBudget: config.rules?.maxTokenBudget ?? 400,
+      maxTokenBudget: config.rules?.maxTokenBudget ?? 600,
     };
     updateConfig({ rules: rulesConfig });
   };
@@ -271,7 +271,7 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
 
   const enabledCount = currentRules.filter(r => r.enabled).length;
   const estimatedTokens = estimateTokens(currentRules);
-  const tokenBudget = config.rules?.maxTokenBudget ?? 400;
+  const tokenBudget = config.rules?.maxTokenBudget ?? 600;
 
   return (
     <div className="space-y-6">
