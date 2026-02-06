@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import * as path from 'path';
-import { execFile } from 'child_process';
+import * as fs from 'fs';
+import * as os from 'os';
+import { spawn } from 'child_process';
 import { Entity } from '../models/Entity';
 import { AgentStatus, ActivityEntry, GovernedTask, GovernanceStats } from '../models/Activity';
 import { ProjectConfig, SetupReadiness } from '../models/ProjectConfig';
@@ -517,35 +519,77 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private invokeClaudeFormat(tier: 'vision' | 'architecture', rawContent: string): Promise<string> {
+  private async invokeClaudeFormat(tier: 'vision' | 'architecture', rawContent: string): Promise<string> {
+    // Size gate — catch unreasonably large content before sending to model
+    const MAX_CONTENT_BYTES = 100 * 1024; // 100KB
+    if (Buffer.byteLength(rawContent, 'utf-8') > MAX_CONTENT_BYTES) {
+      throw new Error(
+        `Content too large (${Math.round(Buffer.byteLength(rawContent, 'utf-8') / 1024)}KB). ` +
+        'Please reduce to under 100KB.'
+      );
+    }
+
     const prompt = tier === 'vision'
       ? VISION_FORMAT_PROMPT
       : ARCHITECTURE_FORMAT_PROMPT;
-
     const fullPrompt = `${prompt}\n\n---\n\nHere is the raw content to format:\n\n${rawContent}`;
 
-    return new Promise((resolve, reject) => {
-      execFile(
-        'claude',
-        ['--print', '--model', 'sonnet', '-p', fullPrompt],
-        { timeout: 60000, maxBuffer: 1024 * 1024 },
-        (error, stdout, stderr) => {
-          if (error) {
-            const msg = (error as NodeJS.ErrnoException).code === 'ENOENT'
-              ? 'Claude CLI not found. Ensure "claude" is installed and on your PATH.'
-              : `Claude CLI failed: ${error.message}${stderr ? ` (${stderr.trim()})` : ''}`;
-            reject(new Error(msg));
-            return;
+    // Use temp files for input/output — avoids CLI arg limits and pipe buffering issues
+    const stamp = `avt-fmt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const inputPath = path.join(os.tmpdir(), `${stamp}-input.md`);
+    const outputPath = path.join(os.tmpdir(), `${stamp}-output.md`);
+
+    try {
+      // Write prompt to temp input file
+      fs.writeFileSync(inputPath, fullPrompt, 'utf-8');
+
+      // Run claude with file-descriptor-based I/O (no shell, no pipes)
+      await new Promise<void>((resolve, reject) => {
+        const inputFd = fs.openSync(inputPath, 'r');
+        const outputFd = fs.openSync(outputPath, 'w');
+
+        const proc = spawn('claude', ['--print', '--model', 'sonnet'], {
+          stdio: [inputFd, outputFd, 'pipe'],
+          timeout: 60000,
+        });
+
+        // Close parent copies of fds — child process has its own
+        fs.closeSync(inputFd);
+        fs.closeSync(outputFd);
+
+        let stderr = '';
+        proc.stderr!.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+        proc.on('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'ENOENT') {
+            reject(new Error('Claude CLI not found. Ensure "claude" is installed and on your PATH.'));
+          } else {
+            reject(new Error(`Claude CLI failed to start: ${err.message}`));
           }
-          const output = stdout.trim();
-          if (!output) {
-            reject(new Error('Claude CLI returned empty output'));
-            return;
+        });
+
+        proc.on('close', (code: number | null) => {
+          if (code !== 0) {
+            reject(new Error(
+              `Claude CLI exited with code ${code}${stderr ? `: ${stderr.trim().slice(0, 500)}` : ''}`
+            ));
+          } else {
+            resolve();
           }
-          resolve(output);
-        }
-      );
-    });
+        });
+      });
+
+      // Read formatted output from temp file
+      const output = fs.readFileSync(outputPath, 'utf-8').trim();
+      if (!output) {
+        throw new Error('Claude CLI returned empty output');
+      }
+      return output;
+    } finally {
+      // Clean up temp files
+      try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
+      try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
+    }
   }
 
   private getHtmlContent(webview: vscode.Webview): string {

@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+import tempfile
 from typing import Optional
 
 from .models import Decision, Finding, ReviewVerdict, Verdict
@@ -63,6 +64,9 @@ class GovernanceReviewer:
     def _run_claude(self, prompt: str, timeout: int = 60) -> str:
         """Run claude --print and return the raw output.
 
+        Uses temp files for input/output to avoid CLI argument length limits
+        and pipe buffering issues.
+
         When the ``GOVERNANCE_MOCK_REVIEW`` environment variable is set,
         returns a deterministic "approved" verdict without invoking the
         ``claude`` binary.  Used by the E2E test harness.
@@ -74,13 +78,30 @@ class GovernanceReviewer:
                 "guidance": "Mock review: auto-approved for E2E testing.",
                 "standards_verified": ["mock"],
             })
+
+        input_fd, input_path = tempfile.mkstemp(prefix="avt-gov-", suffix="-input.md")
+        output_fd, output_path = tempfile.mkstemp(prefix="avt-gov-", suffix="-output.md")
+
         try:
-            result = subprocess.run(
-                ["claude", "--print", "-p", prompt],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
+            # Write prompt to temp input file
+            with os.fdopen(input_fd, "w") as f:
+                f.write(prompt)
+            # input_fd is now closed by os.fdopen
+
+            # Close output_fd so subprocess can write to it
+            os.close(output_fd)
+
+            # Run claude with file-based I/O
+            with open(input_path) as fin, open(output_path, "w") as fout:
+                result = subprocess.run(
+                    ["claude", "--print"],
+                    stdin=fin,
+                    stdout=fout,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=timeout,
+                )
+
             if result.returncode != 0:
                 return json.dumps(
                     {
@@ -97,7 +118,11 @@ class GovernanceReviewer:
                         "standards_verified": [],
                     }
                 )
-            return result.stdout
+
+            # Read output from temp file
+            with open(output_path) as f:
+                return f.read()
+
         except subprocess.TimeoutExpired:
             return json.dumps(
                 {
@@ -116,6 +141,13 @@ class GovernanceReviewer:
                     "standards_verified": [],
                 }
             )
+        finally:
+            # Clean up temp files
+            for p in (input_path, output_path):
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
 
     def _parse_verdict(
         self,
