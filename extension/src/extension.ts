@@ -308,7 +308,13 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   // Register tree views
+  // Empty provider for the Actions view — viewsWelcome content renders the buttons
+  const emptyProvider: vscode.TreeDataProvider<never> = {
+    getTreeItem: () => { throw new Error('unreachable'); },
+    getChildren: () => [],
+  };
   context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('collab.actions', emptyProvider),
     vscode.window.registerTreeDataProvider('collab.findings', findingsProvider),
     vscode.window.registerTreeDataProvider('collab.tasks', tasksProvider),
     vscode.window.registerTreeDataProvider('collab.memory', memoryProvider)

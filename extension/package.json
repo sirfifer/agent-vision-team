@@ -81,6 +81,11 @@
     "views": {
       "collab-intelligence": [
         {
+          "id": "collab.actions",
+          "name": "Actions",
+          "type": "tree"
+        },
+        {
           "id": "collab.memory",
           "name": "Memory Browser"
         },
@@ -94,6 +99,12 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "collab.actions",
+        "contents": "$(dashboard) [Open Dashboard](command:collab.viewDashboard)\n\n$(plug) [Connect to Servers](command:collab.connectMcpServers)\n\n$(lightbulb) [Setup Wizard](command:collab.openSetupWizard)\n\n$(question) [Getting Started](command:collab.openWalkthrough)"
+      }
+    ],
     "menus": {
       "view/title": [
         {
@@ -115,28 +126,6 @@
           "command": "collab.refreshTasks",
           "when": "view == collab.tasks",
           "group": "navigation"
-        }
-      ],
-      "viewContainer/title": [
-        {
-          "command": "collab.viewDashboard",
-          "when": "viewContainer == collab-intelligence",
-          "group": "navigation@1"
-        },
-        {
-          "command": "collab.connectMcpServers",
-          "when": "viewContainer == collab-intelligence",
-          "group": "navigation@2"
-        },
-        {
-          "command": "collab.openSetupWizard",
-          "when": "viewContainer == collab-intelligence",
-          "group": "navigation@3"
-        },
-        {
-          "command": "collab.openWalkthrough",
-          "when": "viewContainer == collab-intelligence",
-          "group": "navigation@4"
         }
       ]
     },
