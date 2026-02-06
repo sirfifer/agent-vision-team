@@ -294,6 +294,17 @@ export function activate(context: vscode.ExtensionContext): void {
     configService = new ProjectConfigService(workspaceRoot);
     configService.ensureFolderStructure();
     dashboardProvider.setConfigService(configService);
+
+    // Push agent detection + session data immediately (before MCP connects)
+    // so agent cards render even when servers aren't running
+    const earlyAgents = detectAgents(workspaceRoot);
+    const earlyPhase = getSessionPhase(workspaceRoot);
+    const earlyTasks = getTaskCounts(workspaceRoot);
+    dashboardProvider.updateData({
+      agents: earlyAgents,
+      sessionPhase: earlyPhase,
+      tasks: earlyTasks,
+    });
   }
 
   // Register tree views
@@ -610,10 +621,12 @@ export function activate(context: vscode.ExtensionContext): void {
     } catch (error) {
       outputChannel.appendLine(`Auto-connect failed: ${error}`);
       statusBar.setHealth('error');
+      dashboardProvider.updateData({ connectionStatus: 'error' });
     }
   }).catch((error) => {
     outputChannel.appendLine(`Auto-start servers failed: ${error}`);
     outputChannel.appendLine('Use "Connect to MCP Servers" command to retry.');
+    dashboardProvider.updateData({ connectionStatus: 'error' });
   });
 }
 
