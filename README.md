@@ -7,8 +7,8 @@ A platform-native collaborative intelligence system for software development, le
 This system provides:
 
 - **Tier-Protected Knowledge Graph**: Persistent institutional memory with vision/architecture/quality protection tiers
-- **Governance Server**: Transactional review checkpoints with AI-powered decision review and governed task execution
-- **Quality Verification**: Deterministic tool wrapping (linters, formatters, tests) with trust engine
+- **Hook-Based Governance Enforcement**: PostToolUse hooks intercept every task Claude creates, automatically pairing it with a governance review — no agent cooperation required
+- **Quality Verification**: Deterministic tool wrapping (linters, formatters, tests, build checks) with trust engine
 - **Governed Task System**: "Intercept early, redirect early" — implementation tasks are blocked from birth until governance review approves them
 - **Claude Code Integration**: Custom subagents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward) that leverage native orchestration
 - **E2E Testing Harness**: Autonomous test suite generating unique projects per run across 11 scenarios with 172+ structural assertions
@@ -19,23 +19,37 @@ This system provides:
 The system follows a **platform-native** philosophy (Principle P9: "Build Only What the Platform Cannot Do"):
 
 ```
-┌─────────────────────────────────────────────┐
-│     Claude Code (Native Orchestration)      │
-│     - Task tool for subagent coordination   │
-│     - Lifecycle hooks for event tracking    │
-│     - Git worktree management              │
-└──────┬──────────────┬──────────────┬────────┘
-       │              │              │
-┌──────▼──────┐  ┌───▼────────┐  ┌──▼──────────┐
-│ Knowledge   │  │ Governance │  │  Quality    │
-│ Graph MCP   │  │ MCP        │  │  MCP        │
-│ Server      │  │ Server     │  │  Server     │
-│ (port 3101) │  │ (port 3103)│  │  (port 3102)│
-└─────────────┘  └────────────┘  └─────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│          Claude Code (Native Orchestration)                 │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  PostToolUse Hook: TaskCreate|TodoWrite              │   │
+│  │  → governance-task-intercept.py                      │   │
+│  │  Every task is "blocked from birth" automatically    │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  PreToolUse Hook: ExitPlanMode                       │   │
+│  │  → verify-governance-review.sh                       │   │
+│  │  Plans cannot be presented without governance review  │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  Task tool for subagent coordination                        │
+│  Git worktree management                                    │
+│  Model routing (Opus/Sonnet/Haiku)                         │
+└───────┬──────────────────┬──────────────────┬───────────────┘
+        │                  │                  │
+┌───────▼───────┐  ┌───────▼────────┐  ┌─────▼──────────┐
+│ Knowledge     │  │ Governance     │  │ Quality        │
+│ Graph MCP     │  │ MCP            │  │ MCP            │
+│ Server        │  │ Server         │  │ Server         │
+│ (port 3101)   │  │ (port 3103)    │  │ (port 3102)    │
+└───────────────┘  └────────────────┘  └────────────────┘
 ```
 
 **What we build:**
 - Three MCP servers providing capabilities Claude Code lacks
+- **Lifecycle hooks** that enforce governance at the platform level
 - Custom subagent definitions (`.claude/agents/*.md`)
 - Orchestration instructions (`CLAUDE.md`)
 - E2E testing harness (`e2e/`)
@@ -43,11 +57,94 @@ The system follows a **platform-native** philosophy (Principle P9: "Build Only W
 
 **What Claude Code provides natively:**
 - Subagent spawning and coordination (Task tool)
+- **PostToolUse / PreToolUse hooks** — the enforcement mechanism we hook into
 - Session persistence and resume
 - Git worktree management
 - Model routing (Opus/Sonnet/Haiku)
 - Tool restrictions and permissions
 - Background execution
+
+## Hook-Based Governance: How It Works
+
+The key architectural insight: **we don't ask agents to call custom governance tools**. That approach is not tenable — agents would need to remember to call `create_governed_task()` instead of using Claude Code's native task system, and there's no enforcement if they forget.
+
+Instead, **we hook directly into what Claude does natively**. After Claude writes each task (via `TaskCreate` or `TodoWrite`), a PostToolUse hook fires automatically and creates the governance artifacts:
+
+```
+Claude creates a task (TaskCreate or TodoWrite)
+        │
+        ▼
+PostToolUse hook fires (governance-task-intercept.py)
+        │
+        ├── Extracts task info from hook payload
+        ├── Creates a [GOVERNANCE] review task
+        ├── Adds blockedBy to the implementation task
+        ├── Records governance state in SQLite
+        └── Queues async automated review (background)
+        │
+        ▼
+Task is "blocked from birth" — cannot execute until review approves
+```
+
+### The Two Hooks
+
+**1. PostToolUse → `TaskCreate|TodoWrite`** (governance-task-intercept.py)
+
+Fires after every task creation. The hook:
+- Reads the hook payload from stdin (tool_name, tool_input, tool_result)
+- For `TodoWrite`: diffs against a seen-todos hash file (`.avt/seen-todos.json`) to detect genuinely new items — since TodoWrite sends the full list each time
+- Creates a governance review task that blocks the implementation task
+- Stores governance records in SQLite (`.avt/governance.db`)
+- Queues an async AI-powered review via `claude --print` with the governance-reviewer agent
+- Returns `additionalContext` to Claude explaining the governance pairing
+- Loop prevention: skips tasks prefixed with `[GOVERNANCE]`, `[REVIEW]`, `[SECURITY]`, `[ARCHITECTURE]`
+
+**2. PreToolUse → `ExitPlanMode`** (verify-governance-review.sh)
+
+Safety net: if an agent tries to present a plan without having called `submit_plan_for_review`, this hook blocks the action. This ensures governance review cannot be bypassed.
+
+### Why Hooks Instead of Custom Tools
+
+| Approach | Problem |
+|----------|---------|
+| Custom `create_governed_task()` tool | Agents must remember to use it; no enforcement if they forget |
+| PostToolUse hook on TaskCreate/TodoWrite | **Every task is intercepted automatically** — agents use Claude's native tools and governance happens behind the scenes |
+
+The hook approach means governance is **transparent and mandatory**. Agents don't need to know about governance — they just create tasks normally, and the hook ensures every task gets reviewed.
+
+### Configuration
+
+Hooks are configured in `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "TaskCreate|TodoWrite",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --directory \"$CLAUDE_PROJECT_DIR/mcp-servers/governance\" python \"$CLAUDE_PROJECT_DIR/scripts/hooks/governance-task-intercept.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/verify-governance-review.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
 
 ## Quick Start
 
@@ -118,6 +215,10 @@ agent-vision-team/
 │   ├── knowledge-graph/       # Tier-protected institutional memory (port 3101)
 │   ├── governance/             # Transactional governance review (port 3103)
 │   └── quality/                # Deterministic quality verification (port 3102)
+├── scripts/
+│   └── hooks/                  # Claude Code lifecycle hooks
+│       ├── governance-task-intercept.py  # PostToolUse: auto-governance on task creation
+│       └── verify-governance-review.sh   # PreToolUse: block plans without review
 ├── e2e/                        # Autonomous E2E testing harness
 │   ├── generator/              # Unique project generation per run (8 domains)
 │   ├── scenarios/              # 11 test scenarios (s01–s12)
@@ -126,11 +227,12 @@ agent-vision-team/
 ├── .claude/
 │   ├── agents/                 # 6 custom subagent definitions
 │   ├── skills/                 # User-invocable skills (/e2e)
-│   └── settings.json           # MCP server config + hooks
+│   └── settings.json           # MCP server config + hooks (governance enforcement)
 ├── .avt/                       # Project config, task briefs, memory, research, data stores
 │   ├── knowledge-graph.jsonl   # KG persistence (JSONL)
 │   ├── trust-engine.db         # Trust engine (SQLite)
-│   └── governance.db           # Governance decisions (SQLite)
+│   ├── governance.db           # Governance decisions (SQLite)
+│   └── seen-todos.json         # TodoWrite hash tracking (for hook diffing)
 ├── extension/                  # VS Code extension (observability only)
 ├── templates/                  # Installation templates for target projects
 ├── docs/
@@ -164,15 +266,16 @@ Three levels of oversight:
 
 ### Governed Task Execution
 
-The system enforces "intercept early, redirect early" through the governance-gated task system:
+The system enforces "intercept early, redirect early" through **Claude Code lifecycle hooks**:
 
-1. **Orchestrator calls `create_governed_task`** — atomically creates a review task AND an implementation task
-2. **Implementation task is blocked from birth** — its `blockedBy` array references the review task
-3. **Governance review runs** — checks vision standards, architecture patterns, KG memory
-4. **Review completes** — approved tasks unblock; blocked tasks stay with guidance
-5. **Worker picks up unblocked task** — guaranteed to be reviewed before execution
+1. **Claude creates a task** — using its native `TaskCreate` or `TodoWrite` tools (no special action required)
+2. **PostToolUse hook fires** — `governance-task-intercept.py` intercepts the tool call
+3. **Governance review task is created** — paired with the implementation task, which is blocked from birth
+4. **Automated review runs** — async AI-powered review checks vision standards, architecture patterns, KG memory
+5. **Review completes** — approved tasks unblock; blocked tasks stay with guidance
+6. **Worker picks up unblocked task** — guaranteed to be reviewed before execution
 
-Multiple review blockers can be stacked (governance → security → architecture). The task is released only when ALL blockers are approved.
+Multiple review blockers can be stacked (governance + security + architecture). The task is released only when ALL blockers are approved.
 
 ### Custom Subagents
 
@@ -191,26 +294,32 @@ The human + primary Claude Code session acts as orchestrator, using:
 - Task tool to spawn subagents
 - CLAUDE.md for task decomposition and governance protocol
 - Governance MCP server for transactional decision review
+- PostToolUse / PreToolUse hooks for automatic governance enforcement
 - session-state.md for persistent session state
 - Git tags for checkpoints
 
 ## Implementation Status
 
-### ✅ Phase 1: MCP Servers (Complete)
+### Phase 1: MCP Servers (Complete)
 
 3 servers: KG (11 tools), Quality (8 tools), Governance (10 tools) = **29 tools total**. JSONL persistence, tier protection, SQLite trust engine, transactional governance review.
 
-### ✅ Phase 2: Subagents + Validation (Complete)
+### Phase 2: Subagents + Validation (Complete)
 
 6 agents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward). Full CLAUDE.md orchestration. E2E testing harness with 11 scenarios and 172+ structural assertions.
 
-### ✅ Phase 3: Extension (Complete)
+### Phase 3: Extension (Complete)
 
 Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governance panel, research prompts panel. 3 MCP clients, 4 TreeViews, 12 commands.
 
-### ✅ Phase 4: Governance + E2E (Complete)
+### Phase 4: Governance + E2E (Complete)
 
-Governed task lifecycle (blocked from birth until review approves), AI-powered review via `claude --print`, multi-blocker support (stack governance + security + architecture reviews).
+- Governed task lifecycle (blocked from birth until review approves)
+- **PostToolUse hook** intercepting `TaskCreate|TodoWrite` for automatic governance enforcement
+- **PreToolUse hook** on `ExitPlanMode` ensuring plans are reviewed before presentation
+- AI-powered review via `claude --print` with governance-reviewer agent
+- Multi-blocker support (stack governance + security + architecture reviews)
+- Quality gates fully operational: build, lint, tests, coverage, findings
 
 ### Phase 5: Expand
 
@@ -229,6 +338,7 @@ Governed task lifecycle (blocked from birth until review approves), AI-powered r
 
 ### Governance Server
 
+- **Hook-Based Enforcement**: PostToolUse hook intercepts every `TaskCreate`/`TodoWrite` — governance is automatic, not opt-in
 - **Transactional Review**: Every decision blocks until review completes (synchronous round-trip)
 - **AI-Powered Review**: Uses `claude --print` with governance-reviewer agent for full reasoning
 - **Decision Categories**: `pattern_choice`, `component_design`, `api_design`, `deviation`, `scope_change`
@@ -236,13 +346,14 @@ Governed task lifecycle (blocked from birth until review approves), AI-powered r
 - **Governed Tasks**: Atomic creation of review + implementation task pairs, blocked from birth
 - **Multi-Blocker**: Stack multiple reviews (governance, security, architecture) on a single task
 - **Audit Trail**: All decisions, verdicts, and task reviews stored in SQLite
+- **Loop Prevention**: Review tasks (prefixed `[GOVERNANCE]`, `[REVIEW]`, etc.) are skipped to prevent infinite recursion
 
 ### Quality Server
 
 - **Multi-Language Support**: Python (ruff), TypeScript (eslint/prettier), Swift (swiftlint), Rust (clippy)
 - **Unified Interface**: Single MCP tools for format, lint, test, coverage
 - **Trust Engine**: SQLite-backed finding tracking with dismissal audit trail
-- **Quality Gates**: Aggregated gate results (build, lint, tests, coverage, findings)
+- **Quality Gates**: All 5 gates operational — build (runs configured build command), lint, tests, coverage, findings (checks trust engine for unresolved critical/high findings)
 - **No Silent Dismissals**: Every dismissal requires justification and identity
 
 ### E2E Testing Harness
@@ -263,11 +374,11 @@ See [e2e/README.md](e2e/README.md) for complete documentation.
 
 | Component | Tests | Coverage | Status |
 |-----------|-------|----------|--------|
-| Knowledge Graph | 18 | 74% | ✅ All passing |
-| Quality Server | 26 | 48% | ✅ All passing |
-| Extension (Unit) | 9 | N/A | ✅ All passing |
-| E2E Harness | 11 scenarios / 172+ assertions | N/A | ✅ All passing |
-| **Total** | **53 unit + 11 E2E scenarios** | — | **✅ All passing** |
+| Knowledge Graph | 18 | 74% | All passing |
+| Quality Server | 26 | 48% | All passing |
+| Extension (Unit) | 9 | N/A | All passing |
+| E2E Harness | 11 scenarios / 172+ assertions | N/A | All passing |
+| **Total** | **53 unit + 11 E2E scenarios** | — | **All passing** |
 
 ### Detailed Coverage
 
