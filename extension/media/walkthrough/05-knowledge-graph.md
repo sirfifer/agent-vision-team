@@ -13,7 +13,7 @@
                  │
   ┌──────────────▼───────────────────────┐
   │        Knowledge Graph               │
-  │     (.claude/collab/kg.jsonl)        │
+  │     (.avt/knowledge-graph.jsonl)      │
   │                                      │
   │  ┌──────────┐  ┌──────────────────┐  │
   │  │ Entities │  │ Relations        │  │

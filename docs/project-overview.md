@@ -21,7 +21,7 @@ A human developer, working through a primary Claude Code session (the orchestrat
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │              HUMAN + PRIMARY SESSION (Orchestrator)               │
-│    Interactive Claude Code session (Opus 4.5)                     │
+│    Interactive Claude Code session (Opus 4.6)                     │
 │    Reads: CLAUDE.md, session-state.md                            │
 │    Uses: Task tool to spawn all subagents                        │
 └──┬──────────┬──────────┬──────────┬──────────┬───────────────────┘
@@ -50,10 +50,14 @@ A human developer, working through a primary Claude Code session (the orchestrat
 │                                          └───────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
    │
-┌──▼──────────────────────────────────────────┐
-│          VS CODE EXTENSION                   │
-│    (Observability Dashboard — Read Only)     │
-└──────────────────────────────────────────────┘
+┌──▼──────────────────────────────────────────────────────────────────┐
+│                      VS CODE EXTENSION                              │
+│  Setup Wizard (9 steps)  │ Workflow Tutorial (10 steps)             │
+│  Governance Panel        │ Research Prompts Panel                   │
+│  Document Editor         │ VS Code Walkthrough (6 steps)           │
+│  3 MCP Clients           │ 4 TreeViews + Actions view              │
+│  12 Commands             │ Status Bar                              │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Platform-Native Philosophy
@@ -92,9 +96,9 @@ Lower tiers cannot modify higher tiers. Vision conflicts override all other work
 
 Persistent institutional memory with tier-based access control. Stores entities (components, patterns, decisions, vision standards), relations between them, and timestamped observations. All Claude Code sessions share the same graph.
 
-**Implementation**: Python + FastMCP, JSONL persistence at `.claude/collab/knowledge-graph.jsonl`
+**Implementation**: Python + FastMCP, JSONL persistence at `.avt/knowledge-graph.jsonl`
 
-**Tools**: `create_entities`, `create_relations`, `add_observations`, `search_nodes`, `get_entity`, `get_entities_by_tier`, `delete_observations`, `delete_entity`
+**Tools**: `create_entities`, `create_relations`, `add_observations`, `get_entity`, `search_nodes`, `get_entities_by_tier`, `delete_entity`, `delete_relations`, `delete_observations`, `ingest_documents`, `validate_tier_access`
 
 **Tier Protection**: Enforced at the tool level. Vision-tier entities are immutable by agents. Architecture-tier writes require explicit approval. Quality-tier is open to all callers.
 
@@ -321,19 +325,26 @@ Rules are configured in the setup wizard (the "Rules" step after "Quality Config
 
 ## VS Code Extension
 
-**Role**: Observability layer — monitors and displays system state. Does NOT orchestrate, spawn agents, or manage sessions. The system works fully from CLI without the extension.
+**Role**: Setup, monitoring, and management layer. Provides interactive onboarding, system observability, governance management, research prompt management, and document authoring. Does NOT orchestrate or spawn agents. The system works fully from CLI without the extension.
 
 **Implementation**: TypeScript + React (dashboard webview), esbuild + Vite
 
 **Capabilities**:
-- **Memory Browser**: KG entities grouped by protection tier
-- **Findings Panel**: Quality findings mapped to VS Code diagnostics
-- **Tasks Panel**: Task briefs from filesystem
-- **Dashboard Webview**: Real-time overview with session state, agent status cards, activity feed, governance decisions panel, research prompts manager
-- **Setup Wizard**: 8-step onboarding flow (welcome, vision docs, architecture docs, quality config, rules, permissions, settings, ingestion)
-- **Status Bar**: Aggregated system health indicator
+- **Setup Wizard**: 9-step interactive onboarding (welcome, vision docs, architecture docs, quality config, rules, permissions, settings, KG ingestion, completion) with AI-assisted document formatting
+- **Workflow Tutorial**: 10-step interactive guide covering the full system lifecycle
+- **VS Code Walkthrough**: Native 6-step walkthrough (`avt-getting-started`) covering system overview, three-tier hierarchy, agent team, work cycle, institutional memory, and project setup
+- **Dashboard Webview**: React/Tailwind application showing session status, agent cards, governance panel, governed tasks, activity feed, and setup readiness banner
+- **Governance Panel**: Governed tasks, pending reviews, decision history, and governance statistics
+- **Research Prompts Panel**: CRUD management for periodic and exploratory research prompts with schedule configuration
+- **Document Editor**: Claude CLI-based auto-formatting for vision and architecture documents using temp-file I/O pattern
+- **Memory Browser**: TreeView displaying KG entities grouped by protection tier
+- **Findings Panel**: TreeView displaying quality findings with VS Code diagnostic integration
+- **Tasks Panel**: TreeView displaying task briefs with status indicators
+- **Actions Panel**: TreeView with welcome content providing quick-action buttons
+- **Status Bar**: Two status bar items showing system health and summary
+- **12 Commands**: System start/stop, MCP connection, refresh operations, dashboard, wizard, walkthrough, tutorial, research, validation, ingestion
 
-**MCP Connectivity**: Connects to the same three MCP servers via HTTP clients (`McpClientService`). Reads only — no writes.
+**MCP Connectivity**: 3 MCP Clients (`KnowledgeGraphClient`, `QualityClient`, `GovernanceClient`) connecting to the same three MCP servers via SSE transport.
 
 **Key files**: `extension/src/extension.ts` (entry point), `extension/src/providers/DashboardWebviewProvider.ts` (React dashboard host), `extension/src/services/McpClientService.ts` (MCP connections), `extension/webview-dashboard/` (React app)
 
@@ -343,7 +354,7 @@ Rules are configured in the setup wizard (the "Rules" step after "Quality Config
 
 An autonomous end-to-end testing system that exercises all three MCP servers across 11 scenarios with 172+ structural assertions.
 
-**How it works**: Each run generates a unique project from a pool of 8 domains (Pet Adoption, Restaurant Reservation, Fitness Tracking, E-commerce, Social Media, Healthcare, Project Management, Fleet Management). Vision standards, architecture patterns, and components are filled from domain-specific templates. All assertions are structural and domain-agnostic — behavioral contracts hold regardless of domain.
+**How it works**: Each run generates a unique project from a pool of 8 domains (Pet Adoption Platform, Restaurant Reservation System, Fitness Tracking App, Online Learning Platform, Smart Home Automation, Inventory Management System, Event Ticketing Platform, Fleet Management System). Vision standards, architecture patterns, and components are filled from domain-specific templates. All assertions are structural and domain-agnostic — behavioral contracts hold regardless of domain.
 
 **Isolation**: Each scenario gets its own KnowledgeGraph (JSONL), GovernanceStore (SQLite), and TaskFileManager (directory). Scenarios run in parallel via `ThreadPoolExecutor`.
 
@@ -379,9 +390,9 @@ An autonomous end-to-end testing system that exercises all three MCP servers acr
 
 | Path | What | Managed By |
 |------|------|------------|
-| `.claude/collab/knowledge-graph.jsonl` | KG entity/relation persistence | KG Server |
-| `.claude/collab/trust-engine.db` | Quality finding audit trails | Quality Server |
-| `.claude/collab/governance.db` | Decision store with verdicts | Governance Server |
+| `.avt/knowledge-graph.jsonl` | KG entity/relation persistence | KG Server |
+| `.avt/trust-engine.db` | Quality finding audit trails | Quality Server |
+| `.avt/governance.db` | Decision store with verdicts | Governance Server |
 
 ### Project Configuration
 
@@ -439,7 +450,7 @@ The KG Librarian syncs important graph entries to human-readable files:
 | Dashboard | React 19 + Vite | Rich observability webview |
 | E2E Testing | Python + Pydantic + ThreadPoolExecutor | Autonomous scenario-based testing |
 | Quality Tools | ruff, eslint, prettier, swiftlint, clippy, pytest | Deterministic verification |
-| AI Models | Opus 4.5 (judgment), Sonnet 4.5 (routine) | Capability-first model routing |
+| AI Models | Opus 4.6 (judgment), Sonnet 4.5 (routine) | Capability-first model routing |
 | Package Management | npm (extension), uv (Python servers) | Standard per ecosystem |
 | Version Control | Git + worktrees | Code state, worker isolation, checkpoints |
 

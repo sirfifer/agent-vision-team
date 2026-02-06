@@ -113,7 +113,7 @@ No parameters.
 
 When an agent calls `submit_decision`:
 
-1. **Store** — Decision saved to SQLite (`.claude/collab/governance.db`) with auto-incremented sequence
+1. **Store** — Decision saved to SQLite (`.avt/governance.db`) with auto-incremented sequence
 2. **Load standards** — Vision standards and architecture entities read from KG JSONL file
 3. **Auto-flag** — `deviation` and `scope_change` categories automatically get `needs_human_review`
 4. **AI review** — For other categories, runs `claude --print` with the governance-reviewer agent, passing decision details and all applicable standards

@@ -166,6 +166,42 @@ class TrustEngine:
             for row in results
         ]
 
+    def get_unresolved_findings(self, min_severity: str = "high") -> list[dict]:
+        """Get unresolved findings at or above a severity threshold.
+
+        Severity hierarchy: critical > high > medium > low > info.
+        Returns findings with status 'open' at or above min_severity.
+        """
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+        threshold = severity_order.get(min_severity.lower(), 1)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT id, tool, severity, component, description, created_at, status
+            FROM findings
+            WHERE status = 'open'
+            ORDER BY created_at DESC
+        """)
+
+        results = cursor.fetchall()
+        conn.close()
+
+        return [
+            {
+                "id": row[0],
+                "tool": row[1],
+                "severity": row[2],
+                "component": row[3],
+                "description": row[4],
+                "created_at": row[5],
+                "status": row[6],
+            }
+            for row in results
+            if severity_order.get(row[2].lower(), 4) <= threshold
+        ]
+
     def get_all_findings(self, status: Optional[str] = None) -> list[dict]:
         """Get all findings, optionally filtered by status."""
         conn = sqlite3.connect(self.db_path)

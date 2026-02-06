@@ -1,8 +1,8 @@
 # Collaborative Intelligence System - Complete
 
 **Status**: ✅ All phases complete
-**Date**: 2024-01-31
-**Validation**: ✅ 21/21 checks passed
+**Date**: 2026-02-06
+**Validation**: ✅ E2E harness: 11 scenarios, 172+ assertions passed
 
 ## System Overview
 
@@ -13,10 +13,10 @@ The Collaborative Intelligence System is a **platform-native** collaborative int
 **Build Only What the Platform Cannot Do** (Principle P9)
 
 We build:
-- 2 MCP servers (Knowledge Graph + Quality)
-- 3 subagent definitions (worker, quality-reviewer, kg-librarian)
-- Orchestration instructions (CLAUDE.md)
-- VS Code extension (observability)
+- 3 MCP servers (Knowledge Graph + Quality + Governance) with 29 tools total
+- 6 subagent definitions (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward)
+- Orchestration instructions (CLAUDE.md) with governance checkpoints
+- VS Code extension (setup wizard, monitoring, management, governance panel)
 
 Claude Code provides natively:
 - Subagent spawning (Task tool)
@@ -45,28 +45,48 @@ Claude Code provides natively:
 - 26 tests, 48% coverage
 - 100% coverage for trust engine
 
+**Governance Server**:
+- SQLite persistence for decisions, verdicts, reviews, and governed tasks
+- AI-powered review via `claude --print` with governance-reviewer agent
+- Governed task lifecycle: blocked-from-birth, multi-blocker support
+- Transactional decision review (submit_decision blocks until verdict)
+- Plan review and completion review checkpoints
+- KG integration for loading vision standards
+- 10 tools (5 decision/review + 5 governed task management)
+- Mock review mode for testing (`GOVERNANCE_MOCK_REVIEW` env var)
+
 **Test Results**:
 ```
 Knowledge Graph: 18 tests ✅ (74% coverage)
 Quality Server:  26 tests ✅ (48% coverage)
-Total:           44 tests ✅ (61% average coverage)
+Extension:        9 unit tests ✅
+E2E Harness:     11 scenarios ✅ (172+ structural assertions)
 ```
 
 ### Phase 2: Subagents + Orchestration ✅
 
 **Subagent Definitions** (`.claude/agents/`):
-- `worker.md` - Implements scoped tasks with quality checks (Opus)
-- `quality-reviewer.md` - Three-lens review (Vision → Architecture → Quality) (Opus)
-- `kg-librarian.md` - Curates institutional memory (Sonnet)
+- `worker.md` - Implements scoped tasks within governance constraints (Opus, 9 tools)
+- `quality-reviewer.md` - Three-lens review: Vision → Architecture → Quality (Opus, 6 tools)
+- `kg-librarian.md` - Curates institutional memory, syncs archival files (Sonnet, 5 tools)
+- `governance-reviewer.md` - AI review called by Governance Server via `claude --print` (Sonnet, 4 tools)
+- `researcher.md` - Dual-mode research: periodic/maintenance + exploratory/design (Opus, 7 tools)
+- `project-steward.md` - Project hygiene: naming, organization, cruft detection (Sonnet, 7 tools)
 
 **Orchestration**:
 - `CLAUDE.md` - Comprehensive orchestrator instructions
   - Task decomposition protocol
+  - Task governance protocol (intercept early, redirect early)
   - Quality review protocol
   - Memory protocol
+  - Research protocol (periodic + exploratory)
+  - Project hygiene protocol
+  - Project rules protocol
   - Drift detection
-  - MCP tool documentation
-- `.claude/settings.json` - MCP server configs, lifecycle hooks, agent tool mappings
+  - Three-tier governance hierarchy
+  - Transactional governance checkpoints
+  - MCP tool documentation (all 3 servers)
+- `.claude/settings.json` - MCP server configs, lifecycle hooks, agent tool mappings, PreToolUse hooks
 
 **Workspace Structure**:
 - `.avt/task-briefs/` - Task briefs for workers (example included)
@@ -86,31 +106,76 @@ Total:           44 tests ✅ (61% average coverage)
 ### Phase 3: VS Code Extension ✅
 
 **Core Implementation**:
-- `McpClientService` - HTTP/JSON-RPC client for read-only server access
-- `KnowledgeGraphClient` - Typed wrapper for KG MCP tools
-- `QualityClient` - Typed wrapper for Quality MCP tools
+- `McpClientService` - SSE-based MCP protocol client for all 3 servers
+- `KnowledgeGraphClient` - Typed wrapper for KG MCP tools (port 3101)
+- `QualityClient` - Typed wrapper for Quality MCP tools (port 3102)
+- `GovernanceClient` - Typed wrapper for Governance MCP tools (port 3103)
+- `McpServerManager` - Spawns and manages MCP server child processes with port readiness polling
+- `ProjectConfigService` - Reads/writes `.avt/project-config.json` with atomic writes
 
 **UI Components**:
-- Memory Browser TreeView - KG entities grouped by tier (Vision/Architecture/Quality)
-- Findings Panel TreeView - Quality findings from lint/test runs
-- Tasks Panel TreeView - Filesystem-based task brief viewer
-- Status Bar - Health indicator and finding count
-- Dashboard Webview - React-based overview (scaffolded)
+- **Setup Wizard** - 9-step interactive onboarding (vision docs, architecture docs, quality config, rules, permissions, settings, KG ingestion)
+- **Workflow Tutorial** - 10-step interactive guide to the collaborative intelligence workflow
+- **VS Code Walkthrough** - Native 6-step walkthrough (system overview, three-tier hierarchy, agent team, work cycle, institutional memory, project setup)
+- **Dashboard Webview** - React/Tailwind SPA: session status, agent cards, governance panel, governed tasks, activity feed, setup readiness banner
+- **Governance Panel** - Governance stats, vision standards list, architectural elements, decision history
+- **Research Prompts Panel** - CRUD management for periodic and exploratory research prompts with schedule configuration
+- **Document Editor** - Claude CLI-based auto-formatting for vision and architecture documents (temp-file I/O pattern)
+- **Memory Browser TreeView** - KG entities grouped by protection tier with observation and relation details
+- **Findings Panel TreeView** - Quality findings grouped by tier with VS Code diagnostic integration
+- **Tasks Panel TreeView** - Task briefs with status indicators
+- **Actions Panel TreeView** - Welcome content with quick-action buttons (Open Dashboard, Connect to Servers, Setup Wizard, Workflow Tutorial)
+- **Status Bar** - Two items: system health indicator + summary (workers, findings, phase)
 
-**Commands** (observability-only):
-- Refresh Memory Browser
-- Refresh Findings Panel
-- Refresh Tasks Panel
-- Search Memory
-- View Dashboard
-- Validate All Quality Gates
-- Connect to MCP Servers
+**Commands** (12 total):
+- `collab.startSystem` / `collab.stopSystem` - System lifecycle
+- `collab.connectMcpServers` - Connect to all 3 MCP servers
+- `collab.refreshMemory` / `collab.refreshFindings` / `collab.refreshTasks` - Refresh tree views
+- `collab.searchMemory` - Full-text KG search
+- `collab.viewDashboard` - Open dashboard webview
+- `collab.openSetupWizard` / `collab.openWalkthrough` / `collab.openWorkflowTutorial` - Onboarding
+- `collab.validateAll` - Run all quality gates
+- `collab.runResearch` / `collab.ingestDocuments` / `collab.createTaskBrief` - Actions
 
 **Test Coverage**:
-- 9 test files with unit tests
-- 18 integration tests (defined, skipped by default)
-- Builds successfully
+- 9 unit test files
+- Builds successfully (node esbuild.config.js + vite build)
 - Complete documentation (README.md, TESTING.md)
+
+### Phase 4: Governance + E2E ✅
+
+**Governance System**:
+- Governance MCP Server (port 3103, 10 tools) with SQLite persistence
+- Governed task lifecycle: blocked-from-birth, multi-blocker support, atomic task pair creation
+- AI-powered review via `claude --print` with governance-reviewer agent
+- Transactional decision review: `submit_decision`, `submit_plan_for_review`, `submit_completion_review`
+- Decision categories: `pattern_choice`, `component_design`, `api_design`, `deviation`, `scope_change`
+- Verdicts: `approved`, `blocked`, `needs_human_review`
+- PreToolUse hook (`ExitPlanMode`) as safety net for governance review
+
+**E2E Testing Harness**:
+- 11 scenarios (s01-s10, s12) with 172+ structural, domain-agnostic assertions
+- 8 domain templates (Pet Adoption, Restaurant Reservation, Fitness Tracking, etc.)
+- Parallel execution via `ThreadPoolExecutor` with full isolation per scenario
+- Each scenario gets its own JSONL, SQLite, and task directories
+- `GOVERNANCE_MOCK_REVIEW` env var enables deterministic testing without live `claude` binary
+- Random domain selection ensures genuine uniqueness testing per run
+
+**Research System**:
+- Researcher subagent with dual modes: periodic/maintenance + exploratory/design
+- Research prompts stored in `.avt/research-prompts/` with schedule configuration
+- Research briefs stored in `.avt/research-briefs/` and referenced by task briefs
+- Model selection: Opus for novel domains, Sonnet for monitoring tasks
+
+**Project Rules System**:
+- Behavioral guidelines in `.avt/project-config.json`
+- Two enforcement levels: `enforce` (non-negotiable) and `prefer` (explain if deviating)
+- Scoped injection: only rules relevant to agent scope are included
+- Configured via setup wizard
+
+**Project Steward**:
+- Project hygiene subagent: naming conventions, folder organization, documentation completeness, cruft detection
+- Periodic cadence: weekly/monthly/quarterly reviews
 
 ## Test Summary
 
@@ -121,22 +186,29 @@ Total:           44 tests ✅ (61% average coverage)
 | Knowledge Graph | 18 | 74% | ✅ |
 | Quality Server | 26 | 48% | ✅ |
 | Extension (Unit) | 9 | N/A | ✅ |
-| **Total** | **53** | **61%** | ✅ |
+| E2E Harness | 11 scenarios (172+ assertions) | N/A | ✅ |
+| **Total** | **64 tests + 11 E2E scenarios** | — | ✅ |
 
 ### Key Metrics
 
 - **Core Business Logic**: 98%+ (graph, storage, trust engine, models)
-- **Integration Points**: 0% (expected - MCP server.py files, tested via integration)
+- **Integration Points**: 0% (expected - MCP server.py files, tested via E2E harness)
 - **Tool Execution**: 13-72% (branches require external tools: ruff, eslint, pytest)
+- **E2E Coverage**: All 3 MCP servers exercised across 11 scenarios with 172+ structural assertions
 
 ### Test Execution
 
 All tests passing:
 ```bash
-# Run all tests
+# Unit tests
 cd mcp-servers/knowledge-graph && uv run pytest  # 18 ✅
 cd mcp-servers/quality && uv run pytest          # 26 ✅
 cd extension && npm test                          # 9 ✅
+
+# E2E tests (exercises all 3 MCP servers)
+./e2e/run-e2e.sh                                  # 11 scenarios ✅
+./e2e/run-e2e.sh --keep                           # preserve workspace for debugging
+./e2e/run-e2e.sh --seed 42                        # reproducible runs
 ```
 
 ## Documentation Complete
@@ -144,14 +216,15 @@ cd extension && npm test                          # 9 ✅
 ### System Documentation
 
 ✅ **README.md** - Project overview, quick start, architecture, test summary
-✅ **ARCHITECTURE.md** - Technical specification (1,148 lines, 14 sections)
+✅ **ARCHITECTURE.md** - Technical specification (18 sections, authoritative architecture reference)
 ✅ **COLLABORATIVE_INTELLIGENCE_VISION.md** - Vision and principles
 ✅ **CLAUDE.md** - Orchestrator instructions and protocols
 
 ### Component Documentation
 
-✅ **mcp-servers/knowledge-graph/README.md** - Complete KG API documentation
-✅ **mcp-servers/quality/README.md** - Complete Quality API documentation
+✅ **mcp-servers/knowledge-graph/README.md** - Complete KG API documentation (11 tools)
+✅ **mcp-servers/quality/README.md** - Complete Quality API documentation (8 tools)
+✅ **mcp-servers/governance/README.md** - Complete Governance API documentation (10 tools)
 ✅ **extension/README.md** - Extension features and usage
 ✅ **extension/TESTING.md** - Extension testing guide
 
@@ -168,61 +241,41 @@ cd extension && npm test                          # 9 ✅
 
 ## Validation Results
 
-### Automated Validation
+### Primary Verification: E2E Test Harness
 
-Run `./validate.sh --skip-servers`:
+Run `./e2e/run-e2e.sh`:
 
 ```
-Phase 1: Knowledge Graph Server
-✓ Knowledge Graph tests (18 tests)
-✓ Knowledge Graph coverage (74% >= 70%)
+11 scenarios, 172+ structural assertions across all 3 MCP servers
 
-Phase 2: Quality Server
-✓ Quality Server tests (26 tests)
-✓ Quality Server coverage (48% >= 40%)
-
-Phase 3: VS Code Extension
-✓ Extension build
-
-Phase 4: Documentation
-✓ README.md exists
-✓ ARCHITECTURE.md exists
-✓ COLLABORATIVE_INTELLIGENCE_VISION.md exists
-✓ CLAUDE.md exists
-✓ .claude/VALIDATION.md exists
-✓ mcp-servers/knowledge-graph/README.md exists
-✓ mcp-servers/quality/README.md exists
-✓ extension/README.md exists
-✓ extension/TESTING.md exists
-
-Phase 5: Subagent Definitions
-✓ .claude/agents/worker.md exists
-✓ .claude/agents/quality-reviewer.md exists
-✓ .claude/agents/kg-librarian.md exists
-✓ .claude/settings.json exists
-
-Phase 6: Workspace Structure
-✓ .avt/task-briefs exists
-✓ .avt/memory exists
-✓ .avt/session-state.md exists
-
-Total checks: 21
-Passed: 21
-Failed: 0
-
-✓ All validation checks passed!
+| Scenario | What It Validates |
+|----------|-------------------|
+| s01 | KG Tier Protection: CRUD + tier-based access control |
+| s02 | Governance Decision Flow: decision storage, review verdicts |
+| s03 | Governed Task Lifecycle: task pair creation, blocking from birth, release on approval |
+| s04 | Vision Violation: vision-tier entity modification rejected |
+| s05 | Architecture Deviation: deviation/scope_change flagged correctly |
+| s06 | Quality Gates: GovernanceStore.get_status() accurate aggregates |
+| s07 | Trust Engine: finding record → dismiss → audit trail lifecycle |
+| s08 | Multi-Blocker Task: 3 stacked blockers released one at a time |
+| s09 | Scope Change Detection: scope_change → needs_human_review verdict |
+| s10 | Completion Guard: unresolved blocks and missing plan reviews caught |
+| s12 | Cross-Server Integration: KG + Governance + Task system interplay |
 ```
 
 ### Manual Validation Checklist
 
-✅ All MCP tools implemented (KG: 10 tools, Quality: 8 tools)
-✅ Tier protection enforced at tool level
+✅ All MCP tools implemented (KG: 11 tools, Quality: 8 tools, Governance: 10 tools = 29 total)
+✅ Tier protection enforced at tool level (vision entities immutable by workers)
 ✅ Trust engine requires justification for all dismissals
-✅ Subagent definitions have correct YAML frontmatter
-✅ Orchestrator CLAUDE.md includes all protocols
+✅ Governed tasks blocked from birth (cannot execute until all reviews approved)
+✅ AI-powered governance review via `claude --print` with governance-reviewer agent
+✅ 6 subagent definitions with correct YAML frontmatter
+✅ Orchestrator CLAUDE.md includes all protocols (governance, research, hygiene, rules)
 ✅ Extension activates on workspace detection
-✅ Extension builds without errors
+✅ Extension builds without errors (esbuild + vite)
 ✅ All documentation cross-referenced
+✅ E2E harness passes all 11 scenarios with 172+ assertions
 
 ## Usage
 
@@ -236,6 +289,10 @@ uv run python -m collab_kg.server
 # Terminal 2: Quality (port 3102)
 cd mcp-servers/quality
 uv run python -m collab_quality.server
+
+# Terminal 3: Governance (port 3103)
+cd mcp-servers/governance
+uv run python -m collab_governance.server
 ```
 
 ### Verify Server Health
@@ -243,30 +300,37 @@ uv run python -m collab_quality.server
 ```bash
 curl http://localhost:3101/health  # Should return 200
 curl http://localhost:3102/health  # Should return 200
+curl http://localhost:3103/health  # Should return 200
 ```
 
 ### Use From Claude Code
 
 1. **Open workspace** containing `.avt/`
-2. **Spawn worker** subagent:
+2. **Create governed task** (governance review blocks implementation from birth):
+   ```
+   create_governed_task(subject: "Feature X", description: "...", context: "...", review_type: "governance")
+   ```
+3. **Governance review completes** (AI-powered via `claude --print`), task unblocks
+4. **Spawn worker** subagent:
    ```
    Task tool → subagent: worker
    prompt: "Implement feature X from task brief"
    ```
-3. **Worker queries KG** for vision standards and patterns
-4. **Worker runs quality checks** before completion
-5. **Spawn quality reviewer**:
+5. **Worker queries KG** for vision standards and patterns
+6. **Worker submits decisions** via `submit_decision` (blocks until governance verdict)
+7. **Worker runs quality checks** (`check_all_gates()`) and calls `submit_completion_review`
+8. **Spawn quality reviewer**:
    ```
    Task tool → subagent: quality-reviewer
    prompt: "Review worker's changes"
    ```
-6. **Reviewer applies three-lens model** (Vision → Architecture → Quality)
-7. **Spawn KG librarian**:
-   ```
-   Task tool → subagent: kg-librarian
-   prompt: "Curate memory after session"
-   ```
-8. **Librarian consolidates** observations and syncs to archival files
+9. **Reviewer applies three-lens model** (Vision → Architecture → Quality)
+10. **Spawn KG librarian**:
+    ```
+    Task tool → subagent: kg-librarian
+    prompt: "Curate memory after session"
+    ```
+11. **Librarian consolidates** observations and syncs to archival files
 
 ### Use Extension (Optional)
 
@@ -280,97 +344,117 @@ curl http://localhost:3102/health  # Should return 200
 ```
 agent-vision-team/
 ├── .claude/
-│   ├── agents/                     # Subagent definitions
-│   │   ├── worker.md
-│   │   ├── quality-reviewer.md
-│   │   └── kg-librarian.md
-│   └── collab/                     # KG persistence
-│       └── knowledge-graph.jsonl
-├── .avt/                            # Workspace structure
-│   ├── task-briefs/
-│   ├── memory/
-│   ├── research-prompts/
-│   ├── research-briefs/
-│   ├── session-state.md
-│   └── project-config.json
-│   ├── settings.json               # MCP and agent configs
-│   ├── VALIDATION.md              # Validation guide
-│   └── PHASE3-STATUS.md           # Phase 3 status
+│   ├── agents/                     # 6 subagent definitions
+│   │   ├── worker.md               # Opus, 9 tools
+│   │   ├── quality-reviewer.md     # Opus, 6 tools
+│   │   ├── kg-librarian.md         # Sonnet, 5 tools
+│   │   ├── governance-reviewer.md  # Sonnet, 4 tools (called via claude --print)
+│   │   ├── researcher.md           # Opus, 7 tools
+│   │   └── project-steward.md      # Sonnet, 7 tools
+│   ├── settings.json               # MCP server configs, hooks, agent tool mappings
+│   ├── VALIDATION.md               # Validation guide
+│   └── PHASE3-STATUS.md            # Phase 3 status
+├── .avt/                            # System config and persistent data
+│   ├── knowledge-graph.jsonl        # KG entity/relation persistence
+│   ├── trust-engine.db              # Quality finding audit trails
+│   ├── governance.db                # Decision store with verdicts
+│   ├── task-briefs/                 # Task briefs for workers
+│   ├── memory/                      # Archival memory files
+│   ├── research-prompts/            # Research prompt definitions
+│   ├── research-briefs/             # Research output briefs
+│   ├── session-state.md             # Current session tracking
+│   └── project-config.json          # Project configuration (rules, gates, permissions)
 ├── mcp-servers/
-│   ├── knowledge-graph/           # KG MCP server
+│   ├── knowledge-graph/             # KG MCP server (port 3101, 11 tools)
 │   │   ├── collab_kg/
-│   │   ├── tests/                 # 18 tests
+│   │   ├── tests/                   # 18 tests
 │   │   └── README.md
-│   └── quality/                   # Quality MCP server
-│       ├── collab_quality/
-│       ├── tests/                 # 26 tests
+│   ├── quality/                     # Quality MCP server (port 3102, 8 tools)
+│   │   ├── collab_quality/
+│   │   ├── tests/                   # 26 tests
+│   │   └── README.md
+│   └── governance/                  # Governance MCP server (port 3103, 10 tools)
+│       ├── collab_governance/
 │       └── README.md
-├── extension/                     # VS Code extension
+├── extension/                       # VS Code extension
 │   ├── src/
-│   │   ├── mcp/                   # Typed MCP clients
-│   │   ├── providers/             # TreeView providers
-│   │   ├── services/              # Core services
-│   │   └── test/                  # 9 test files
+│   │   ├── mcp/                     # 3 typed MCP clients (KG, Quality, Governance)
+│   │   ├── providers/               # TreeView + Webview providers
+│   │   ├── services/                # Core services (MCP client, server manager, etc.)
+│   │   ├── commands/                # 12 registered commands
+│   │   └── test/                    # 9 unit test files
+│   ├── webview-dashboard/           # React + Tailwind dashboard (Vite build)
+│   │   └── src/
+│   │       └── components/
+│   │           ├── wizard/          # 9-step setup wizard
+│   │           └── tutorial/        # 10-step workflow tutorial
 │   ├── README.md
 │   └── TESTING.md
+├── e2e/                             # E2E testing harness
+│   ├── run-e2e.sh                   # Shell entry point
+│   ├── run-e2e.py                   # Python orchestrator
+│   ├── generator/                   # Unique project generation (8 domain templates)
+│   ├── scenarios/                   # 11 test scenarios (s01-s10, s12)
+│   ├── parallel/                    # ThreadPoolExecutor + per-scenario isolation
+│   └── validation/                  # Assertion engine + report generator
 ├── docs/
-│   └── v1-full-architecture/      # Archived v1 design
-├── README.md                      # Project overview
-├── ARCHITECTURE.md                # Technical spec
+│   ├── vision/                      # Vision standard documents
+│   ├── architecture/                # Architecture documents
+│   └── v1-full-architecture/        # Archived v1 design
+├── README.md                        # Project overview
+├── ARCHITECTURE.md                  # Technical spec (authoritative reference)
 ├── COLLABORATIVE_INTELLIGENCE_VISION.md  # Vision
-├── CLAUDE.md                      # Orchestrator instructions
-├── validate.sh                    # Validation script
-└── COMPLETE.md                    # This file
+├── CLAUDE.md                        # Orchestrator instructions
+└── COMPLETE.md                      # This file
 ```
 
 ## Next Steps
 
 The system is complete and ready for use. Optional enhancements:
 
-### Phase 4: Expand (Optional)
+### Phase 5: Expand (Future)
 
-- [ ] Cross-project memory (shared KG across repositories)
-- [ ] Multi-worker parallelism patterns (parallel feature development)
-- [ ] Installation script for target projects
-- [ ] Dashboard webview data wiring (React components)
-- [ ] VS Code diagnostics for findings (squiggly underlines)
-- [ ] Historical trend tracking (quality metrics over time)
-
-### Integration Tests
-
-To run full integration tests (requires live servers):
-
-1. Start both MCP servers
-2. Remove `.skip` from integration test cases in `extension/src/test/*.test.ts`
-3. Run `npm test` in extension directory
-
-Expected: 18 additional integration tests pass
+- [ ] Cross-project memory (shared KG across repositories, namespace design, conflict resolution)
+- [ ] Multi-team coordination (implementation team, review team, research team)
+- [ ] Plugin packaging and distribution (Claude Code plugin marketplace)
+- [ ] FastMCP 3.0 migration
+- [ ] Replace quality server gate stubs (build gate, findings gate in `check_all_gates()`)
+- [ ] Align extension UI with current system state (audit dashboard against MCP server APIs)
+- [ ] Agent Teams evaluation (when session resumption and nested teams are available)
 
 ## Key Achievements
 
-✅ **Platform-Native Architecture**: Leverages Claude Code's native capabilities
-✅ **Tier Protection**: Enforced at tool level, prevents accidental corruption
-✅ **No Silent Dismissals**: Every finding dismissal requires justification
-✅ **Complete Test Coverage**: 53 tests, 61% average coverage, 98%+ for core logic
-✅ **Comprehensive Documentation**: 9 documentation files covering all aspects
-✅ **Observability Extension**: Read-only monitoring without orchestration
-✅ **Validation Script**: Automated validation of all components
+✅ **Platform-Native Architecture**: Leverages Claude Code's native capabilities (Task tool, MCP, hooks, skills)
+✅ **3 MCP Servers**: Knowledge Graph (11 tools), Quality (8 tools), Governance (10 tools) = 29 tools total
+✅ **6 Subagents**: Worker, Quality Reviewer, KG Librarian, Governance Reviewer, Researcher, Project Steward
+✅ **Governed Tasks**: Blocked-from-birth lifecycle with multi-blocker support and AI-powered review
+✅ **Tier Protection**: Three-tier hierarchy (Vision > Architecture > Quality) enforced at tool level
+✅ **No Silent Dismissals**: Every finding dismissal requires justification with audit trail
+✅ **E2E Testing**: 11 scenarios, 172+ structural assertions, parallel execution, 8 domain templates
+✅ **Research System**: Dual-mode researcher (periodic + exploratory) with research prompts and briefs
+✅ **Project Rules**: Enforce/prefer behavioral guidelines injected into agent contexts
+✅ **VS Code Extension**: 9-step wizard, 10-step tutorial, 6-step walkthrough, governance panel, 12 commands
+✅ **Comprehensive Documentation**: ARCHITECTURE.md (authoritative), CLAUDE.md, Vision, component READMEs
 
 ## References
 
 - [Vision Document](COLLABORATIVE_INTELLIGENCE_VISION.md)
-- [Architecture Document](ARCHITECTURE.md)
+- [Architecture Document](ARCHITECTURE.md) (authoritative reference)
 - [Orchestrator Instructions](CLAUDE.md)
 - [Validation Guide](.claude/VALIDATION.md)
 - [KG Server Documentation](mcp-servers/knowledge-graph/README.md)
 - [Quality Server Documentation](mcp-servers/quality/README.md)
+- [Governance Server Documentation](mcp-servers/governance/README.md)
 - [Extension Documentation](extension/README.md)
 - [Extension Testing Guide](extension/TESTING.md)
+- [E2E Testing Harness](e2e/run-e2e.sh)
 
 ---
 
 **System Status**: Production-ready for experimentation
-**All Phases**: Complete ✅
-**Test Coverage**: 61% average, 98%+ core logic ✅
+**All Phases**: Phases 1-4 Complete ✅ (Phase 5: Expand is future work)
+**MCP Servers**: 3 servers, 29 tools ✅
+**Subagents**: 6 definitions ✅
+**Test Coverage**: 44 unit tests + 11 E2E scenarios (172+ assertions), 98%+ core logic ✅
 **Documentation**: Complete ✅
-**Validation**: 21/21 checks passed ✅
+**E2E Validation**: 11 scenarios passed ✅

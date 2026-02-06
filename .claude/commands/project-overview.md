@@ -30,7 +30,7 @@ Regenerate `docs/project-overview.md` by analyzing the current state of the enti
 
 ### Supporting Context
 9. `docs/reports/` — Any intelligence reports that affect the project
-10. `.claude/collab/` — Current collaboration workspace state
+10. `.avt/` — Current collaboration workspace state
 11. `DOGFOOD-CHECKLIST.md` — Testing/validation status (if exists)
 
 ## Document Structure Requirements

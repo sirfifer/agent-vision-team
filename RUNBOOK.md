@@ -26,6 +26,7 @@ This master script will:
   ```bash
   cd mcp-servers/knowledge-graph && uv sync
   cd mcp-servers/quality && uv sync
+  cd mcp-servers/governance && uv sync
   cd extension && npm install
   ```
 
@@ -35,12 +36,20 @@ This master script will:
 ./scripts/build-extension.sh
 ```
 
+The extension requires two build steps:
+
+1. **Backend build**: `cd extension && node esbuild.config.js`
+2. **Webview dashboard build**: `cd extension/webview-dashboard && npm run build`
+
 **Expected Output**:
 ```
 === Building Extension ===
 
-Running build...
-Build complete.
+Running backend build...
+Backend build complete.
+
+Running webview dashboard build...
+Webview build complete.
 
 ✓ Build successful
   Output: out/extension.js (234K)
@@ -66,16 +75,21 @@ Starting Quality server on port 3102...
   PID: 12346
   Log: /tmp/quality-server.log
 
+Starting Governance server on port 3103...
+  PID: 12347
+  Log: /tmp/governance-server.log
+
 Verifying server health...
   ✓ Knowledge Graph server: HEALTHY (port 3101)
   ✓ Quality server: HEALTHY (port 3102)
+  ✓ Governance server: HEALTHY (port 3103)
 
 === MCP Servers Started Successfully ===
 ```
 
 **Troubleshooting**:
-- If health check fails, check logs: `tail -f /tmp/kg-server.log` or `/tmp/quality-server.log`
-- Ensure ports 3101 and 3102 are not in use: `lsof -i :3101` and `lsof -i :3102`
+- If health check fails, check logs: `tail -f /tmp/kg-server.log`, `/tmp/quality-server.log`, or `/tmp/governance-server.log`
+- Ensure ports 3101, 3102, and 3103 are not in use: `lsof -i :3101`, `lsof -i :3102`, `lsof -i :3103`
 
 ### Step 3: Populate Test Data
 
@@ -137,8 +151,14 @@ Open `DOGFOOD-CHECKLIST.md` and work through all verification items.
 - Memory Browser (3 tiers, test entities)
 - Findings Panel
 - Tasks Panel
-- All 7 commands
-- Status bar
+- Actions view
+- Setup Wizard (9 steps)
+- Workflow Tutorial (10 steps)
+- Governance Panel
+- Research Prompts Panel
+- Document Editor
+- All 12 commands
+- Status bar (2 items)
 - Error handling
 
 ### Step 6: Cleanup
@@ -152,6 +172,7 @@ Open `DOGFOOD-CHECKLIST.md` and work through all verification items.
 Stopping MCP servers...
   ✓ Knowledge Graph server stopped
   ✓ Quality server stopped
+  ✓ Governance server stopped
 
 Servers stopped.
 ```
@@ -173,7 +194,7 @@ Servers stopped.
 
 ### start-mcp-servers.sh
 
-**Purpose**: Starts both MCP servers with health checks
+**Purpose**: Starts all 3 MCP servers with health checks (KG:3101, Quality:3102, Governance:3103)
 
 **Usage**:
 ```bash
@@ -232,14 +253,14 @@ Servers stopped.
 **Symptom**: No icon in Activity Bar
 
 **Possible Causes**:
-1. Workspace doesn't contain `.claude/collab/` directory
+1. Workspace doesn't contain `.avt/` directory
 2. Extension not built: `./scripts/build-extension.sh`
 3. VS Code cache issue: Reload window (Cmd+R / Ctrl+R)
 
 **Fix**:
 ```bash
 # Verify workspace structure
-ls -la .claude/collab/
+ls -la .avt/
 
 # Rebuild extension
 ./scripts/build-extension.sh
@@ -261,6 +282,7 @@ ls -la .claude/collab/
 # Check if servers running
 curl http://localhost:3101/health
 curl http://localhost:3102/health
+curl http://localhost:3103/health
 
 # Restart servers
 ./scripts/stop-mcp-servers.sh
@@ -269,6 +291,7 @@ curl http://localhost:3102/health
 # Check logs
 tail -f /tmp/kg-server.log
 tail -f /tmp/quality-server.log
+tail -f /tmp/governance-server.log
 ```
 
 ### Memory Browser shows empty tiers
@@ -300,20 +323,27 @@ tail -f /tmp/quality-server.log
 
 ### Build fails
 
-**Symptom**: `npm run build` errors
+**Symptom**: Build errors during backend or webview compilation
 
 **Possible Causes**:
 1. Dependencies not installed
 2. TypeScript compilation errors
+3. Webview dashboard dependencies not installed
 
 **Fix**:
 ```bash
+# Backend build
 cd extension
+npm install
+node esbuild.config.js
+
+# Webview dashboard build
+cd extension/webview-dashboard
 npm install
 npm run build
 
-# Check for TypeScript errors
-npx tsc --noEmit
+# Check for TypeScript errors (note: pre-existing mocha type errors can be ignored)
+cd extension && npx tsc --noEmit
 ```
 
 ### Port already in use
@@ -325,12 +355,39 @@ npx tsc --noEmit
 # Find process using port
 lsof -i :3101  # For KG server
 lsof -i :3102  # For Quality server
+lsof -i :3103  # For Governance server
 
 # Kill the process
 kill <PID>
 
 # Or use stop script
 ./scripts/stop-mcp-servers.sh
+```
+
+### Governance server issues
+
+**Symptom**: Governance panel shows no data, governed tasks not loading, or governance-related commands fail
+
+**Possible Causes**:
+1. Governance server not started (port 3103)
+2. Governance database (`.avt/governance.db`) corrupted or missing
+3. Server crashed after startup
+
+**Fix**:
+```bash
+# Check if governance server is running
+curl http://localhost:3103/health
+
+# Check governance server logs
+tail -f /tmp/governance-server.log
+
+# Restart governance server manually
+cd mcp-servers/governance && uv run python -m collab_governance.server
+
+# If database issues, remove and let server recreate
+rm .avt/governance.db
+./scripts/stop-mcp-servers.sh
+./scripts/start-mcp-servers.sh
 ```
 
 ---
@@ -341,11 +398,12 @@ kill <PID>
 
 For quick testing during development:
 
-1. Make code changes in `extension/src/`
-2. Rebuild: `npm run build` (in extension directory)
-3. In Extension Development Host: **Cmd+R / Ctrl+R** (reload window)
-4. Test changes
-5. Repeat
+1. Make code changes in `extension/src/` or `extension/webview-dashboard/src/`
+2. Rebuild backend: `cd extension && node esbuild.config.js`
+3. Rebuild webview (if changed): `cd extension/webview-dashboard && npm run build`
+4. In Extension Development Host: **Cmd+R / Ctrl+R** (reload window)
+5. Test changes
+6. Repeat
 
 **No need to**:
 - Restart MCP servers (unless server code changed)
@@ -455,10 +513,12 @@ npm install --save-dev vscode-extension-tester @types/mocha @types/chai
 # Check server health
 curl http://localhost:3101/health  # KG
 curl http://localhost:3102/health  # Quality
+curl http://localhost:3103/health  # Governance
 
 # View logs
 tail -f /tmp/kg-server.log
 tail -f /tmp/quality-server.log
+tail -f /tmp/governance-server.log
 
 # Reload extension in Dev Host
 # Press: Cmd+R (macOS) or Ctrl+R (Windows/Linux)

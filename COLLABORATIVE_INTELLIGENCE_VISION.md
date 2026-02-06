@@ -2,7 +2,7 @@
 
 A system of collaborative agents whose primary purpose is preserving and serving the project's vision and architectural integrity. Every capability this system provides — institutional memory, quality enforcement, research, session management — exists to ensure that all development work, whether by a single agent or a coordinated team, faithfully serves the project's vision and follows established architecture. Originally conceived as a "Quality Co-Agent," the scope expanded when we recognized that code quality is downstream of architecture, and architecture is downstream of vision. Protecting the higher-order concerns is what makes the lower-order ones achievable.
 
-**Execution Platform: Claude Code Max.** This entire system operates through Claude Code sessions on a Claude Max subscription. Claude Code provides the orchestration primitives natively — custom subagents, background task execution, lifecycle hooks, parallel sessions, worktree isolation, session resume — and MCP servers extend those primitives with persistent institutional memory and deterministic quality verification. No API keys are needed. No external orchestration frameworks. The platform handles coordination; we build only what it cannot do.
+**Execution Platform: Claude Code Max.** This entire system operates through Claude Code sessions on a Claude Max subscription. Claude Code provides the orchestration primitives natively — custom subagents, background task execution, lifecycle hooks, parallel sessions, worktree isolation, session resume — and MCP servers extend those primitives with persistent institutional memory, deterministic quality verification, and transactional governance review. No API keys are needed. No external orchestration frameworks. The platform handles coordination; we build only what it cannot do.
 
 **Platform-Native Philosophy.** This architecture is deliberately built on top of Claude Code's native capabilities rather than around them. Where the v1 design called for a custom Communication Hub server and extension-driven session management, we now use Claude Code's built-in subagent system, Task tool, and lifecycle hooks. The result is less custom code, faster validation, and tighter integration with the platform's evolution. This is also an experiment: by pushing the boundaries of what native primitives can handle, we'll learn precisely where custom infrastructure becomes necessary — and build it with that hard-won knowledge rather than speculation.
 
@@ -44,11 +44,11 @@ End result is not just what was hoped for but potentially BETTER. That success i
 All agentic work runs through Claude Code sessions on a Max subscription. This means:
 - The orchestrator is the human's primary Claude Code session
 - Workers are Claude Code subagents spawned via the Task tool, running in worktrees or background
-- The quality reviewer is a Claude Code subagent with access to Quality MCP tools
-- MCP servers provide unique capabilities the platform lacks: persistent institutional memory and deterministic quality verification
+- The quality reviewer is a Claude Code subagent with access to Quality MCP tools; the governance reviewer validates decisions via the Governance MCP server
+- MCP servers provide unique capabilities the platform lacks: persistent institutional memory, deterministic quality verification, and transactional governance review
 - Git coordinates code state; the filesystem stores artifacts and human-readable archives
 - The human developer is always the ultimate orchestrator with Claude Code as the instrument
-- Model selection follows "capability first": Opus 4.5 is the default for anything requiring judgment; Sonnet 4.5 for genuinely routine tasks where speed is an advantage; Haiku only for purely mechanical operations
+- Model selection follows "capability first": Opus 4.6 is the default for anything requiring judgment; Sonnet 4.5 for genuinely routine tasks where speed is an advantage; Haiku only for purely mechanical operations
 
 **P9: Build Only What the Platform Cannot Do**
 Before building any custom infrastructure, verify that Claude Code's native capabilities don't already solve the problem. Custom MCP servers are justified only for capabilities the platform genuinely lacks. Custom orchestration code is justified only when declarative configuration (CLAUDE.md, subagent definitions, hooks) cannot express the needed behavior. This principle kept us from building a Communication Hub server and extension-driven session management — Claude Code's subagent system, Task tool, and lifecycle hooks already handle those concerns.
@@ -66,7 +66,7 @@ A pipeline is: hooks fire, tools run, state files update, agents read state. Tha
 - They can sustain focus and coherence over long working sessions
 - **Every member understands the project's vision and protects it.** The quality subagent is the explicit guardian, but all sessions operate within the vision's boundaries.
 
-The architecture supports this at every level: the knowledge graph encodes vision and architectural standards that all sessions consult, MCP servers provide the persistent memory and quality verification, Claude Code's native primitives provide the orchestration, and git provides the transaction log.
+The architecture supports this at every level: the knowledge graph encodes vision and architectural standards that all sessions consult, MCP servers provide the persistent memory, quality verification, and governance review, Claude Code's native primitives provide the orchestration, and git provides the transaction log.
 
 ---
 
@@ -78,7 +78,7 @@ Claude Code provides the orchestration primitives natively. MCP servers extend t
 
 | Capability | Claude Code Primitive | How We Use It |
 |---|---|---|
-| **Agent spawning** | Custom subagents (`.claude/agents/*.md`) | Define quality-reviewer, worker, kg-librarian as subagent files with YAML frontmatter |
+| **Agent spawning** | Custom subagents (`.claude/agents/*.md`) | Define worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward as subagent files |
 | **Parallel execution** | Task tool with `run_in_background` | Orchestrator spawns multiple workers simultaneously |
 | **Agent coordination** | Parent-child communication via Task results | Orchestrator delegates work, receives results, chains subagents |
 | **Lifecycle hooks** | `SubagentStart`, `SubagentStop`, `PreToolUse`, `PostToolUse` | Track when subagents begin/end, validate operations |
@@ -94,12 +94,13 @@ Claude Code provides the orchestration primitives natively. MCP servers extend t
 |---|---|---|
 | **Persistent institutional memory** | Knowledge Graph server | Claude Code sessions are ephemeral. Memory doesn't survive across sessions natively. The KG provides persistent, structured, tier-protected memory that all sessions can query. |
 | **Deterministic quality verification** | Quality server | Claude Code can invoke tools, but doesn't bundle linter/formatter/test runner wrappers. The Quality server provides a unified MCP interface to ruff, eslint, swiftlint, pytest, etc., plus a trust engine for finding management. |
+| **Transactional governance review** | Governance server | Claude Code provides task management but not synchronous governance checkpoints. The Governance server provides transactional decision review, governed task lifecycle management, and plan/completion verification — ensuring every key decision is reviewed against vision standards before implementation proceeds. |
 
 ### What We Deliberately Don't Build
 
 | Capability | Why Not |
 |---|---|
-| **Communication Hub / message router** | Claude Code's Task tool + subagent system handles agent spawning, coordination, and result delivery. If we need an audit trail, a simple append-only JSONL log suffices. |
+| **Communication Hub / message router** | Claude Code's Task tool + subagent system handles agent spawning, coordination, and result delivery. The Governance MCP server provides transactional review checkpoints (synchronous tool-call-based review, not a message router), and its SQLite database serves as the audit trail for decisions and verdicts. |
 | **Agent registry** | The orchestrator knows who it spawned. SubagentStart/SubagentStop hooks can track lifecycle events. |
 | **Extension-driven orchestration** | Claude Code IS the orchestrator. The extension monitors; it doesn't drive. |
 | **Custom session management** | Subagent definitions + CLAUDE.md provide declarative session configuration. No imperative process management needed. |
@@ -112,55 +113,76 @@ Claude Code provides the orchestration primitives natively. MCP servers extend t
 | Subagent nesting | Subagents cannot spawn subagents. | Workflows are one level deep. The orchestrator spawns all workers directly. |
 | Background subagent MCP access | Background subagents cannot use MCP tools. | Workers that need KG/Quality MCP access must run in foreground, or the orchestrator pre-fetches context for them. |
 | Dynamic model switching | Model is set at session/subagent creation. | Strategic model selection happens at spawn time. |
-| Session-scoped tasks | Native Tasks don't persist across sessions. | Cross-session continuity comes from KG + filesystem, not from the Task system itself. |
+| ~~Session-scoped tasks~~ | Claude Code's native Task List now provides persistence across sessions. | Cross-session continuity uses the Task List alongside the KG and filesystem. This was a previous limitation that has since been resolved by the platform. |
 
 ---
 
 ## 1. Agent Topology
 
-The three-tier model maps onto Claude Code's native subagent system:
+The three-tier oversight model maps onto Claude Code's native subagent system. Six specialized subagents serve distinct roles, with five spawned by the orchestrator and one (the governance-reviewer) invoked internally by the Governance server:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│              HUMAN + PRIMARY SESSION (Orchestrator)          │
-│  The human developer in an interactive Claude Code session.  │
-│  Maintains goals, delegates work, reviews results,           │
-│  manages checkpoints via git.                                │
-└────────────┬────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│               HUMAN + PRIMARY SESSION (Orchestrator)              │
+│   The human developer in an interactive Claude Code session.      │
+│   Maintains goals, delegates work, reviews results,               │
+│   manages checkpoints via git.                                    │
+└────────────┬─────────────────────────────────────────────────────┘
              │ spawns via Task tool
              │
-    ┌────────┴──────────────────────────────────────┐
-    │                                               │
-    │  ┌─────────────┐    ┌──────────────────────┐  │
-    │  │   WORKER     │    │   QUALITY REVIEWER   │  │
-    │  │   SUBAGENT   │    │   SUBAGENT           │  │
-    │  │  (.claude/   │    │  (.claude/agents/    │  │
-    │  │   agents/    │    │   quality-reviewer   │  │
-    │  │   worker.md) │    │   .md)               │  │
-    │  └──────┬───────┘    └──────────┬───────────┘  │
-    │         │                       │              │
-    │         │     MCP Tools         │              │
-    │         ├───────────────────────┤              │
-    │         │                       │              │
-    │    ┌────▼─────┐          ┌─────▼──────┐       │
-    │    │Knowledge │          │  Quality   │       │
-    │    │  Graph   │          │  Server    │       │
-    │    │  Server  │          │            │       │
-    │    └──────────┘          └────────────┘       │
-    │                                               │
-    │  ┌──────────────────────────────────────────┐ │
-    │  │   KG LIBRARIAN SUBAGENT                  │ │
-    │  │  (.claude/agents/kg-librarian.md)         │ │
-    │  │   Curates memory after work sessions      │ │
-    │  └──────────────────────────────────────────┘ │
-    │                                               │
-    └───────────────────────────────────────────────┘
+    ┌────────┴─────────────────────────────────────────────────┐
+    │                                                          │
+    │  ┌──────────────┐  ┌───────────────┐  ┌──────────────┐  │
+    │  │    WORKER     │  │   QUALITY     │  │  RESEARCHER  │  │
+    │  │    SUBAGENT   │  │   REVIEWER    │  │  SUBAGENT    │  │
+    │  │  (.claude/    │  │   SUBAGENT    │  │ (.claude/    │  │
+    │  │   agents/     │  │  (.claude/    │  │  agents/     │  │
+    │  │   worker.md)  │  │   agents/     │  │  researcher  │  │
+    │  │              │  │   quality-    │  │  .md)        │  │
+    │  │              │  │   reviewer    │  │              │  │
+    │  │              │  │   .md)        │  │              │  │
+    │  └──────┬───────┘  └──────┬────────┘  └──────────────┘  │
+    │         │                 │                               │
+    │         │   MCP Tools     │                               │
+    │         ├─────────────────┤                               │
+    │         │                 │                               │
+    │    ┌────▼──────┐   ┌─────▼───────┐   ┌──────────────┐   │
+    │    │Knowledge  │   │  Quality    │   │ Governance   │   │
+    │    │  Graph    │   │  Server     │   │ Server       │   │
+    │    │  Server   │   │             │   │              │   │
+    │    └───────────┘   └─────────────┘   └──────┬───────┘   │
+    │                                             │            │
+    │                              invokes via claude --print  │
+    │                                             │            │
+    │                                    ┌────────▼─────────┐  │
+    │                                    │   GOVERNANCE     │  │
+    │                                    │   REVIEWER       │  │
+    │                                    │  (.claude/agents/ │  │
+    │                                    │   governance-    │  │
+    │                                    │   reviewer.md)   │  │
+    │                                    │  (NOT spawned by │  │
+    │                                    │   orchestrator)  │  │
+    │                                    └──────────────────┘  │
+    │                                                          │
+    │  ┌────────────────────────────────────────────────────┐  │
+    │  │   KG LIBRARIAN SUBAGENT                            │  │
+    │  │  (.claude/agents/kg-librarian.md)                   │  │
+    │  │   Curates memory after work sessions                │  │
+    │  └────────────────────────────────────────────────────┘  │
+    │                                                          │
+    │  ┌────────────────────────────────────────────────────┐  │
+    │  │   PROJECT STEWARD SUBAGENT                         │  │
+    │  │  (.claude/agents/project-steward.md)                │  │
+    │  │   Maintains project hygiene and organization        │  │
+    │  └────────────────────────────────────────────────────┘  │
+    │                                                          │
+    └──────────────────────────────────────────────────────────┘
 
-    ┌──────────────────────────────────────────────┐
-    │    VS Code Extension (observability only)     │
-    │    Reads from MCP servers + filesystem        │
-    │    Displays agents, findings, memory, tasks   │
-    └──────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────┐
+    │    VS Code Extension (observability only)                 │
+    │    Reads from MCP servers + filesystem                    │
+    │    Displays agents, findings, memory, tasks               │
+    └──────────────────────────────────────────────────────────┘
 ```
 
 **The Orchestrator: Human + Primary Session**
@@ -188,6 +210,28 @@ The three-tier model maps onto Claude Code's native subagent system:
 - Ensures tier protection consistency (no vision entities modified by agents).
 - Syncs important graph entries to archival files.
 - Spawned periodically by the orchestrator after work sessions.
+
+**Governance Reviewer Subagent: Decision Validator**
+- A custom subagent defined in `.claude/agents/governance-reviewer.md`, invoked by the Governance MCP server via `claude --print` — not spawned directly by the orchestrator.
+- Reviews decisions, plans, and completions against vision standards and institutional memory.
+- Returns structured verdicts (approved, blocked, needs_human_review) with guidance.
+- Operates as the internal reasoning engine for all governance checkpoints.
+- This architectural distinction matters: the governance-reviewer is called synchronously within a tool call, ensuring that review is transactional and blocking, not fire-and-forget.
+
+**Researcher Subagent: Intelligence Gatherer**
+- A custom subagent defined in `.claude/agents/researcher.md`, spawned by the orchestrator for investigative work.
+- Gathers intelligence to inform development decisions: evaluates technologies, compares approaches, monitors external dependencies.
+- Operates in two modes: periodic/maintenance research (tracking API changes, deprecations, security advisories) and exploratory/design research (deep investigation before architectural decisions).
+- Outputs structured research briefs stored in `.avt/research-briefs/`.
+- Uses Opus for novel domains and architectural analysis, Sonnet for routine changelog monitoring.
+- Workers implement; researchers investigate. This separation keeps workers focused on execution.
+
+**Project Steward Subagent: Hygiene Guardian**
+- A custom subagent defined in `.claude/agents/project-steward.md`, spawned by the orchestrator for organizational reviews.
+- Monitors project-level files, naming conventions, folder organization, documentation completeness, and cruft.
+- Produces structured review reports and records conventions in the KG for future reference.
+- Can apply mechanical fixes (renaming, cruft removal) when non-controversial.
+- Spawned periodically for consistency reviews, before releases, or after major refactoring.
 
 **VS Code Extension: Observability Layer**
 - Does NOT spawn sessions, manage processes, or orchestrate agents.
@@ -335,7 +379,7 @@ The orchestrator session's CLAUDE.md contains instructions for:
 
 Custom subagent definitions in `.claude/agents/` specify:
 - Each subagent's system prompt and role
-- Which tools it can access (KG MCP, Quality MCP, or restricted)
+- Which tools it can access (KG MCP, Quality MCP, Governance MCP, or restricted)
 - Which model to use
 - What hooks to run on lifecycle events
 
@@ -344,7 +388,7 @@ This is **declarative orchestration** — the behavior is specified in configura
 ### Session State and Checkpoint-Resume
 
 ```yaml
-# .claude/collab/session-state.md
+# .avt/session-state.md
 session_id: "2026-01-29-feature-sprint"
 started: "2026-01-29T09:00:00Z"
 goals:
@@ -369,12 +413,16 @@ Checkpoint creation: After each meaningful unit of work, the orchestrator update
 
 | Task Type | Model | Rationale |
 |---|---|---|
-| Orchestrator session | Opus 4.5 | Strategic decisions, cross-session coordination, judgment calls |
-| Quality reviewer subagent | Opus 4.5 | Vision enforcement and architectural review require deep reasoning |
-| Complex code generation | Opus 4.5 | Novel implementations, architectural decisions |
+| Orchestrator session | Opus 4.6 | Strategic decisions, cross-session coordination, judgment calls |
+| Quality reviewer subagent | Opus 4.6 | Vision enforcement and architectural review require deep reasoning |
+| Governance reviewer subagent | Sonnet 4.5 | Standards verification is structured; invoked by Governance server via `claude --print` |
+| Complex code generation | Opus 4.6 | Novel implementations, architectural decisions |
 | Routine code generation | Sonnet 4.5 | Well-defined tasks following established patterns |
+| Research (novel domains) | Opus 4.6 | Architectural decisions, security analysis, ambiguous requirements |
+| Research (routine monitoring) | Sonnet 4.5 | Changelog monitoring, version updates, API documentation |
 | Fast exploration | Haiku (Explore subagent) | Speed is the advantage; exploration is about breadth |
 | KG librarian | Sonnet 4.5 | Curation is structured and pattern-based |
+| Project steward | Sonnet 4.5 | Hygiene checks are pattern-based and well-defined |
 
 ### Drift Detection
 
@@ -592,6 +640,7 @@ specialists:
 |---|---|---|
 | **Knowledge Graph** | Persistent institutional memory with tier-aware protection | No existing MCP server provides tier-based access control (vision=immutable, architecture=human-gated, quality=open). This is our core differentiator. |
 | **Quality** | Unified quality tool interface + trust engine | Wraps ruff, eslint, swiftlint, pytest, etc. behind MCP with trust engine for finding management. No existing server does this. |
+| **Governance** | Transactional decision review + governed task lifecycle | Provides synchronous governance checkpoints where every key decision is reviewed against vision standards before implementation. Integrates with Claude Code's Task List for governed task creation and blocker management. No existing server provides this transactional review pattern. |
 
 ### What We Configure (Claude Code Native)
 
@@ -600,6 +649,9 @@ specialists:
 | `.claude/agents/worker.md` | Worker subagent definition |
 | `.claude/agents/quality-reviewer.md` | Quality reviewer subagent definition |
 | `.claude/agents/kg-librarian.md` | Memory curator subagent definition |
+| `.claude/agents/governance-reviewer.md` | Governance reviewer subagent definition (invoked by Governance server) |
+| `.claude/agents/researcher.md` | Researcher subagent definition |
+| `.claude/agents/project-steward.md` | Project steward subagent definition |
 | `CLAUDE.md` | Orchestrator instructions |
 | `.claude/settings.json` | Hooks for SubagentStart/SubagentStop events |
 
@@ -607,7 +659,7 @@ specialists:
 
 | Idea | Verdict | Reasoning |
 |---|---|---|
-| Communication Hub MCP server | Skip (for now) | Claude Code's Task tool + subagent returns handle coordination. Revisit if we need persistent cross-session messaging or audit trails beyond what JSONL logging provides. |
+| Communication Hub MCP server | Partially addressed | The Governance MCP server provides transactional review checkpoints (synchronous tool-call-based, not a message router). Its SQLite database serves as the decision audit trail. A general-purpose message router remains unnecessary — Claude Code's Task tool handles coordination. |
 | Extension-driven session management | Skip | Claude Code spawns and manages subagents natively. |
 | Custom agent registry | Skip | Orchestrator tracks who it spawned. SubagentStart hooks can log events. |
 | External orchestration frameworks | Skip | Requires API keys. Incompatible with Claude Code Max. |
@@ -622,49 +674,42 @@ Before building anything custom, ask: "Does Claude Code already do this natively
 
 ## 11. Implementation Approach
 
-### Phase 1: Make MCP Servers Real
+### Phase 1: MCP Servers -- COMPLETE
 
-Stand up the two MCP servers with actual functionality (not stubs):
+Stood up the Knowledge Graph and Quality MCP servers with full functionality:
 
-**Knowledge Graph Server:**
-- JSONL persistence (load on startup, append on write)
-- Full CRUD for entities, relations, observations
-- Tier protection enforced at server level
-- Pre-populate with example vision/architecture entities
+**Knowledge Graph Server (port 3101):** JSONL persistence, full CRUD for entities/relations/observations, tier protection enforced at server level.
 
-**Quality Server:**
-- Wrap real tools: `ruff` (Python), `eslint` (TypeScript), `swiftlint` (Swift)
-- Wrap real formatters: `ruff format`, `prettier`, `swiftformat`
-- Wrap real test runners: `pytest`, `npm test`, `xcodebuild test`
-- Trust engine with SQLite-backed finding history
-- Quality gate aggregation with real results
+**Quality Server (port 3102):** Wraps ruff, eslint, swiftlint, pytest, and more behind a unified MCP interface. Trust engine with SQLite-backed finding history. Quality gate aggregation.
 
-### Phase 2: Create Subagents + Validate End-to-End
+### Phase 2: Subagents + End-to-End Validation -- COMPLETE
 
-Create Claude Code subagent definitions and validate the full loop works from CLI:
+Created Claude Code subagent definitions and validated the full orchestrator-worker-reviewer loop from CLI:
+- Defined all six subagent files in `.claude/agents/`
+- Wrote orchestrator CLAUDE.md with task decomposition, quality review, memory, and governance protocols
+- Validated: orchestrator spawns worker, worker queries KG, implements, quality reviewer evaluates, findings route back, worker fixes, gates pass
 
-1. Define `.claude/agents/quality-reviewer.md`, `worker.md`, `kg-librarian.md`
-2. Write orchestrator CLAUDE.md with task decomposition and quality review instructions
-3. Start KG + Quality MCP servers
-4. Open Claude Code as orchestrator
-5. Test: orchestrator spawns worker → worker queries KG for constraints → worker implements → quality reviewer evaluates → findings flow back → worker fixes → quality passes → done
+### Phase 3: VS Code Extension -- COMPLETE
 
-If this works end-to-end without any extension code, the core architecture is validated.
+Built the extension as an observability layer:
+- MCP HTTP client connecting to all three servers
+- TreeView providers wired to real data (agents, findings, memory, tasks)
+- Dashboard webview with setup wizard and multi-step workflow tutorial
+- Filesystem watchers for session state and task briefs
 
-### Phase 3: Build Extension as Monitoring Layer
+### Phase 4: Governance + E2E Testing -- COMPLETE
 
-Only after Phase 2 proves the loop works:
-- Implement MCP HTTP client (connect to KG + Quality)
-- Wire TreeView providers to real data
-- Build dashboard webview
-- Add filesystem watchers for session state
-- Diagnostics integration (findings → VS Code squigglies)
+Added the Governance MCP server and comprehensive end-to-end testing:
 
-### Phase 4: Expand and Harden
+**Governance Server (port 3103):** Transactional decision review, governed task lifecycle (create, block, release), plan and completion verification. Integrates with Claude Code's Task List for persistence. Uses the governance-reviewer subagent internally via `claude --print`.
 
-- Event logging (simplified audit trail)
+**E2E Testing Harness:** 11 scenarios with 172+ structural assertions exercising all three MCP servers. Random domain generation, parallel execution with full isolation, domain-agnostic validation.
+
+### Phase 5: Expand -- IN PROGRESS
+
 - Cross-project memory (KG entities that travel between projects)
 - Multi-worker parallelism at scale
+- Research automation (scheduled research prompts)
 - FastMCP 3.0 migration when stable
 
 ---
@@ -691,17 +736,17 @@ This system exists to preserve and serve the project's vision. Everything it doe
 
 **Three-tiered oversight** is the organizing principle. Vision standards are immutable by agents and enforced as the highest priority. Architectural standards evolve through structured proposals requiring human approval. Quality standards are automated and low-friction.
 
-A human developer, working through a primary Claude Code session, orchestrates specialized subagents: workers implement tasks in isolated worktrees, a quality reviewer evaluates through the three-lens model (vision first, architecture second, quality third), and a librarian curates institutional memory.
+A human developer, working through a primary Claude Code session, orchestrates six specialized subagents: workers implement tasks in isolated worktrees, a quality reviewer evaluates through the three-lens model (vision first, architecture second, quality third), a governance reviewer validates decisions against vision standards, a researcher gathers intelligence before architectural decisions, a librarian curates institutional memory, and a project steward maintains organizational hygiene.
 
-Two custom MCP servers provide what Claude Code cannot: the Knowledge Graph stores persistent, tier-protected institutional memory queryable by all sessions. The Quality server wraps deterministic verification tools behind a unified interface with a trust engine for finding management.
+Three custom MCP servers provide what Claude Code cannot: the Knowledge Graph stores persistent, tier-protected institutional memory queryable by all sessions. The Quality server wraps deterministic verification tools behind a unified interface with a trust engine for finding management. The Governance server provides transactional decision review, ensuring every key decision is checked against vision standards before implementation proceeds.
 
-Everything else uses Claude Code's native capabilities: subagent spawning, background execution, lifecycle hooks, session resume, model routing, permission control.
+Everything else uses Claude Code's native capabilities: subagent spawning, background execution, lifecycle hooks, Task List persistence, session resume, model routing, permission control.
 
 **The confidence mechanism**: Confidence emerges from deterministic verification first (does it compile? do tests pass?), then from track record (did previous suggestions work?), then from explanation quality (is the rationale project-specific?). Never from self-assessment.
 
 **The team relationship**: Workers and the quality reviewer have each other's back. The quality system provides vision enforcement, architectural guidance, institutional memory, and quality automation that makes workers dramatically more effective. Workers aren't being policed; they're being supported by a teammate that remembers everything, knows the codebase patterns, guards the project's vision, and can bring fresh perspective when things get stuck.
 
-**The platform**: Everything runs on Claude Code Max. Custom infrastructure is limited to two MCP servers that provide capabilities the platform genuinely cannot. The architecture leverages native primitives aggressively, building only what it must. The result is a system that is practically powerful, readily extensible, and honest about what it knows and what it's still learning.
+**The platform**: Everything runs on Claude Code Max. Custom infrastructure is limited to three MCP servers that provide capabilities the platform genuinely cannot. The architecture leverages native primitives aggressively, building only what it must. The result is a system that is practically powerful, readily extensible, and honest about what it knows and what it's still learning.
 
 ---
 

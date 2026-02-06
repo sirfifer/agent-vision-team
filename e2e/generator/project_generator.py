@@ -155,7 +155,7 @@ def _materialise_architecture_patterns(
 # ---------------------------------------------------------------------------
 
 def _write_directory_structure(workspace: Path) -> dict[str, Path]:
-    """Create the ``.avt/``, ``docs/``, and ``.claude/collab/`` directory trees.
+    """Create the ``.avt/`` and ``docs/`` directory trees.
 
     Returns a dict mapping logical names to their created paths.
     """
@@ -178,10 +178,10 @@ def _write_directory_structure(workspace: Path) -> dict[str, Path]:
         p.mkdir(parents=True, exist_ok=True)
         dirs[subdir] = p
 
-    # .claude/collab for KG and governance DB
-    collab = workspace / ".claude" / "collab"
-    collab.mkdir(parents=True, exist_ok=True)
-    dirs["collab"] = collab
+    # .avt/ also holds KG and governance DB
+    avt = workspace / ".avt"
+    avt.mkdir(parents=True, exist_ok=True)
+    dirs["avt"] = avt
 
     # .claude/agents (empty, but expected by the system)
     agents = workspace / ".claude" / "agents"
@@ -312,7 +312,7 @@ def _ensure_governance_db(workspace: Path) -> Path:
     access. For E2E purposes we just ensure the file exists so that path
     references in ``GeneratedProject`` are valid.
     """
-    db_path = workspace / ".claude" / "collab" / "governance.db"
+    db_path = workspace / ".avt" / "governance.db"
     if not db_path.exists():
         db_path.touch()
     return db_path
@@ -373,7 +373,7 @@ def generate_project(
     dirs = _write_directory_structure(workspace)
 
     # 4. Write knowledge graph
-    kg_path = dirs["collab"] / "knowledge-graph.jsonl"
+    kg_path = dirs["avt"] / "knowledge-graph.jsonl"
     _write_knowledge_graph(kg_path, vision_standards, architecture_patterns)
 
     # 5. Write project config

@@ -358,7 +358,7 @@ A `PreToolUse` hook on `ExitPlanMode` runs `scripts/hooks/verify-governance-revi
 ### Internal Review Flow
 
 Inside each governance tool call:
-1. Decision/plan stored in SQLite (`.claude/collab/governance.db`)
+1. Decision/plan stored in SQLite (`.avt/governance.db`)
 2. Vision standards loaded from KG JSONL
 3. `claude --print` runs with the governance-reviewer agent for full AI reasoning
 4. Verdict stored in SQLite
@@ -671,6 +671,10 @@ e2e/
 - **Research before implementing**: For unfamiliar domains or architectural decisions, spawn the researcher first. Workers should implement, not research.
 - **Track external dependencies**: Set up periodic research prompts to monitor APIs, frameworks, and tools the project depends on.
 - **Maintain project hygiene**: Periodically spawn the project-steward for consistency reviews. Clean projects are maintainable projects.
+
+## Writing Style
+
+- **No em dashes.** Never use em dashes (the `—` character) in any generated prose, documentation, or narrative content. Replace with commas, semicolons, colons, or parentheses as grammatically appropriate. This applies to all output, not just PROJECT_STORY.md.
 
 ## Vision Standards (Examples)
 

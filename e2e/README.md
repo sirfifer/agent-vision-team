@@ -126,7 +126,7 @@ workspace/
 │   │   ├── project-config.json
 │   │   ├── session-state.md
 │   │   └── memory/
-│   └── .claude/collab/
+│   └── .avt/
 │       ├── knowledge-graph.jsonl
 │       └── governance.db
 ├── s01-kg-tier-protection/     # Per-scenario isolation
@@ -658,7 +658,7 @@ When a scenario fails, the root cause is in the MCP server code, not the test. U
    ls /tmp/avt-e2e-XXXXXX/project/.avt/
 
    # Read the generated KG
-   cat /tmp/avt-e2e-XXXXXX/project/.claude/collab/knowledge-graph.jsonl
+   cat /tmp/avt-e2e-XXXXXX/project/.avt/knowledge-graph.jsonl
 
    # Check a specific scenario's isolated data
    ls /tmp/avt-e2e-XXXXXX/s03-governed-task-lifecycle/

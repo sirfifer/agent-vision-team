@@ -171,7 +171,7 @@ class EntityWithRelations(Entity):
 ## Storage
 
 - **Format**: JSONL (one entity or relation per line)
-- **Path**: `.claude/collab/knowledge-graph.jsonl` (configurable)
+- **Path**: `.avt/knowledge-graph.jsonl` (configurable)
 - **Loading**: Entire file loaded into memory on startup
 - **Writing**: Append-only for new entities/relations
 - **Compaction**: Automatic after 1000 writes (rewrites file with current state only)

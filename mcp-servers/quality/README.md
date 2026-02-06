@@ -170,7 +170,7 @@ record_dismissal(
 
 ## Trust Engine
 
-SQLite database (`.claude/collab/trust-engine.db`) with two tables:
+SQLite database (`.avt/trust-engine.db`) with two tables:
 
 ### findings
 

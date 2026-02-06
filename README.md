@@ -126,12 +126,15 @@ agent-vision-team/
 ├── .claude/
 │   ├── agents/                 # 6 custom subagent definitions
 │   ├── skills/                 # User-invocable skills (/e2e)
-│   ├── collab/                 # KG, trust engine, governance databases
 │   └── settings.json           # MCP server config + hooks
-├── .avt/                       # Project config, task briefs, memory, research
+├── .avt/                       # Project config, task briefs, memory, research, data stores
+│   ├── knowledge-graph.jsonl   # KG persistence (JSONL)
+│   ├── trust-engine.db         # Trust engine (SQLite)
+│   └── governance.db           # Governance decisions (SQLite)
 ├── extension/                  # VS Code extension (observability only)
 ├── templates/                  # Installation templates for target projects
 ├── docs/
+│   ├── project-overview.md     # Project overview
 │   └── v1-full-architecture/   # Archived v1 design documents
 ├── COLLABORATIVE_INTELLIGENCE_VISION.md  # System vision (principles, topology)
 ├── ARCHITECTURE.md             # Technical architecture specification
@@ -146,6 +149,7 @@ agent-vision-team/
 - **[E2E Testing Harness](e2e/README.md)**: Autonomous test suite — architecture, scenario reference, writing new tests, debugging
 - **[Knowledge Graph Server README](mcp-servers/knowledge-graph/README.md)**: KG server API and tier protection
 - **[Quality Server README](mcp-servers/quality/README.md)**: Quality tools and trust engine
+- **[Governance Server README](mcp-servers/governance/README.md)**: Governance tools and governed task system
 - **[V1 Architecture (Archived)](docs/v1-full-architecture/README.md)**: Original full-infrastructure design
 
 ## Core Concepts
@@ -194,54 +198,23 @@ The human + primary Claude Code session acts as orchestrator, using:
 
 ### ✅ Phase 1: MCP Servers (Complete)
 
-- [x] Knowledge Graph with JSONL persistence
-- [x] Tier protection enforcement
-- [x] `delete_entity` and `delete_relations` tools
-- [x] Quality tool wrappers (format, lint, test, coverage)
-- [x] SQLite trust engine with dismissal tracking
-- [x] 18 tests (KG), 26 tests (Quality) - all passing
-- [x] 74% test coverage (KG), 48% (Quality)
-- [x] Complete API documentation
+3 servers: KG (11 tools), Quality (8 tools), Governance (10 tools) = **29 tools total**. JSONL persistence, tier protection, SQLite trust engine, transactional governance review.
 
 ### ✅ Phase 2: Subagents + Validation (Complete)
 
-- [x] Write `.claude/agents/worker.md`
-- [x] Write `.claude/agents/quality-reviewer.md`
-- [x] Write `.claude/agents/kg-librarian.md`
-- [x] Write orchestrator `CLAUDE.md`
-- [x] Write `.claude/settings.json` with lifecycle hooks
-- [x] Create workspace structure (task-briefs, memory, session-state)
-- [x] Example task brief and archival files
-- [x] Validation documentation
+6 agents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward). Full CLAUDE.md orchestration. E2E testing harness with 11 scenarios and 172+ structural assertions.
 
 ### ✅ Phase 3: Extension (Complete)
 
-- [x] MCP client service (read-only HTTP/JSON-RPC)
-- [x] Memory Browser TreeView (KG entities by tier)
-- [x] Findings Panel TreeView (quality findings)
-- [x] Tasks Panel TreeView (filesystem-based)
-- [x] Status bar integration
-- [x] Observability commands (refresh, search, validate)
-- [x] Extension builds successfully
-- [x] Unit tests (9 test files)
-- [x] Integration test suite (skipped by default)
-- [x] Complete documentation (README, TESTING)
+Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governance panel, research prompts panel. 3 MCP clients, 4 TreeViews, 12 commands.
 
 ### ✅ Phase 4: Governance + E2E (Complete)
 
-- [x] Governance MCP server with transactional decision review
-- [x] AI-powered review via `claude --print` with governance-reviewer agent
-- [x] Governed task system — tasks blocked from birth until review approves
-- [x] Multi-blocker support (stack governance + security + architecture reviews)
-- [x] 6 custom subagents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward)
-- [x] E2E testing harness (11 scenarios, 172+ assertions, 8 random domains)
-- [x] `/e2e` skill for easy test invocation
-- [x] `GOVERNANCE_MOCK_REVIEW` env var for deterministic E2E testing
+Governed task lifecycle (blocked from birth until review approves), AI-powered review via `claude --print`, multi-blocker support (stack governance + security + architecture reviews).
 
-### 🚀 Phase 5: Expand
+### Phase 5: Expand
 
 - [ ] Cross-project memory
-- [ ] Multi-worker parallelism patterns
 - [ ] Installation script for target projects
 
 ## Key Features

@@ -444,7 +444,7 @@ After generating the report:
 4. **P3 findings** → Archive for future reference
 
 The report serves as input for:
-- `.claude/collab/task-briefs/` — Generate task briefs from P0/P1 findings
+- `.avt/task-briefs/` — Generate task briefs from P0/P1 findings
 - `ARCHITECTURE.md` — Update if architectural changes needed
 - `.claude/settings.json` — Update if configuration changes needed
 - `mcp-servers/` — Modify servers if MCP changes required

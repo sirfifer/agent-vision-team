@@ -13,7 +13,7 @@ Complete this checklist while testing the Collab Intelligence extension in VS Co
 ## Pre-Test Setup
 
 - [ ] MCP servers started (`./scripts/start-mcp-servers.sh`)
-- [ ] Both servers healthy (KG:3101, Quality:3102)
+- [ ] All three servers healthy (KG:3101, Quality:3102, Governance:3103)
 - [ ] Extension built (`./scripts/build-extension.sh`)
 - [ ] Test data populated (`./scripts/populate-test-data.sh`)
 
@@ -81,30 +81,145 @@ _____________________________________________________________________________
 
 ---
 
-## Commands (All 7)
+## Commands (All 12)
 
 Test each command via Command Palette (Cmd+Shift+P / Ctrl+Shift+P):
 
-- [ ] **Collab Intelligence: Refresh Memory Browser**
-  Result: Memory Browser re-fetches entities
-
-- [ ] **Collab Intelligence: Refresh Findings Panel**
-  Result: Findings Panel re-fetches findings
-
-- [ ] **Collab Intelligence: Refresh Tasks Panel**
-  Result: Tasks Panel rescans directory
-
-- [ ] **Collab Intelligence: Search Memory**
-  Result: Input box appears, search works
-
-- [ ] **Collab Intelligence: View Dashboard**
+- [ ] **Collab Intelligence: View Dashboard** (`collab.viewDashboard`)
   Result: Dashboard webview opens
 
-- [ ] **Collab Intelligence: Validate All Quality Gates**
+- [ ] **Collab Intelligence: Refresh Memory Browser** (`collab.refreshMemory`)
+  Result: Memory Browser re-fetches entities
+
+- [ ] **Collab Intelligence: Search Memory** (`collab.searchMemory`)
+  Result: Input box appears, search works
+
+- [ ] **Collab Intelligence: Refresh Findings Panel** (`collab.refreshFindings`)
+  Result: Findings Panel re-fetches findings
+
+- [ ] **Collab Intelligence: Refresh Tasks Panel** (`collab.refreshTasks`)
+  Result: Tasks Panel rescans directory
+
+- [ ] **Collab Intelligence: Validate All Quality Gates** (`collab.validateAll`)
   Result: Notification shows gate results
 
-- [ ] **Collab Intelligence: Connect to MCP Servers**
+- [ ] **Collab Intelligence: Connect to MCP Servers** (`collab.connectMcpServers`)
   Result: Status bar updates, connection logs visible
+
+- [ ] **Collab Intelligence: Open Setup Wizard** (`collab.openSetupWizard`)
+  Result: Dashboard opens with Setup Wizard overlay visible
+
+- [ ] **Collab Intelligence: Open Workflow Tutorial** (`collab.openWorkflowTutorial`)
+  Result: Dashboard opens with Workflow Tutorial overlay visible
+
+- [ ] **Collab Intelligence: Run Research Prompt** (`collab.runResearch`)
+  Result: Research prompt selection or creation flow starts
+
+- [ ] **Collab Intelligence: Getting Started** (`collab.openWalkthrough`)
+  Result: VS Code native walkthrough opens with 6 steps
+
+- [ ] **Collab Intelligence: Create Task Brief** (`collab.createTaskBrief`)
+  Result: Task brief creation flow starts
+
+**Notes**:
+_____________________________________________________________________________
+
+---
+
+## Actions View
+
+- [ ] Sidebar shows "Actions" section
+- [ ] Welcome content displays quick-action buttons:
+  - [ ] "Open Dashboard" button
+  - [ ] "Connect to Servers" button
+  - [ ] "Setup Wizard" button
+  - [ ] "Workflow Tutorial" button
+- [ ] Each button triggers its corresponding command
+
+**Notes**:
+_____________________________________________________________________________
+
+---
+
+## Setup Wizard (9 Steps)
+
+- [ ] Command Palette → "Collab Intelligence: Open Setup Wizard"
+- [ ] Wizard overlay appears in Dashboard
+- [ ] Step 1: Welcome — displays intro text
+- [ ] Step 2: Vision Docs — vision document configuration
+- [ ] Step 3: Architecture Docs — architecture document configuration
+- [ ] Step 4: Quality Config — quality gate settings
+- [ ] Step 5: Rules — project rules with enforce/prefer levels
+- [ ] Step 6: Permissions — agent permission configuration
+- [ ] Step 7: Settings — general project settings
+- [ ] Step 8: KG Ingestion — knowledge graph document ingestion
+- [ ] Step 9: Completion — summary and finish
+- [ ] Can navigate forward/backward between steps
+- [ ] Step indicators show progress
+- [ ] Wizard can be closed/dismissed
+
+**Notes**:
+_____________________________________________________________________________
+
+---
+
+## Workflow Tutorial (10 Steps)
+
+- [ ] Command Palette → "Collab Intelligence: Open Workflow Tutorial"
+- [ ] Tutorial overlay appears in Dashboard
+- [ ] Step 1: Welcome
+- [ ] Step 2: Big Picture
+- [ ] Step 3: Setup
+- [ ] Step 4: Starting Work
+- [ ] Step 5: Behind the Scenes
+- [ ] Step 6: Monitoring
+- [ ] Step 7: Knowledge Graph
+- [ ] Step 8: Quality Gates
+- [ ] Step 9: Tips
+- [ ] Step 10: Ready
+- [ ] Can navigate forward/backward between steps
+- [ ] Tutorial can be closed/dismissed
+
+**Notes**:
+_____________________________________________________________________________
+
+---
+
+## Governance Panel
+
+- [ ] Dashboard shows Governance Panel (left side, 2/5 width)
+- [ ] Governance stats counters displayed
+- [ ] Vision standards list shown
+- [ ] Architectural elements list shown
+- [ ] Governed tasks with review status badges visible
+- [ ] Blocker indicators display correctly
+
+**Notes**:
+_____________________________________________________________________________
+
+---
+
+## Research Prompts Panel
+
+- [ ] Research Prompts Panel accessible from Dashboard (Session Bar button)
+- [ ] Can create a new research prompt
+- [ ] Can edit an existing research prompt
+- [ ] Can delete a research prompt
+- [ ] Schedule configuration works (periodic/exploratory modes)
+- [ ] Can run a research prompt
+
+**Notes**:
+_____________________________________________________________________________
+
+---
+
+## Document Editor
+
+- [ ] Can draft content for vision/architecture documents
+- [ ] Format button triggers Claude CLI-based auto-formatting
+- [ ] Formatted result appears for review
+- [ ] Can save formatted document
+- [ ] Error states handled gracefully
 
 **Notes**:
 _____________________________________________________________________________
@@ -113,10 +228,14 @@ _____________________________________________________________________________
 
 ## Status Bar
 
-- [ ] Left side shows: `$(shield) Collab: Active`
-- [ ] Color is green (indicates healthy)
-- [ ] Center shows: `N findings · Phase: active`
-- [ ] Clicking status bar item triggers action (if implemented)
+Two status bar items (both click through to the Dashboard):
+
+- [ ] Health indicator (left, priority 100): `$(shield) Collab: Active`
+  - [ ] Shows `$(warning) Collab: Warning` with warning background when degraded
+  - [ ] Shows `$(error) Collab: Error` with error background on failure
+  - [ ] Shows `$(circle-outline) Collab: Inactive` when disconnected
+- [ ] Summary indicator (left, priority 99): `N workers · N findings · Phase: <phase>`
+- [ ] Clicking either status bar item opens the Dashboard
 
 **Notes**:
 _____________________________________________________________________________

@@ -6,11 +6,11 @@ This document describes how to validate that the Collaborative Intelligence Syst
 
 ### ✅ MCP Servers (Phase 1)
 - **Knowledge Graph Server**: `mcp-servers/knowledge-graph/`
-  - JSONL persistence in `.claude/collab/knowledge-graph.jsonl` (MCP server manages this)
+  - JSONL persistence in `.avt/knowledge-graph.jsonl` (MCP server manages this)
   - Tier protection (Vision > Architecture > Quality)
   - 18 tests passing, 74% coverage
 - **Quality Server**: `mcp-servers/quality/`
-  - SQLite trust engine in `.claude/collab/trust-engine.db` (MCP server manages this)
+  - SQLite trust engine in `.avt/trust-engine.db` (MCP server manages this)
   - Language-agnostic tool wrapping (ruff, eslint, pytest, etc.)
   - 26 tests passing, 48% coverage
 
