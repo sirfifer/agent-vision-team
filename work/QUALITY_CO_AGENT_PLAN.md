@@ -551,7 +551,7 @@ async def handle_swift_change(self, file_path: Path):
 
 ### Security Considerations
 
-1. **Local-only execution**: All tools run locally, no network calls
+1. **Local-only quality tools**: Linters, formatters, and test runners execute locally with no network calls (note: the AI agents invoking these tools use cloud-based inference via Claude Code)
 2. **No credential handling**: Uses existing tool auth (git config, keychain)
 3. **Audit trail**: All dismissals logged with justification
 4. **Subprocess isolation**: External tools run in subprocess with timeout

@@ -42,7 +42,7 @@ This document specifies the engineering-level architecture for the Collaborative
 - CI/CD pipelines for target projects
 - External service internals (CodeRabbit, GitHub Actions)
 - External orchestration frameworks (no Goose, LangGraph, AutoGen, CrewAI)
-- API keys of any kind — the system runs entirely on Claude Code Max
+- API key management — Claude Code Max provides cloud-based model access via subscription (no API keys needed)
 
 ### Glossary
 
@@ -144,7 +144,7 @@ All components run on a single developer machine (macOS):
 - **Claude Code Sessions**: Run as separate terminal processes (each in its own VS Code terminal)
 - **Git/Filesystem**: Local, standard filesystem access
 
-No network services, no cloud dependencies, no API keys.
+MCP servers and persistent state are local. AI inference is cloud-based via Anthropic's Claude models through Claude Code Max (no API keys needed, internet connection required).
 
 ---
 

@@ -16,7 +16,7 @@ The governing principle: constraints should carry their own justification, and t
 
 ### The Problem
 
-Today, architectural entities carry descriptions ("ServiceRegistry Pattern: decouple service creation from consumption") but not structured *intent* (why it exists) or *desired outcome* (what measurable result it produces). Without these, governance can only say "you're breaking architecture" rather than engaging with whether the architecture is being well-served.
+Today, architectural entities carry descriptions ("ServiceRegistry Pattern: decouple service creation from consumption") but not structured *intent* (why it exists, what problem it solves). Without this, governance can only say "you're breaking architecture" rather than engaging with whether the architecture is being well-served.
 
 ### Data Model
 
@@ -24,11 +24,12 @@ KG entities store observations as `list[str]`. Rather than changing this core mo
 
 ```
 intent: <why this decision exists, what problem it solves>
-desired_outcome: <what measurable result this should produce>
-outcome_metric: <metric_name>|<success_criteria>|<baseline_value>
+outcome_metric: <metric_name>|<success_criteria>|<baseline_value>  (optional, zero or more)
 vision_alignment: <vision_entity_name>|<explanation of how it serves that standard>
 metadata_completeness: full|partial|none
 ```
+
+Intent carries the philosophical "why" that governance evaluates against. Metrics (optional) carry the measurable "how would you know it's working" that the evolution workflow uses for validation contracts. A single intent may have multiple metrics when the problem space has several measurable dimensions.
 
 New relation type `serves_vision` formally links architecture entities to vision standards.
 
@@ -37,13 +38,13 @@ New relation type `serves_vision` formally links architecture entities to vision
 | File | Change |
 |------|--------|
 | `mcp-servers/knowledge-graph/collab_kg/models.py` | Add `OUTCOME_METRIC`, `EVOLUTION_PROPOSAL`, `EXPERIMENT_RESULT` to `EntityType` enum |
-| `mcp-servers/knowledge-graph/collab_kg/metadata.py` (new) | Helper functions: `get_intent()`, `get_desired_outcome()`, `get_outcome_metrics()`, `get_vision_alignments()`, `get_metadata_completeness()`, `build_intent_observations()` |
+| `mcp-servers/knowledge-graph/collab_kg/metadata.py` (new) | Helper functions: `get_intent()`, `get_outcome_metrics()`, `get_vision_alignments()`, `get_metadata_completeness()`, `build_intent_observations()` |
 | `mcp-servers/knowledge-graph/collab_kg/server.py` | Add tools: `get_architecture_completeness`, `set_entity_metadata`, `validate_ingestion` |
-| `mcp-servers/knowledge-graph/collab_kg/ingestion.py` | Extract `## Intent`, `## Desired Outcome`, `## Metrics`, `## Vision Alignment` sections during parsing |
+| `mcp-servers/knowledge-graph/collab_kg/ingestion.py` | Extract `## Intent`, `## Metrics`, `## Vision Alignment` sections during parsing |
 
 ### Backward Compatibility
 
-- Existing entities without intent/outcome continue to function
+- Existing entities without intent continue to function
 - All new observation prefixes are additive; existing code ignores them
 - `metadata_completeness: none` is the implicit default for legacy entities
 - JSONL storage format is unchanged
@@ -55,7 +56,7 @@ New relation type `serves_vision` formally links architecture entities to vision
 
 ### The Problem
 
-Currently, architecture documents are ingested in bulk without validating that each granular piece (a) has clear intent/outcome, or (b) serves the project's vision. A user can ingest an architecture doc that contains decisions orthogonal to or conflicting with their vision standards, and the system won't catch this until governance blocks a worker downstream.
+Currently, architecture documents are ingested in bulk without validating that each granular piece (a) has clear intent, or (b) serves the project's vision. A user can ingest an architecture doc that contains decisions orthogonal to or conflicting with their vision standards, and the system won't catch this until governance blocks a worker downstream.
 
 ### Two Paths to Architecture
 
@@ -70,7 +71,7 @@ Currently, architecture documents are ingested in bulk without validating that e
 - Governance approves the decisions
 - Approved decisions are recorded as quality-tier `solution_pattern` entities
 - KG Librarian identifies recurring patterns
-- New: promotion to architecture tier requires intent/outcome enrichment
+- New: promotion to architecture tier requires intent enrichment
 
 ### Enrichment Flow (Path A)
 
@@ -78,10 +79,10 @@ After architecture documents are ingested and KG entities are created, a new enr
 
 1. Call `validate_ingestion('architecture')` to get completeness status of every entity
 2. Display each entity with its completeness status (complete / partial / missing)
-3. For entities missing intent/outcome:
-   - Claude proposes intent, outcome, and vision alignments based on the entity's description and available vision standards
+3. For entities missing intent:
+   - Claude proposes intent, optional metrics, and vision alignments based on the entity's description and available vision standards
    - User accepts, edits, or replaces Claude's suggestions
-   - If Claude's proposed intent/outcome naturally covers vision alignment, nothing more is needed
+   - If Claude's proposed intent naturally covers vision alignment, nothing more is needed
    - If vision alignment is unclear, Claude proposes how the entity might serve specific standards, or suggests architectural modifications that would better serve the vision
 4. For entities where no vision alignment exists and none can be inferred:
    - Flag for human attention ("This architectural decision doesn't appear to serve any vision standard")
@@ -93,9 +94,9 @@ After architecture documents are ingested and KG entities are created, a new enr
 When the KG Librarian or orchestrator proposes promoting a quality-tier decision to an architecture entity:
 
 1. System loads the original governance decision and its review verdict
-2. Claude proposes intent/outcome based on the decision context
+2. Claude proposes intent (and optional metrics) based on the decision context
 3. Human reviews and approves the promotion with enriched metadata
-4. New architecture entity is created with full intent/outcome/vision-alignment
+4. New architecture entity is created with full intent and vision-alignment
 
 ### Key Design Principle: Collaboration Over Blocking
 
@@ -108,7 +109,7 @@ The enrichment step is collaborative, not a gate. Architecture can be ingested w
 
 | File | Change |
 |------|--------|
-| `extension/src/providers/DashboardWebviewProvider.ts` | Update `ARCHITECTURE_FORMAT_PROMPT` to include Intent/Desired Outcome/Metrics/Vision Alignment sections; add handlers for `validateIngestion`, `suggestEntityMetadata`, `saveEntityMetadata` |
+| `extension/src/providers/DashboardWebviewProvider.ts` | Update `ARCHITECTURE_FORMAT_PROMPT` to include Intent/Metrics/Vision Alignment sections; add handlers for `validateIngestion`, `suggestEntityMetadata`, `saveEntityMetadata` |
 | `extension/webview-dashboard/src/components/wizard/steps/ArchitectureEnrichmentStep.tsx` (new) | Post-ingestion enrichment wizard step |
 | `extension/webview-dashboard/src/types.ts` | Add `'architecture-enrichment'` to WizardStep, new message types |
 | `extension/webview-dashboard/src/context/DashboardContext.tsx` | State for enrichment results, suggestions |
@@ -122,7 +123,7 @@ When suggesting metadata for an entity, Claude receives:
 - All loaded vision standards
 - Other architecture entities (for cross-reference)
 
-And proposes: intent, desired outcome, suggested metrics, vision alignments, and a confidence level. The prompt emphasizes: if the intent/outcome naturally demonstrates vision alignment, that is sufficient; do not manufacture artificial connections.
+And proposes: intent, optional metrics, vision alignments, and a confidence level. The prompt emphasizes: if the intent naturally demonstrates vision alignment, that is sufficient; do not manufacture artificial connections.
 
 ---
 
@@ -138,7 +139,7 @@ When an agent believes a better approach exists for achieving an architectural e
 |------|-----------|----------|
 | **Covered, compliant** | Work follows existing architecture | Normal governance review, proceed |
 | **Uncovered** | No architecture applies | Open territory; propose new architecture |
-| **Covered, but improvable** | Agent believes it can better serve intent/outcome | Evolution proposal workflow |
+| **Covered, but improvable** | Agent believes it can better serve intent | Evolution proposal workflow |
 
 ### Evolution Workflow
 
@@ -149,7 +150,7 @@ Agent recognizes potential improvement
 propose_evolution(target_entity, proposed_change, rationale, experiment_plan, validation_criteria)
     |
     v
-Governance reviews proposal against intent/outcome/vision
+Governance reviews proposal against intent/vision
     |--- blocked: rationale insufficient or violates vision
     |--- needs_human_review: significant architectural scope
     |--- approved for experimentation
@@ -177,11 +178,11 @@ Governance reviews proposal against intent/outcome/vision
 
 | Tool | Purpose |
 |------|---------|
-| `propose_evolution(target_entity, proposed_change, rationale, experiment_plan, validation_criteria, agent)` | Submit an evolution proposal referencing the entity's intent/outcome |
+| `propose_evolution(target_entity, proposed_change, rationale, experiment_plan, validation_criteria, agent)` | Submit an evolution proposal referencing the entity's intent |
 | `submit_experiment_evidence(proposal_id, evidence_type, evidence_data, agent)` | Submit real evidence from an experiment |
 | `present_evolution_results(proposal_id, agent)` | Compile and present side-by-side comparison for human review |
 | `approve_evolution(proposal_id, verdict, guidance, cascade_tasks)` | Human approval/rejection with optional cascade |
-| `propose_architecture_promotion(decision_id, entity_name, entity_type, intent, desired_outcome, ...)` | Promote an approved decision to a formal architecture entity |
+| `propose_architecture_promotion(decision_id, entity_name, entity_type, intent, ...)` | Promote an approved decision to a formal architecture entity |
 
 ### Validation Integrity ("Real, Not Mock")
 
@@ -224,7 +225,7 @@ When an evolution is approved, the system identifies downstream impact:
 | `mcp-servers/governance/collab_governance/models.py` | Add `ARCHITECTURE_EVOLUTION`, `EXPERIMENT_PROPOSAL`, `EXPERIMENT_RESULT` to `DecisionCategory`; add `EvolutionProposal` model |
 | `mcp-servers/governance/collab_governance/store.py` | Add `evolution_proposals` table with CRUD methods |
 | `mcp-servers/governance/collab_governance/server.py` | Add all five new tools (propose, evidence, present, approve, promote) |
-| `mcp-servers/governance/collab_governance/reviewer.py` | Add `review_evolution_proposal()` method; add `_format_architecture_with_intent()` that surfaces intent/outcome in review prompts; update `_build_decision_prompt()` instructions to consider intent |
+| `mcp-servers/governance/collab_governance/reviewer.py` | Add `review_evolution_proposal()` method; add `_format_architecture_with_intent()` that surfaces intent and metrics in review prompts; update `_build_decision_prompt()` instructions to consider intent |
 | `mcp-servers/governance/collab_governance/kg_client.py` | Add `get_entity_with_metadata()`, `get_entities_serving_vision()` |
 | `mcp-servers/governance/collab_governance/evidence_validator.py` (new) | Evidence integrity validation |
 | `.claude/agents/governance-reviewer.md` | Add intent-based review protocol for evolution proposals |
@@ -244,7 +245,7 @@ New `_format_architecture_with_intent()` method surfaces structured metadata:
 ```
 - **service_registry_pattern** (pattern): Decouple service creation from consumption
   Intent: Enable any component to be tested in isolation without real dependencies
-  Desired Outcome: Every consumer testable with stubs in < 500ms
+  Metrics: test_isolation_time (< 500ms per test, baseline: 847ms)
   Serves: protocol_based_di (All services swappable via protocols)
 ```
 
@@ -255,9 +256,10 @@ Updated review instructions:
 2. Check if this decision deviates from established architecture patterns.
    When checking alignment, consider whether the decision serves the INTENT
    of the pattern, not just its literal form. A decision that achieves the
-   pattern's desired outcome through a different mechanism may be acceptable.
+   pattern's intent through a different mechanism may be acceptable.
 3. If the decision affects an architecture entity, verify it serves that
-   entity's stated intent and desired outcome.
+   entity's stated intent. If metrics exist, consider whether the decision
+   would move the metrics in the right direction.
 4. If the decision is a "deviation" or "scope_change" category, verdict
    should be "needs_human_review".
 5. If the decision aligns with standards and serves their intent, verdict
@@ -272,7 +274,7 @@ This is the key behavioral shift: governance evaluates against intent, not just 
 
 ### No Vision Standards Defined Yet
 
-- Intent and desired outcome can still be captured (they stand alone)
+- Intent can still be captured (it stands alone)
 - Vision alignment fields left empty; `metadata_completeness: partial`
 - When vision standards are added later, `validate_ingestion('architecture')` identifies entities needing alignment
 - The enrichment step shows a notice: "No vision standards defined yet. Vision alignment will be checked later."
@@ -281,15 +283,15 @@ This is the key behavioral shift: governance evaluates against intent, not just 
 
 Allowed and tracked. `metadata_completeness` has three levels:
 - `none`: legacy entity, no structured metadata
-- `partial`: some fields present (e.g., intent but no outcome)
-- `full`: intent + outcome + at least one vision alignment
+- `partial`: some fields present (e.g., intent but no vision alignment)
+- `full`: intent + at least one vision alignment
 
 System nudges toward completeness but does not block.
 
 ### Conflicting Architectural Entities
 
-Two entities with conflicting intents or overlapping outcomes:
-- Detected during `validate_ingestion` by comparing intents and outcomes
+Two entities with conflicting intents or overlapping scope:
+- Detected during `validate_ingestion` by comparing intents
 - Flagged as a governance finding requiring human resolution
 
 ### Architecture Emerging Without a Document
@@ -298,14 +300,14 @@ When no architecture document exists and Claude makes all decisions:
 - Each approved `pattern_choice` or `component_design` decision is recorded
 - The system tracks these as potential architecture
 - After threshold occurrences (3+), the KG Librarian flags for promotion
-- Promotion requires intent/outcome enrichment (with Claude proposing, human approving)
+- Promotion requires intent enrichment (with Claude proposing, human approving)
 - This is the organic path; it works exactly like the document path except the source is Claude's decisions rather than a human-authored document
 
 ### Evolution Proposal for Entity with Missing Metadata
 
-If an agent proposes evolution against an entity lacking intent/outcome:
+If an agent proposes evolution against an entity lacking intent:
 - The proposal is routed to `needs_human_review`
-- Guidance explains: "This entity lacks structured intent/outcome. Please enrich it before evolution can be evaluated."
+- Guidance explains: "This entity lacks structured intent. Please enrich it before evolution can be evaluated."
 - This creates natural pressure to enrich metadata
 
 ---
@@ -321,8 +323,8 @@ If an agent proposes evolution against an entity lacking intent/outcome:
 6. E2E scenario: `s14_architecture_metadata.py`
 
 ### Phase 2: Ingestion Enhancement
-1. Extend `parse_document()` to extract intent/outcome/metrics/vision-alignment sections
-2. Update `ARCHITECTURE_FORMAT_PROMPT` in DashboardWebviewProvider
+1. Extend `parse_document()` to extract intent/metrics/vision-alignment sections
+2. Update `ARCHITECTURE_FORMAT_PROMPT` in DashboardWebviewProvider to include Intent/Metrics/Vision Alignment sections
 3. Build `ArchitectureEnrichmentStep.tsx` wizard step
 4. Wire up message handlers: `validateIngestion`, `suggestEntityMetadata`, `saveEntityMetadata`
 5. E2E scenario: `s15_ingestion_with_metadata.py`
@@ -347,15 +349,15 @@ If an agent proposes evolution against an entity lacking intent/outcome:
 ### Unit Testing
 - `metadata.py` helpers: parse and build observation strings correctly
 - `evidence_validator.py`: reject synthetic evidence, accept real evidence
-- `ingestion.py`: extract new sections from formatted architecture documents
+- `ingestion.py`: extract intent, metrics, and vision alignment sections from formatted architecture documents
 
 ### E2E Testing
-- **s14**: Create architecture entity with intent/outcome, verify `get_architecture_completeness` reports it correctly, verify `set_entity_metadata` updates it
-- **s15**: Ingest an architecture document containing Intent/Desired Outcome sections, verify entities have structured metadata
+- **s14**: Create architecture entity with intent, verify `get_architecture_completeness` reports it correctly, verify `set_entity_metadata` updates it
+- **s15**: Ingest an architecture document containing Intent/Metrics sections, verify entities have structured metadata
 - **s16**: Full evolution lifecycle: propose, experiment, submit evidence, present, approve, verify KG entity updated
 - **s17**: After evolution approval, verify cascading alignment tasks are created for dependent entities
 
 ### Manual Validation
 - Walk through the enrichment wizard step with a real architecture document
-- Verify Claude's suggestions for intent/outcome are meaningful
+- Verify Claude's suggestions for intent are meaningful
 - Submit an evolution proposal and verify the side-by-side comparison is useful to a human reviewer

@@ -2,7 +2,7 @@
 
 This document is the authoritative architecture reference for the Agent Vision Team Collaborative Intelligence System. It describes the system as built: a Claude Code-based orchestration platform coordinating 6 custom subagents across 3 MCP servers, with transactional governance review, persistent institutional memory, deterministic quality verification, and a VS Code extension providing setup, monitoring, and management capabilities.
 
-The system runs entirely locally on a developer's machine. There are no cloud services, no API keys to manage (Claude Code Max provides model access), and no network dependencies beyond the Claude Code binary itself. All MCP servers communicate over stdio transport (spawned by Claude Code, not network listeners), and all persistent state lives in the project directory.
+The system's orchestration infrastructure runs on the developer's machine: MCP servers communicate over stdio transport (spawned by Claude Code as child processes), and all persistent state (Knowledge Graph, governance database, trust engine) lives in the project directory. AI inference is cloud-based, handled by Anthropic's Claude models via Claude Code. Claude Code Max provides model access through a subscription (no API keys to manage), but an internet connection is required for all agent operations.
 
 ---
 
@@ -30,7 +30,7 @@ The system runs entirely locally on a developer's machine. There are no cloud se
 | Exclusion | Rationale |
 |-----------|-----------|
 | External CI/CD pipelines | All quality gates run locally via MCP servers |
-| External cloud services | System is fully local; Claude Code Max provides model access |
+| External cloud services (beyond Claude) | AI inference uses Anthropic's cloud via Claude Code Max; no additional cloud services |
 | API key management | No API keys required (Claude Code Max subscription model) |
 | External authentication | No multi-user system; single developer workflow |
 | External frameworks or runtimes | MCP servers use Python/uv; extension uses Node/TypeScript — no additional frameworks |
@@ -210,8 +210,7 @@ Developer Machine (macOS / Linux)
 ```
 
 **Key properties**:
-- **Fully local**: No network services, no cloud, no API keys.
-- **Claude Code Max**: Model access provided by subscription; no API key management.
+- **Local orchestration, cloud inference**: MCP servers and persistent state are local. AI inference is cloud-based via Anthropic's Claude models through Claude Code Max (subscription, no API keys).
 - **Stdio transport**: MCP servers are spawned as child processes by Claude Code, not network listeners. Port numbers in this document are logical identifiers for documentation, not TCP ports.
 - **Single-user**: Designed for one developer per project directory. Multi-user coordination is out of scope.
 

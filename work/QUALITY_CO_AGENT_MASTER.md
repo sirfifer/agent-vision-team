@@ -467,7 +467,7 @@ Rigour's FSM naturally produces structured audit trails: sequences of Fix Packet
 
 - **Insider Threat model**: Agentic AI is probabilistic, generating its own commands from intent. Assume the LLM will be compromised/subverted. Restrict blast radius via sandboxing.
 - **Prompt injection defense**: Structured Fix Packets (not chat text) for error feedback. AST Gates that examine code structure, not LLM explanations.
-- **Local-only execution**: No network calls from quality tools. No credential handling (uses existing tool auth). No code transmission.
+- **Local-only quality tools**: No network calls from linters, formatters, or test runners (note: the AI agents invoking these tools use cloud-based inference via Claude Code). No credential handling (uses existing tool auth). No code transmission.
 - **Subprocess isolation**: External tools run in subprocess with timeout.
 - **Audit trail**: All dismissals logged with justification.
 - **Secure remote access**: Outbound tunnels (Cloudflare) instead of exposed ports. Zero open inbound ports. E2E encrypted, QR handshake auth.
