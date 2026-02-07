@@ -107,6 +107,27 @@ Call `submit_completion_review` with your work summary and list of changed files
 
 **One decision per key choice. Submit BEFORE writing implementation code.**
 
+## Intent-Aware Decision Making
+
+Architecture entities carry structured intent metadata: why the decision exists (intent), how to measure success (metrics), and which vision standards it serves (vision alignment). Use this metadata to make better decisions.
+
+### Three Zones of Work
+
+When your task involves an architectural component, determine which zone you're in:
+
+1. **Covered and compliant**: The entity has intent metadata and your work aligns with it. Proceed normally; reference the intent in your governance submissions to strengthen approval likelihood.
+
+2. **Uncovered**: The entity lacks intent metadata (metadata_completeness: none or partial). Treat existing patterns as authoritative but flag the gap. When submitting decisions, note that the entity is missing structured intent so the reviewer has full context.
+
+3. **Covered but improvable**: The entity has intent metadata, but you see a better way to achieve the same intent. Do NOT silently deviate. Instead, use `propose_evolution` on the governance server to formally propose the improvement. This triggers the evolution workflow: experiment, evidence, present, approve.
+
+### Referencing Intent in Decisions
+
+When calling `submit_decision`, include the relevant entity's intent in your decision detail:
+- Quote the intent ("This pattern exists to enable isolated testing...")
+- Explain how your decision serves or aligns with that intent
+- If metrics exist, note whether your approach improves or maintains the measured baselines
+
 ## During Work
 
 - Stay within the scope defined in your task brief

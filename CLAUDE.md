@@ -429,6 +429,13 @@ Available tools:
 - `get_task_review_status(implementation_task_id)` — get review status and blockers for a task
 - `get_pending_reviews()` — list all reviews awaiting attention
 
+**Evolution Workflow Tools** (for intent-driven architectural evolution):
+- `propose_evolution(target_entity, proposed_change, rationale, experiment_plan, validation_criteria, agent)` — submit an evolution proposal for an architecture entity; loads intent metadata and runs governance review
+- `submit_experiment_evidence(proposal_id, evidence_type, source, raw_output, summary, metrics, comparison_to_baseline, agent)` — submit structurally validated evidence from an experiment
+- `present_evolution_results(proposal_id, agent)` — compile side-by-side comparison of baseline vs experiment for human review
+- `approve_evolution(proposal_id, verdict, guidance, cascade_alignment)` — record human verdict; on approval triggers cascading alignment for dependent entities
+- `propose_architecture_promotion(decision_id, entity_name, entity_type, intent, metrics, vision_alignments, agent)` — promote an approved quality-tier decision to a formal architecture entity (requires human approval)
+
 ## Quality Gates
 
 Workers must pass all gates before completion:
@@ -498,7 +505,7 @@ e2e/                                     # Autonomous E2E testing harness
 ├── run-e2e.py                           # Python orchestrator
 ├── pyproject.toml                       # Dependencies
 ├── generator/                           # Unique project generation per run
-├── scenarios/                           # 11 test scenarios (s01–s12)
+├── scenarios/                           # 18 test scenarios (s01–s18)
 ├── parallel/                            # ThreadPoolExecutor + isolation
 └── validation/                          # Assertion engine + report generator
 ```
@@ -525,7 +532,7 @@ All servers will be available to all Claude Code sessions and subagents.
 
 ## E2E Testing
 
-The project includes an autonomous end-to-end testing harness that exercises all three MCP servers (KG, Governance, Quality) across 11 scenarios with 172+ structural assertions.
+The project includes an autonomous end-to-end testing harness that exercises all three MCP servers (KG, Governance, Quality) across 18 scenarios with 350+ structural assertions.
 
 ### Quick Start
 
@@ -559,6 +566,11 @@ Scenarios run in parallel with full isolation: each gets its own KnowledgeGraph 
 | Scope Change Detection | scope_change/deviation → needs_human_review verdict |
 | Completion Guard | Unresolved blocks and missing plan reviews are caught |
 | Cross-Server Integration | KG + Governance + Task system interplay |
+| Architecture Metadata | Intent/metrics/vision-alignment observations, completeness tracking, metadata helpers |
+| Ingestion with Metadata | Document parsing extracts structured Intent/Metrics/Vision Alignment sections |
+| Evolution Proposal Lifecycle | propose → experiment → evidence → validate → approve; KGClient metadata; store queries |
+| Cascading Alignment | Dependent entity discovery, evidence validator (non-mock), reviewer intent formatting |
+| Extended Coverage | Architecture promotion, cascade discovery, timestamp edge cases, error paths, intent-aware prompts |
 
 ### When to Run
 
@@ -581,7 +593,7 @@ e2e/
 ├── generator/                  # Unique project generation
 │   ├── project_generator.py    # Domain selection + template filling
 │   └── domain_templates.py     # 8 domain vocabulary pools
-├── scenarios/                  # 11 test scenarios (s01–s12)
+├── scenarios/                  # 18 test scenarios (s01–s18)
 │   └── base.py                 # BaseScenario + assertion helpers
 ├── parallel/
 │   └── executor.py             # ThreadPoolExecutor + per-scenario isolation

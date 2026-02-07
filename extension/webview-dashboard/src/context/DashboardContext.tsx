@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt } from '../types';
+import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, EnrichmentValidationResult, EntityMetadataSuggestion } from '../types';
 import { useVsCodeApi } from '../hooks/useVsCodeApi';
 
 const defaultData: DashboardData = {
@@ -35,6 +35,9 @@ interface DashboardContextValue {
   visionDocs: DocumentInfo[];
   architectureDocs: DocumentInfo[];
   lastIngestionResult: IngestionResult | null;
+  // Architecture enrichment
+  enrichmentResult: EnrichmentValidationResult | null;
+  entitySuggestions: Record<string, EntityMetadataSuggestion>;
   // Document formatting
   lastFormatResult: FormatDocResult | null;
   // Research prompts
@@ -79,6 +82,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [architectureDocs, setArchitectureDocs] = useState<DocumentInfo[]>([]);
   const [lastIngestionResult, setLastIngestionResult] = useState<IngestionResult | null>(null);
   const [lastFormatResult, setLastFormatResult] = useState<FormatDocResult | null>(null);
+  const [enrichmentResult, setEnrichmentResult] = useState<EnrichmentValidationResult | null>(null);
+  const [entitySuggestions, setEntitySuggestions] = useState<Record<string, EntityMetadataSuggestion>>({});
 
   // Research prompts state
   const [showResearchPrompts, setShowResearchPrompts] = useState(false);
@@ -169,6 +174,15 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
             error: msg.error,
           });
           break;
+        case 'enrichmentValidationResult':
+          setEnrichmentResult(msg.result);
+          break;
+        case 'entityMetadataSuggestion':
+          setEntitySuggestions(prev => ({
+            ...prev,
+            [msg.entityName]: msg.suggestion,
+          }));
+          break;
         case 'showWizard':
           setShowWizard(true);
           break;
@@ -211,6 +225,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       visionDocs,
       architectureDocs,
       lastIngestionResult,
+      enrichmentResult,
+      entitySuggestions,
       lastFormatResult,
       showResearchPrompts, setShowResearchPrompts,
       researchPrompts,

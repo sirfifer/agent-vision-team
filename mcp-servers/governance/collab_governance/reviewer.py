@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from typing import Optional
 
-from .models import Decision, Finding, ReviewVerdict, Verdict
+from .models import Decision, EvolutionProposal, Finding, ReviewVerdict, Verdict
 
 
 class GovernanceReviewer:
@@ -60,6 +60,99 @@ class GovernanceReviewer:
         )
         raw = self._run_claude(prompt, timeout=90)
         return self._parse_verdict(raw, plan_id=task_id)
+
+    def review_evolution_proposal(
+        self,
+        proposal: EvolutionProposal,
+        target_entity: dict,
+        vision_standards: list[dict],
+    ) -> ReviewVerdict:
+        """Review an evolution proposal against the target entity's intent and vision.
+
+        Args:
+            proposal: The evolution proposal to review.
+            target_entity: The target entity dict with parsed metadata
+                (from KGClient.get_entity_with_metadata).
+            vision_standards: Vision-tier entities for context.
+
+        Returns:
+            ReviewVerdict with verdict: approved (for experimentation),
+            blocked, or needs_human_review.
+        """
+        prompt = self._build_evolution_prompt(proposal, target_entity, vision_standards)
+        raw = self._run_claude(prompt, timeout=90)
+        return self._parse_verdict(raw, decision_id=proposal.decision_id)
+
+    def _build_evolution_prompt(
+        self,
+        proposal: EvolutionProposal,
+        target_entity: dict,
+        vision_standards: list[dict],
+    ) -> str:
+        standards_text = self._format_standards(vision_standards)
+
+        # Format target entity metadata
+        intent = target_entity.get("intent", "(no intent recorded)")
+        metrics = target_entity.get("metrics", [])
+        vision_alignments = target_entity.get("vision_alignments", [])
+
+        metrics_text = "\n".join(
+            f"  - {m['name']}: criteria={m['criteria']}, baseline={m['baseline']}"
+            for m in metrics
+        ) or "  (none)"
+
+        va_text = "\n".join(
+            f"  - {va['vision_entity']}: {va['explanation']}"
+            for va in vision_alignments
+        ) or "  (none)"
+
+        criteria_text = "\n".join(
+            f"  - {c}" for c in proposal.validation_criteria
+        ) or "  (none specified)"
+
+        return f"""You are a governance reviewer evaluating an evolution proposal. An agent wants to change an existing architectural entity and believes a better approach exists for achieving the same intent.
+
+## Vision Standards
+{standards_text}
+
+## Target Entity: {proposal.target_entity}
+- **Current intent**: {intent}
+- **Current outcome metrics**:
+{metrics_text}
+- **Vision alignments**:
+{va_text}
+
+## Evolution Proposal
+- **Proposing agent**: {proposal.proposing_agent}
+- **Proposed change**: {proposal.proposed_change}
+- **Rationale**: {proposal.rationale}
+- **Experiment plan**: {proposal.experiment_plan or '(none provided)'}
+- **Validation criteria**:
+{criteria_text}
+
+## Instructions
+Evaluate this proposal on three dimensions:
+
+1. **Intent preservation**: Does the proposed change still serve the entity's original intent? If the proposal would undermine the intent, verdict is "blocked".
+2. **Vision alignment**: Does the proposal maintain alignment with the vision standards the entity serves? If it breaks vision alignment, verdict is "blocked".
+3. **Experiment quality**: Is the experiment plan concrete enough to produce real evidence? If the plan is vague or relies on subjective evaluation, verdict is "needs_human_review".
+
+If the proposal preserves intent, maintains vision alignment, and has a concrete experiment plan, verdict is "approved" (approved for experimentation, not for permanent adoption).
+
+Respond with ONLY a JSON object:
+{{
+  "verdict": "approved" | "blocked" | "needs_human_review",
+  "findings": [
+    {{
+      "tier": "vision" | "architecture" | "quality",
+      "severity": "vision_conflict" | "architectural" | "logic",
+      "description": "what was found",
+      "suggestion": "how to fix it"
+    }}
+  ],
+  "guidance": "brief guidance for the proposing agent",
+  "standards_verified": ["list of standards checked"]
+}}"""
 
     def _run_claude(self, prompt: str, timeout: int = 60) -> str:
         """Run claude --print and return the raw output.
@@ -226,11 +319,21 @@ class GovernanceReviewer:
         architecture: list[dict],
     ) -> str:
         standards_text = self._format_standards(vision_standards)
-        arch_text = self._format_architecture(architecture)
+
+        # Use intent-aware formatting when architecture entities have metadata
+        has_metadata = any(a.get("intent") or a.get("metrics") or a.get("vision_alignments") for a in architecture)
+        arch_text = self._format_architecture_with_intent(architecture) if has_metadata else self._format_architecture(architecture)
+
         alts_text = "\n".join(
             f"  - {a.option}: rejected because {a.reason_rejected}"
             for a in decision.alternatives_considered
         )
+
+        intent_instructions = ""
+        if has_metadata:
+            intent_instructions = """
+5. **Intent-aware evaluation**: Architecture entities carry structured intent (why they exist). A decision that achieves the pattern's intent through a different mechanism may be acceptable even if it doesn't match the literal form. Evaluate against INTENT, not just structure.
+6. If an entity has outcome metrics, check whether the decision maintains or improves those baselines."""
 
         return f"""You are a governance reviewer. Evaluate this decision against the project's vision and architecture standards.
 
@@ -254,7 +357,7 @@ class GovernanceReviewer:
 1. Check if this decision CONFLICTS with any vision standard. If yes, verdict is "blocked".
 2. Check if this decision deviates from established architecture patterns. If deviation is unjustified, verdict is "blocked".
 3. If the decision is a "deviation" or "scope_change" category, verdict should be "needs_human_review".
-4. If the decision aligns with standards, verdict is "approved".
+4. If the decision aligns with standards, verdict is "approved".{intent_instructions}
 
 Respond with ONLY a JSON object (no markdown, no explanation outside the JSON):
 {{
@@ -389,4 +492,50 @@ Respond with ONLY a JSON object:
             etype = a.get("entityType", "")
             obs = "; ".join(a.get("observations", [])[:3])
             lines.append(f"- **{name}** ({etype}): {obs}")
+        return "\n".join(lines)
+
+    def _format_architecture_with_intent(self, architecture: list[dict]) -> str:
+        """Format architecture entities with structured intent metadata.
+
+        When an entity has parsed metadata (intent, metrics, vision_alignments),
+        uses a rich format. Falls back to the simple format for legacy entities.
+        """
+        if not architecture:
+            return "(no architecture entities found in KG)"
+
+        lines = []
+        for a in architecture:
+            name = a.get("name", "unknown")
+            etype = a.get("entityType", "")
+
+            # Check for parsed metadata (added by KGClient.get_entity_with_metadata)
+            intent = a.get("intent")
+            metrics = a.get("metrics", [])
+            vision_alignments = a.get("vision_alignments", [])
+            completeness = a.get("completeness", "none")
+
+            if intent or metrics or vision_alignments:
+                # Rich format with structured metadata
+                entry = f"- **{name}** ({etype})"
+                # Description from observations
+                obs = a.get("observations", [])
+                desc = next((o[len("description: "):] for o in obs if o.startswith("description: ")), None)
+                if desc:
+                    entry += f": {desc}"
+                lines.append(entry)
+
+                if intent:
+                    lines.append(f"  Intent: {intent}")
+                if metrics:
+                    metric_parts = [f"{m['name']} ({m['criteria']}, baseline: {m['baseline']})" for m in metrics]
+                    lines.append(f"  Metrics: {'; '.join(metric_parts)}")
+                if vision_alignments:
+                    va_parts = [f"{va['vision_entity']} ({va['explanation']})" for va in vision_alignments]
+                    lines.append(f"  Serves: {', '.join(va_parts)}")
+                lines.append(f"  Metadata completeness: {completeness}")
+            else:
+                # Fallback: simple format for legacy entities
+                obs_text = "; ".join(a.get("observations", [])[:3])
+                lines.append(f"- **{name}** ({etype}): {obs_text}")
+
         return "\n".join(lines)

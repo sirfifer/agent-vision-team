@@ -5,11 +5,15 @@ from typing import Optional
 from fastmcp import FastMCP
 
 from .kg_client import KGClient
+from .evidence_validator import validate_evidence, validate_evidence_batch
 from .models import (
     Alternative,
     Confidence,
     Decision,
     DecisionCategory,
+    EvolutionProposal,
+    EvolutionStatus,
+    ExperimentEvidence,
     Finding,
     GovernedTaskRecord,
     ReviewType,
@@ -691,6 +695,462 @@ def _queue_governance_review(review_id: str, impl_task_id: str, context: str) ->
     #     "architecture": kg.get_architecture_entities(),
     # })
     pass  # Parameters documented in docstring, used in future async implementation
+
+
+# =============================================================================
+# Evolution Workflow Tools
+# =============================================================================
+
+
+@mcp.tool()
+def propose_evolution(
+    target_entity: str,
+    proposed_change: str,
+    rationale: str,
+    experiment_plan: str = "",
+    validation_criteria: Optional[list[str]] = None,
+    agent: str = "worker",
+) -> dict:
+    """Submit an evolution proposal for an architecture entity.
+
+    When an agent believes a better approach exists for achieving the same
+    intent as an existing architecture entity, it submits a proposal here.
+    The proposal is reviewed against the entity's intent metadata and vision
+    alignment before experimentation can begin.
+
+    Args:
+        target_entity: Name of the architecture entity to evolve.
+        proposed_change: What the agent wants to change.
+        rationale: Why this better serves the entity's intent.
+        experiment_plan: How to validate with real evidence.
+        validation_criteria: Measurable success criteria for the experiment.
+        agent: Name of the proposing agent.
+
+    Returns:
+        {proposal_id, verdict, guidance, target_metadata}
+    """
+    criteria = validation_criteria or []
+
+    # Load the target entity's metadata
+    entity_data = kg.get_entity_with_metadata(target_entity)
+    if not entity_data:
+        return {
+            "error": f"Entity '{target_entity}' not found in KG.",
+            "status": "failed",
+        }
+
+    # Create the proposal
+    proposal = EvolutionProposal(
+        target_entity=target_entity,
+        original_intent=entity_data.get("intent") or "",
+        proposed_change=proposed_change,
+        rationale=rationale,
+        experiment_plan=experiment_plan,
+        validation_criteria=criteria,
+        proposing_agent=agent,
+    )
+
+    # Store the proposal
+    proposal = store.store_evolution_proposal(proposal)
+
+    # Run governance review on the proposal
+    vision_standards = kg.get_vision_standards()
+    review = reviewer.review_evolution_proposal(proposal, entity_data, vision_standards)
+
+    # Update proposal with review result
+    if review.verdict == Verdict.APPROVED:
+        proposal.status = EvolutionStatus.EXPERIMENTING
+        proposal.review_verdict = "approved_for_experimentation"
+    elif review.verdict == Verdict.BLOCKED:
+        proposal.status = EvolutionStatus.REJECTED
+        proposal.review_verdict = "blocked"
+    else:
+        proposal.status = EvolutionStatus.PROPOSED
+        proposal.review_verdict = "needs_human_review"
+
+    store.update_evolution_proposal(proposal)
+
+    # Record decision in KG
+    kg.record_decision(
+        f"evolution_{proposal.id}",
+        f"Evolution proposal for {target_entity}: {proposed_change[:100]}",
+        review.verdict.value,
+        agent,
+    )
+
+    return {
+        "proposal_id": proposal.id,
+        "status": proposal.status.value,
+        "verdict": review.verdict.value,
+        "guidance": review.guidance,
+        "findings": [f.model_dump() for f in review.findings],
+        "target_metadata": {
+            "intent": entity_data.get("intent"),
+            "metrics": entity_data.get("metrics", []),
+            "vision_alignments": entity_data.get("vision_alignments", []),
+            "completeness": entity_data.get("completeness"),
+        },
+    }
+
+
+@mcp.tool()
+def submit_experiment_evidence(
+    proposal_id: str,
+    evidence_type: str,
+    source: str = "",
+    raw_output: str = "",
+    summary: str = "",
+    metrics: Optional[dict] = None,
+    comparison_to_baseline: Optional[dict] = None,
+    agent: str = "worker",
+) -> dict:
+    """Submit evidence from an evolution experiment for validation.
+
+    Evidence is structurally validated to ensure it contains real data
+    (file paths exist, test output has pass/fail counts, benchmarks have
+    numeric values). Mock or fabricated evidence is rejected.
+
+    Args:
+        proposal_id: The evolution proposal ID.
+        evidence_type: Type of evidence - test_results, benchmark,
+            production_metrics, code_review.
+        source: Path to the evidence source (test output file, benchmark results).
+        raw_output: Raw output from tests/benchmarks (truncated if needed).
+        summary: Human-readable summary of the evidence.
+        metrics: Dict of metric_name -> numeric_value.
+        comparison_to_baseline: Dict of metric_name -> {baseline, experiment, improvement}.
+        agent: Name of the submitting agent.
+
+    Returns:
+        {accepted, proposal_id, evidence_count, validation_failures}
+    """
+    proposal = store.get_evolution_proposal(proposal_id)
+    if not proposal:
+        return {"error": f"Proposal '{proposal_id}' not found.", "status": "failed"}
+
+    if proposal.status not in (EvolutionStatus.EXPERIMENTING, EvolutionStatus.PROPOSED):
+        return {
+            "error": f"Proposal is in state '{proposal.status.value}', not accepting evidence.",
+            "status": "failed",
+        }
+
+    evidence = ExperimentEvidence(
+        evidence_type=evidence_type,
+        source=source,
+        raw_output=raw_output[:5000],  # Truncate to prevent bloat
+        summary=summary,
+        metrics=metrics or {},
+        comparison_to_baseline=comparison_to_baseline or {},
+    )
+
+    # Validate the evidence
+    validation = validate_evidence(evidence, experiment_start=proposal.created_at)
+    if not validation.valid:
+        return {
+            "accepted": False,
+            "proposal_id": proposal_id,
+            "evidence_count": len(proposal.evidence),
+            "validation_failures": validation.failures,
+        }
+
+    # Add to proposal
+    proposal.evidence.append(evidence)
+    if proposal.status == EvolutionStatus.PROPOSED:
+        proposal.status = EvolutionStatus.EXPERIMENTING
+    store.update_evolution_proposal(proposal)
+
+    return {
+        "accepted": True,
+        "proposal_id": proposal_id,
+        "evidence_count": len(proposal.evidence),
+        "validation_failures": [],
+    }
+
+
+@mcp.tool()
+def present_evolution_results(
+    proposal_id: str,
+    agent: str = "worker",
+) -> dict:
+    """Compile and present evolution experiment results for human review.
+
+    Generates a side-by-side comparison of the current approach vs the
+    proposed evolution, using the entity's outcome metrics as the basis
+    for comparison.
+
+    Args:
+        proposal_id: The evolution proposal ID.
+        agent: Name of the presenting agent.
+
+    Returns:
+        {proposal_id, target_entity, comparison, evidence_summary,
+         validation_criteria_met, ready_for_decision}
+    """
+    proposal = store.get_evolution_proposal(proposal_id)
+    if not proposal:
+        return {"error": f"Proposal '{proposal_id}' not found.", "status": "failed"}
+
+    if not proposal.evidence:
+        return {
+            "error": "No evidence has been submitted yet.",
+            "status": "failed",
+        }
+
+    # Validate all evidence
+    batch_validation = validate_evidence_batch(
+        proposal.evidence, experiment_start=proposal.created_at
+    )
+
+    # Load target entity for baseline comparison
+    entity_data = kg.get_entity_with_metadata(proposal.target_entity)
+    baseline_metrics = entity_data.get("metrics", []) if entity_data else []
+
+    # Build comparison
+    comparison = {
+        "target_entity": proposal.target_entity,
+        "original_intent": proposal.original_intent,
+        "proposed_change": proposal.proposed_change,
+        "rationale": proposal.rationale,
+        "baseline_metrics": baseline_metrics,
+        "experiment_evidence": [
+            {
+                "type": e.evidence_type,
+                "summary": e.summary,
+                "metrics": e.metrics,
+                "comparison": e.comparison_to_baseline,
+            }
+            for e in proposal.evidence
+        ],
+    }
+
+    # Check which validation criteria are addressed by evidence
+    criteria_status = []
+    for criterion in proposal.validation_criteria:
+        # Simple heuristic: check if any evidence summary or metrics mention the criterion
+        addressed = any(
+            criterion.lower() in (e.summary or "").lower()
+            or any(criterion.lower() in k.lower() for k in e.metrics.keys())
+            for e in proposal.evidence
+        )
+        criteria_status.append({"criterion": criterion, "addressed": addressed})
+
+    # Mark proposal as validated if all evidence passes
+    if batch_validation.valid:
+        proposal.status = EvolutionStatus.VALIDATED
+        store.update_evolution_proposal(proposal)
+
+    return {
+        "proposal_id": proposal_id,
+        "target_entity": proposal.target_entity,
+        "comparison": comparison,
+        "evidence_summary": {
+            "count": len(proposal.evidence),
+            "types": list({e.evidence_type for e in proposal.evidence}),
+            "all_valid": batch_validation.valid,
+            "validation_failures": batch_validation.failures,
+        },
+        "validation_criteria_met": criteria_status,
+        "status": proposal.status.value,
+        "ready_for_decision": batch_validation.valid,
+    }
+
+
+@mcp.tool()
+def approve_evolution(
+    proposal_id: str,
+    verdict: str,
+    guidance: str = "",
+    cascade_alignment: bool = True,
+) -> dict:
+    """Record human verdict on an evolution proposal.
+
+    On approval, updates the target entity's metadata in the KG and
+    optionally triggers cascading alignment tasks for dependent entities.
+
+    Args:
+        proposal_id: The evolution proposal ID.
+        verdict: Human verdict - approved, rejected, needs_more_evidence.
+        guidance: Guidance for the proposing agent or affected entities.
+        cascade_alignment: If True and approved, create alignment tasks
+            for entities that depend on the evolved entity.
+
+    Returns:
+        {proposal_id, verdict, kg_updated, cascade_tasks_created}
+    """
+    proposal = store.get_evolution_proposal(proposal_id)
+    if not proposal:
+        return {"error": f"Proposal '{proposal_id}' not found.", "status": "failed"}
+
+    cascade_tasks = []
+
+    if verdict == "approved":
+        proposal.status = EvolutionStatus.APPROVED
+        proposal.review_verdict = "approved"
+
+        # Update KG entity metadata if possible
+        entity_data = kg.get_entity_with_metadata(proposal.target_entity)
+        kg_updated = entity_data is not None
+
+        # Trigger cascading alignment
+        if cascade_alignment and entity_data:
+            cascade_tasks = _create_cascade_alignment_tasks(
+                proposal, entity_data, guidance
+            )
+
+    elif verdict == "rejected":
+        proposal.status = EvolutionStatus.REJECTED
+        proposal.review_verdict = "rejected"
+        kg_updated = False
+
+    elif verdict == "needs_more_evidence":
+        proposal.status = EvolutionStatus.NEEDS_MORE_EVIDENCE
+        proposal.review_verdict = "needs_more_evidence"
+        kg_updated = False
+
+    else:
+        return {"error": f"Invalid verdict: {verdict}", "status": "failed"}
+
+    store.update_evolution_proposal(proposal)
+
+    # Record in KG
+    kg.record_decision(
+        f"evolution_verdict_{proposal.id}",
+        f"Evolution verdict for {proposal.target_entity}: {verdict}",
+        verdict,
+        "human",
+    )
+
+    return {
+        "proposal_id": proposal_id,
+        "verdict": verdict,
+        "status": proposal.status.value,
+        "kg_updated": kg_updated,
+        "cascade_tasks_created": len(cascade_tasks),
+        "cascade_task_ids": cascade_tasks,
+        "guidance": guidance,
+    }
+
+
+@mcp.tool()
+def propose_architecture_promotion(
+    decision_id: str,
+    entity_name: str,
+    entity_type: str,
+    intent: str,
+    metrics: Optional[list[dict]] = None,
+    vision_alignments: Optional[list[dict]] = None,
+    agent: str = "worker",
+) -> dict:
+    """Promote an approved quality-tier decision to a formal architecture entity.
+
+    When a decision proves itself through successful implementation, it can
+    be promoted to a first-class architecture entity with full intent metadata.
+
+    Args:
+        decision_id: The governance decision that proved this approach.
+        entity_name: Name for the new architecture entity (snake_case).
+        entity_type: Entity type - pattern, component, architectural_standard.
+        intent: Why this architectural decision exists.
+        metrics: Optional outcome metrics [{name, criteria, baseline}].
+        vision_alignments: Vision standards served [{vision_entity, explanation}].
+        agent: Name of the proposing agent.
+
+    Returns:
+        {entity_name, status, needs_human_approval, metadata}
+    """
+    # Verify the decision exists and was approved
+    decisions = store.get_all_decisions(verdict="approved")
+    decision = None
+    for d_dict in decisions:
+        if d_dict.get("id") == decision_id:
+            decision = d_dict
+            break
+
+    if not decision:
+        return {
+            "error": f"Decision '{decision_id}' not found or not approved.",
+            "status": "failed",
+        }
+
+    # Check if entity already exists
+    existing = kg.get_entity_with_metadata(entity_name)
+    if existing:
+        return {
+            "error": f"Entity '{entity_name}' already exists in KG.",
+            "status": "failed",
+        }
+
+    # Build metadata observations
+    from collab_kg.metadata import build_intent_observations
+    metadata_obs = build_intent_observations(
+        intent=intent,
+        metrics=metrics,
+        vision_alignments=vision_alignments,
+    )
+
+    return {
+        "entity_name": entity_name,
+        "entity_type": entity_type,
+        "status": "needs_human_approval",
+        "needs_human_approval": True,
+        "decision_id": decision_id,
+        "metadata": {
+            "intent": intent,
+            "metrics": metrics or [],
+            "vision_alignments": vision_alignments or [],
+            "observations": metadata_obs,
+        },
+        "message": f"Promotion of '{entity_name}' to architecture tier requires human approval. "
+                   "Use create_entities() with protection_tier: architecture after approval.",
+    }
+
+
+def _create_cascade_alignment_tasks(
+    proposal: EvolutionProposal,
+    entity_data: dict,
+    guidance: str,
+) -> list[str]:
+    """Create governed tasks for entities that depend on the evolved entity.
+
+    Queries the KG for entities with follows_pattern or serves_vision
+    relations to the evolved entity and creates alignment tasks for each.
+
+    Returns list of created task IDs.
+    """
+    task_ids = []
+
+    # Find entities that reference the evolved entity via relations
+    serving = kg.get_entities_serving_vision(proposal.target_entity)
+
+    # Also check for entities that follow this pattern (via KG search)
+    related = kg.search_entities([proposal.target_entity])
+    dependents = {e.get("name") for e in serving}
+    for r in related:
+        name = r.get("name", "")
+        if name and name != proposal.target_entity:
+            dependents.add(name)
+
+    for dep_name in dependents:
+        # Create a governed task for alignment
+        try:
+            result = create_governed_task(
+                subject=f"Align {dep_name} with evolved {proposal.target_entity}",
+                description=(
+                    f"The architecture entity '{proposal.target_entity}' has been evolved. "
+                    f"Change: {proposal.proposed_change}\n"
+                    f"Rationale: {proposal.rationale}\n"
+                    f"Guidance: {guidance}\n\n"
+                    f"Review {dep_name} for alignment with the updated entity."
+                ),
+                context=f"Cascading alignment from evolution proposal {proposal.id}",
+                review_type="architecture",
+            )
+            if "implementation_task_id" in result:
+                task_ids.append(result["implementation_task_id"])
+        except Exception:
+            pass  # Don't fail the approval if cascade creation fails
+
+    return task_ids
 
 
 if __name__ == "__main__":

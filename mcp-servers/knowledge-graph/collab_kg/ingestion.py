@@ -77,6 +77,33 @@ def parse_document(filepath: Path, tier: str) -> Optional[dict]:
     if examples:
         observations.append(f"examples: {examples}")
 
+    # Extract Intent section (for architecture docs)
+    intent = _extract_section(content, 'Intent')
+    if intent:
+        observations.append(f"intent: {intent}")
+
+    # Extract Metrics section (for architecture docs)
+    metrics_section = _extract_section(content, 'Metrics', preserve_lines=True)
+    if metrics_section:
+        for line in metrics_section.split('\n'):
+            line = line.strip().lstrip('-').lstrip('*').strip()
+            if line and '|' in line:
+                observations.append(f"outcome_metric: {line}")
+
+    # Extract Vision Alignment section (for architecture docs)
+    vision_alignment = _extract_section(content, 'Vision Alignment', preserve_lines=True)
+    if vision_alignment:
+        for line in vision_alignment.split('\n'):
+            line = line.strip().lstrip('-').lstrip('*').strip()
+            if line and '|' in line:
+                observations.append(f"vision_alignment: {line}")
+
+    # Add metadata completeness tracking for architecture entities
+    if tier == 'architecture':
+        from .metadata import get_metadata_completeness
+        completeness = get_metadata_completeness(observations)
+        observations.append(f"metadata_completeness: {completeness}")
+
     # Add the full document title as an observation
     observations.append(f"title: {raw_title}")
 
@@ -117,17 +144,22 @@ def _determine_entity_type(content: str, tier: str) -> EntityType:
     return EntityType.ARCHITECTURAL_STANDARD
 
 
-def _extract_section(content: str, section_name: str) -> Optional[str]:
+def _extract_section(content: str, section_name: str, preserve_lines: bool = False) -> Optional[str]:
     """Extract content from a markdown section.
 
     Looks for ## Section Name and extracts content until the next ## or end.
+
+    Args:
+        content: The full markdown document.
+        section_name: The H2 heading to find.
+        preserve_lines: If True, keep newlines intact (for list-based sections).
     """
     pattern = rf'^##\s+{re.escape(section_name)}\s*\n(.*?)(?=^##|\Z)'
     match = re.search(pattern, content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
     if match:
         text = match.group(1).strip()
-        # Collapse multiple whitespace
-        text = re.sub(r'\s+', ' ', text)
+        if not preserve_lines:
+            text = re.sub(r'\s+', ' ', text)
         return text if text else None
     return None
 

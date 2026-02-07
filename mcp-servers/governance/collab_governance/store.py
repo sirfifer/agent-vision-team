@@ -10,6 +10,9 @@ from .models import (
     Decision,
     DecisionCategory,
     Confidence,
+    EvolutionProposal,
+    EvolutionStatus,
+    ExperimentEvidence,
     Finding,
     GovernedTaskRecord,
     ReviewType,
@@ -107,6 +110,29 @@ class GovernanceStore:
                 ON task_reviews(implementation_task_id);
             CREATE INDEX IF NOT EXISTS idx_task_reviews_review
                 ON task_reviews(review_task_id);
+
+            -- Architectural evolution tables
+            CREATE TABLE IF NOT EXISTS evolution_proposals (
+                id TEXT PRIMARY KEY,
+                target_entity TEXT NOT NULL,
+                original_intent TEXT,
+                proposed_change TEXT NOT NULL,
+                rationale TEXT NOT NULL,
+                experiment_plan TEXT,
+                validation_criteria TEXT,
+                status TEXT NOT NULL DEFAULT 'proposed',
+                worktree_branch TEXT,
+                evidence TEXT,
+                proposing_agent TEXT,
+                decision_id TEXT REFERENCES decisions(id),
+                review_verdict TEXT,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_evolution_target
+                ON evolution_proposals(target_entity);
+            CREATE INDEX IF NOT EXISTS idx_evolution_status
+                ON evolution_proposals(status);
             """
         )
         conn.commit()
@@ -507,4 +533,123 @@ class GovernanceStore:
             reviewer=row["reviewer"],
             created_at=row["created_at"],
             completed_at=row["completed_at"],
+        )
+
+    # =========================================================================
+    # Architectural Evolution Methods
+    # =========================================================================
+
+    def store_evolution_proposal(self, proposal: EvolutionProposal) -> EvolutionProposal:
+        """Store an evolution proposal."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO evolution_proposals
+               (id, target_entity, original_intent,
+                proposed_change, rationale, experiment_plan, validation_criteria,
+                status, worktree_branch, evidence, proposing_agent,
+                decision_id, review_verdict, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                proposal.id,
+                proposal.target_entity,
+                proposal.original_intent,
+                proposal.proposed_change,
+                proposal.rationale,
+                proposal.experiment_plan,
+                json.dumps(proposal.validation_criteria),
+                proposal.status.value,
+                proposal.worktree_branch,
+                json.dumps([e.model_dump() for e in proposal.evidence]),
+                proposal.proposing_agent,
+                proposal.decision_id,
+                proposal.review_verdict,
+                proposal.created_at,
+            ),
+        )
+        conn.commit()
+        return proposal
+
+    def update_evolution_proposal(self, proposal: EvolutionProposal) -> EvolutionProposal:
+        """Update an existing evolution proposal."""
+        conn = self._get_conn()
+        conn.execute(
+            """UPDATE evolution_proposals SET
+               status = ?, worktree_branch = ?, evidence = ?,
+               decision_id = ?, review_verdict = ?
+               WHERE id = ?""",
+            (
+                proposal.status.value,
+                proposal.worktree_branch,
+                json.dumps([e.model_dump() for e in proposal.evidence]),
+                proposal.decision_id,
+                proposal.review_verdict,
+                proposal.id,
+            ),
+        )
+        conn.commit()
+        return proposal
+
+    def get_evolution_proposal(self, proposal_id: str) -> Optional[EvolutionProposal]:
+        """Get an evolution proposal by ID."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM evolution_proposals WHERE id = ?",
+            (proposal_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return self._row_to_evolution_proposal(row)
+
+    def get_evolution_proposals_for_entity(self, target_entity: str) -> list[EvolutionProposal]:
+        """Get all evolution proposals targeting a specific entity."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM evolution_proposals WHERE target_entity = ? ORDER BY created_at DESC",
+            (target_entity,),
+        ).fetchall()
+        return [self._row_to_evolution_proposal(r) for r in rows]
+
+    def get_active_experiments(self) -> list[EvolutionProposal]:
+        """Get all proposals currently in experimenting or validated state."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM evolution_proposals WHERE status IN ('experimenting', 'validated') ORDER BY created_at",
+        ).fetchall()
+        return [self._row_to_evolution_proposal(r) for r in rows]
+
+    def get_all_evolution_proposals(
+        self,
+        status: Optional[str] = None,
+    ) -> list[EvolutionProposal]:
+        """Get all evolution proposals, optionally filtered by status."""
+        conn = self._get_conn()
+        if status:
+            rows = conn.execute(
+                "SELECT * FROM evolution_proposals WHERE status = ? ORDER BY created_at DESC",
+                (status,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM evolution_proposals ORDER BY created_at DESC",
+            ).fetchall()
+        return [self._row_to_evolution_proposal(r) for r in rows]
+
+    def _row_to_evolution_proposal(self, row: sqlite3.Row) -> EvolutionProposal:
+        """Convert a database row to an EvolutionProposal."""
+        evidence_raw = json.loads(row["evidence"] or "[]")
+        return EvolutionProposal(
+            id=row["id"],
+            target_entity=row["target_entity"],
+            original_intent=row["original_intent"] or "",
+            proposed_change=row["proposed_change"],
+            rationale=row["rationale"],
+            experiment_plan=row["experiment_plan"] or "",
+            validation_criteria=json.loads(row["validation_criteria"] or "[]"),
+            status=EvolutionStatus(row["status"]),
+            worktree_branch=row["worktree_branch"] or "",
+            evidence=[ExperimentEvidence(**e) for e in evidence_raw],
+            proposing_agent=row["proposing_agent"] or "",
+            decision_id=row["decision_id"],
+            review_verdict=row["review_verdict"],
+            created_at=row["created_at"],
         )

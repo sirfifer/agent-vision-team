@@ -25,6 +25,9 @@ class EntityType(str, Enum):
     PATTERN = "pattern"
     PROBLEM = "problem"
     SOLUTION_PATTERN = "solution_pattern"
+    OUTCOME_METRIC = "outcome_metric"
+    EVOLUTION_PROPOSAL = "evolution_proposal"
+    EXPERIMENT_RESULT = "experiment_result"
 
 
 class Relation(BaseModel):

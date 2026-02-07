@@ -13,6 +13,9 @@ class DecisionCategory(str, Enum):
     API_DESIGN = "api_design"
     DEVIATION = "deviation"
     SCOPE_CHANGE = "scope_change"
+    ARCHITECTURE_EVOLUTION = "architecture_evolution"
+    EXPERIMENT_PROPOSAL = "experiment_proposal"
+    EXPERIMENT_RESULT = "experiment_result"
 
 
 class Confidence(str, Enum):
@@ -132,3 +135,58 @@ class GovernedTaskRecord(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
     released_at: Optional[str] = None
+
+
+# =============================================================================
+# Architectural Evolution Models
+# =============================================================================
+
+
+class EvolutionStatus(str, Enum):
+    """Lifecycle states for an evolution proposal."""
+    PROPOSED = "proposed"
+    EXPERIMENTING = "experimenting"
+    VALIDATED = "validated"
+    PRESENTED = "presented"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    NEEDS_MORE_EVIDENCE = "needs_more_evidence"
+
+
+class ExperimentEvidence(BaseModel):
+    """A single piece of evidence from an architectural experiment."""
+    evidence_type: str  # test_results, benchmark, production_metrics, code_review
+    source: str = ""  # Path to test/benchmark output or metric source
+    timestamp: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+    raw_output: str = ""  # Actual output (truncated if needed)
+    summary: str = ""  # Human-readable summary
+    metrics: dict = Field(default_factory=dict)  # {metric_name: value}
+    comparison_to_baseline: dict = Field(default_factory=dict)  # {metric: {baseline, experiment, improvement}}
+
+
+class EvolutionProposal(BaseModel):
+    """A proposal to evolve an architectural entity based on its intent.
+
+    Evolution proposals enable agents to challenge existing architecture when they
+    believe a better approach exists for achieving the same intent. The proposal
+    must reference the target entity's structured metadata and include a concrete
+    experiment plan with validation criteria.
+    """
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    target_entity: str  # The architecture entity to evolve
+    original_intent: str = ""  # Current intent (for reference)
+    proposed_change: str  # What the agent wants to change
+    rationale: str  # Why this better serves the intent
+    experiment_plan: str = ""  # How to validate with real evidence
+    validation_criteria: list[str] = Field(default_factory=list)  # Measurable success criteria
+    status: EvolutionStatus = EvolutionStatus.PROPOSED
+    worktree_branch: str = ""  # Git branch for the experiment
+    evidence: list[ExperimentEvidence] = Field(default_factory=list)
+    proposing_agent: str = ""
+    decision_id: Optional[str] = None  # Link to governance decision
+    review_verdict: Optional[str] = None  # Final verdict
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )

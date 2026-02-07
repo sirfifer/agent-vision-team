@@ -67,6 +67,13 @@ from e2e.scenarios.s08_multi_blocker_task import S08MultiBlockerTask
 from e2e.scenarios.s09_scope_change_detection import S09ScopeChangeDetection
 from e2e.scenarios.s10_completion_guard import S10CompletionGuard
 from e2e.scenarios.s12_cross_server_integration import S12CrossServerIntegration
+from e2e.scenarios.s11_hook_based_governance import HookBasedGovernanceScenario
+from e2e.scenarios.s13_hook_pipeline_at_scale import HookPipelineAtScaleScenario
+from e2e.scenarios.s14_architecture_metadata import S14ArchitectureMetadata
+from e2e.scenarios.s15_ingestion_with_metadata import S15IngestionWithMetadata
+from e2e.scenarios.s16_evolution_proposal_lifecycle import S16EvolutionProposalLifecycle
+from e2e.scenarios.s17_cascading_alignment import S17CascadingAlignment
+from e2e.scenarios.s18_extended_coverage import S18ExtendedCoverage
 
 # Registry of all scenario classes to instantiate.
 ALL_SCENARIO_CLASSES: list[type[BaseScenario]] = [
@@ -80,7 +87,14 @@ ALL_SCENARIO_CLASSES: list[type[BaseScenario]] = [
     S08MultiBlockerTask,
     S09ScopeChangeDetection,
     S10CompletionGuard,
+    HookBasedGovernanceScenario,
     S12CrossServerIntegration,
+    HookPipelineAtScaleScenario,
+    S14ArchitectureMetadata,
+    S15IngestionWithMetadata,
+    S16EvolutionProposalLifecycle,
+    S17CascadingAlignment,
+    S18ExtendedCoverage,
 ]
 
 # ---------------------------------------------------------------------------

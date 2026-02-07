@@ -244,6 +244,23 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         case 'formatDocContent':
           this.handleFormatDocContent(message.tier, message.rawContent, message.requestId);
           break;
+
+        case 'validateEnrichment':
+          this.handleValidateEnrichment();
+          break;
+
+        case 'suggestEntityMetadata':
+          this.handleSuggestEntityMetadata(message.entityName, message.existingObservations, message.requestId);
+          break;
+
+        case 'saveEntityMetadata':
+          this.handleSaveEntityMetadata(
+            message.entityName,
+            message.intent,
+            message.metrics,
+            message.visionAlignments,
+          );
+          break;
       }
     });
   }
@@ -604,6 +621,177 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Architecture Enrichment Handlers
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  private async handleValidateEnrichment(): Promise<void> {
+    try {
+      const result = await vscode.commands.executeCommand<{
+        total: number;
+        complete: number;
+        partial: number;
+        missing: number;
+        entities: Array<{
+          name: string;
+          entityType: string;
+          completeness: 'full' | 'partial' | 'none';
+          missingFields: string[];
+          existingObservations: string[];
+        }>;
+      }>('collab.validateEnrichment');
+
+      if (result) {
+        this.postMessage({ type: 'enrichmentValidationResult', result });
+      }
+    } catch (err) {
+      this.postMessage({
+        type: 'enrichmentValidationResult',
+        result: { total: 0, complete: 0, partial: 0, missing: 0, entities: [] },
+      });
+    }
+  }
+
+  private async handleSuggestEntityMetadata(
+    entityName: string,
+    existingObservations: string[],
+    requestId: string,
+  ): Promise<void> {
+    try {
+      const suggestion = await this.invokeClaudeSuggestMetadata(entityName, existingObservations);
+      this.postMessage({
+        type: 'entityMetadataSuggestion',
+        requestId,
+        entityName,
+        suggestion,
+      });
+    } catch (err) {
+      // Send a fallback suggestion with empty fields so the UI can still proceed
+      this.postMessage({
+        type: 'entityMetadataSuggestion',
+        requestId,
+        entityName,
+        suggestion: {
+          intent: '',
+          suggestedMetrics: [],
+          visionAlignments: [],
+          confidence: 'low' as const,
+        },
+      });
+    }
+  }
+
+  private async invokeClaudeSuggestMetadata(
+    entityName: string,
+    existingObservations: string[],
+  ): Promise<{
+    intent: string;
+    suggestedMetrics: Array<{ name: string; criteria: string; baseline: string }>;
+    visionAlignments: Array<{ visionStandard: string; explanation: string }>;
+    confidence: 'high' | 'medium' | 'low';
+  }> {
+    // Gather vision standards for context
+    let visionContext = '';
+    try {
+      const visionEntities = await vscode.commands.executeCommand<Array<{
+        name: string;
+        observations: string[];
+      }>>('collab.getEntitiesByTier', 'vision');
+      if (visionEntities && visionEntities.length > 0) {
+        visionContext = '\n\nAvailable Vision Standards:\n' +
+          visionEntities.map(v => {
+            const statement = v.observations.find((o: string) => o.startsWith('statement: '));
+            return `- ${v.name}: ${statement ? statement.replace('statement: ', '') : v.observations[0] || '(no description)'}`;
+          }).join('\n');
+      }
+    } catch {
+      // Vision standards unavailable; proceed without them
+    }
+
+    const prompt = ENTITY_METADATA_SUGGEST_PROMPT
+      .replace('{{ENTITY_NAME}}', entityName)
+      .replace('{{OBSERVATIONS}}', existingObservations.join('\n'))
+      .replace('{{VISION_CONTEXT}}', visionContext);
+
+    // Use temp files for I/O (gold standard pattern)
+    const stamp = `avt-suggest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const inputPath = path.join(os.tmpdir(), `${stamp}-input.md`);
+    const outputPath = path.join(os.tmpdir(), `${stamp}-output.md`);
+
+    try {
+      fs.writeFileSync(inputPath, prompt, 'utf-8');
+
+      await new Promise<void>((resolve, reject) => {
+        const inputFd = fs.openSync(inputPath, 'r');
+        const outputFd = fs.openSync(outputPath, 'w');
+
+        const proc = spawn('claude', ['--print', '--model', 'sonnet'], {
+          stdio: [inputFd, outputFd, 'pipe'],
+          timeout: 60000,
+        });
+
+        fs.closeSync(inputFd);
+        fs.closeSync(outputFd);
+
+        let stderr = '';
+        proc.stderr!.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+        proc.on('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'ENOENT') {
+            reject(new Error('Claude CLI not found. Ensure "claude" is installed and on your PATH.'));
+          } else {
+            reject(new Error(`Claude CLI failed to start: ${err.message}`));
+          }
+        });
+
+        proc.on('close', (code: number | null) => {
+          if (code !== 0) {
+            reject(new Error(
+              `Claude CLI exited with code ${code}${stderr ? `: ${stderr.trim().slice(0, 500)}` : ''}`
+            ));
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      const output = fs.readFileSync(outputPath, 'utf-8').trim();
+      if (!output) {
+        throw new Error('Claude CLI returned empty output');
+      }
+
+      // Parse the JSON response from Claude
+      const jsonMatch = output.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Could not parse JSON from Claude response');
+      }
+      return JSON.parse(jsonMatch[0]);
+    } finally {
+      try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
+      try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
+    }
+  }
+
+  private async handleSaveEntityMetadata(
+    entityName: string,
+    intent: string,
+    metrics: string[],
+    visionAlignments: string[],
+  ): Promise<void> {
+    try {
+      await vscode.commands.executeCommand(
+        'collab.saveEntityMetadata',
+        entityName,
+        intent,
+        metrics,
+        visionAlignments,
+      );
+    } catch (err) {
+      // Log but don't crash; the enrichment step handles its own retry
+      console.error(`Failed to save entity metadata for ${entityName}:`, err);
+    }
+  }
+
   private getHtmlContent(webview: vscode.Webview): string {
     const distPath = vscode.Uri.joinPath(this.extensionUri, 'webview-dashboard', 'dist');
     const scriptUri = webview.asWebviewUri(
@@ -664,12 +852,45 @@ Instructions:
 - For each element, create a section with:
   - A Type (standard, pattern, or component)
   - A clear Description of what it is and its purpose
+  - An Intent section: WHY this exists, what problem it solves
   - Usage guidance (when and how to use it)
+  - Optionally, a Metrics section with measurable criteria. Format each metric as a bullet: metric_name|success_criteria|baseline_value
+  - Optionally, a Vision Alignment section listing which vision standards this serves. Format each as a bullet: vision_standard_name|explanation of how it serves that standard
   - Optionally, Examples with code snippets
-  - Optionally, Related links to other architectural elements
 - Use proper markdown formatting with ## headings for each element
 - Add a top-level # heading summarizing the document
 - Remove redundancy, fix grammar, and organize logically
 - If the content is vague, do your best to extract actionable architecture guidance
+- For Intent: infer it from context if not explicitly stated. Every architectural decision exists for a reason; make that reason explicit
 - Output ONLY the formatted markdown document, no preamble or explanation
 - Do not wrap the output in markdown code fences`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Entity Metadata Suggestion Prompt
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ENTITY_METADATA_SUGGEST_PROMPT = `You are an architecture advisor. Given an architectural entity and its existing observations, propose structured metadata for it.
+
+Entity: {{ENTITY_NAME}}
+
+Existing Observations:
+{{OBSERVATIONS}}
+{{VISION_CONTEXT}}
+
+Your task:
+1. Propose an INTENT: why this architectural decision/pattern/component exists, what problem it solves. Intent carries the philosophical "why" that governance evaluates against.
+2. Optionally suggest 1-3 METRICS that could measure whether the intent is being served. Each metric has a name, success criteria, and baseline value. Metrics are optional; only include them when measurable dimensions exist.
+3. If vision standards are available, identify which ones this entity serves and explain how. Only include genuine connections; do not manufacture artificial alignment. If the intent naturally demonstrates vision alignment, that is sufficient.
+4. Rate your CONFIDENCE as high, medium, or low based on how much context you had.
+
+Output ONLY a valid JSON object (no markdown fences, no preamble) with this exact structure:
+{
+  "intent": "string",
+  "suggestedMetrics": [
+    { "name": "string", "criteria": "string", "baseline": "string" }
+  ],
+  "visionAlignments": [
+    { "visionStandard": "string", "explanation": "string" }
+  ],
+  "confidence": "high" | "medium" | "low"
+}`;

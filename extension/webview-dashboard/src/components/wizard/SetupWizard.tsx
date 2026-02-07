@@ -10,6 +10,7 @@ import { PermissionsStep } from './steps/PermissionsStep';
 import { SettingsStep } from './steps/SettingsStep';
 import { RulesStep } from './steps/RulesStep';
 import { IngestionStep } from './steps/IngestionStep';
+import { ArchitectureEnrichmentStep } from './steps/ArchitectureEnrichmentStep';
 import { CompleteStep } from './steps/CompleteStep';
 
 const DEFAULT_CONFIG: ProjectConfig = {
@@ -160,6 +161,8 @@ export function SetupWizard() {
         return <SettingsStep {...stepProps} />;
       case 'ingestion':
         return <IngestionStep {...stepProps} />;
+      case 'architecture-enrichment':
+        return <ArchitectureEnrichmentStep {...stepProps} />;
       case 'complete':
         return <CompleteStep {...stepProps} onComplete={handleComplete} />;
       default:

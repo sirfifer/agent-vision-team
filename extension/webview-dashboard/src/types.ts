@@ -112,6 +112,7 @@ export type WizardStep =
   | 'permissions'
   | 'settings'
   | 'ingestion'
+  | 'architecture-enrichment'
   | 'complete';
 
 export const WIZARD_STEPS: WizardStep[] = [
@@ -123,6 +124,7 @@ export const WIZARD_STEPS: WizardStep[] = [
   'permissions',
   'settings',
   'ingestion',
+  'architecture-enrichment',
   'complete',
 ];
 
@@ -135,6 +137,7 @@ export const WIZARD_STEP_LABELS: Record<WizardStep, string> = {
   'permissions': 'Permissions',
   'settings': 'Settings',
   'ingestion': 'Ingestion',
+  'architecture-enrichment': 'Enrich',
   'complete': 'Complete',
 };
 
@@ -339,7 +342,9 @@ export type ExtensionMessage =
   | { type: 'governanceStats'; stats: GovernanceStats }
   | { type: 'formatDocContentResult'; requestId: string; success: boolean; formattedContent?: string; error?: string }
   | { type: 'showWizard' }
-  | { type: 'showTutorial' };
+  | { type: 'showTutorial' }
+  | { type: 'enrichmentValidationResult'; result: EnrichmentValidationResult }
+  | { type: 'entityMetadataSuggestion'; requestId: string; entityName: string; suggestion: EntityMetadataSuggestion };
 
 export type WebviewMessage =
   | { type: 'connect' }
@@ -359,7 +364,10 @@ export type WebviewMessage =
   | { type: 'deleteResearchPrompt'; id: string }
   | { type: 'runResearchPrompt'; id: string }
   | { type: 'requestGovernedTasks' }
-  | { type: 'formatDocContent'; tier: 'vision' | 'architecture'; rawContent: string; requestId: string };
+  | { type: 'formatDocContent'; tier: 'vision' | 'architecture'; rawContent: string; requestId: string }
+  | { type: 'validateEnrichment' }
+  | { type: 'suggestEntityMetadata'; entityName: string; existingObservations: string[]; requestId: string }
+  | { type: 'saveEntityMetadata'; entityName: string; intent: string; metrics: string[]; visionAlignments: string[] };
 
 export interface IngestionResult {
   tier: 'vision' | 'architecture';
@@ -367,4 +375,27 @@ export interface IngestionResult {
   entities: string[];
   errors: string[];
   skipped: string[];
+}
+
+export interface EnrichmentEntityStatus {
+  name: string;
+  entityType: string;
+  completeness: 'full' | 'partial' | 'none';
+  missingFields: string[];
+  existingObservations: string[];
+}
+
+export interface EnrichmentValidationResult {
+  total: number;
+  complete: number;
+  partial: number;
+  missing: number;
+  entities: EnrichmentEntityStatus[];
+}
+
+export interface EntityMetadataSuggestion {
+  intent: string;
+  suggestedMetrics: Array<{ name: string; criteria: string; baseline: string }>;
+  visionAlignments: Array<{ visionStandard: string; explanation: string }>;
+  confidence: 'high' | 'medium' | 'low';
 }
