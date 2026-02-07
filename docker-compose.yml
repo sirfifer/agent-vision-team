@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  avt:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - ./:/project                    # Mount project repo
+      - avt-state:/project/.avt        # Persist AVT state across rebuilds
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PROJECT_DIR=/project
+      - AVT_API_KEY=${AVT_API_KEY:-}   # Optional: set fixed API key
+      - GIT_REPO_URL=${GIT_REPO_URL:-} # Optional: clone repo on first run
+      - GIT_BRANCH=${GIT_BRANCH:-main}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-opus}
+    restart: unless-stopped
+
+volumes:
+  avt-state:

@@ -25,6 +25,7 @@ class EntityType(str, Enum):
     PATTERN = "pattern"
     PROBLEM = "problem"
     SOLUTION_PATTERN = "solution_pattern"
+    GOVERNANCE_DECISION = "governance_decision"
 
 
 class Relation(BaseModel):

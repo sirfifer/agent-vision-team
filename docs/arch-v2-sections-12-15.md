@@ -412,7 +412,7 @@ The project-steward subagent maintains project organization, naming conventions,
 
 ## 13. E2E Testing Architecture
 
-The project includes an autonomous end-to-end testing harness that exercises all three MCP servers across 11 scenarios with 172+ structural assertions. Every run generates a unique project from a pool of 8 domains, ensuring tests validate structural properties rather than domain-specific content.
+The project includes an autonomous end-to-end testing harness that exercises all three MCP servers across 14 scenarios with 292+ structural assertions. Every run generates a unique project from a pool of 8 domains, ensuring tests validate structural properties rather than domain-specific content.
 
 ---
 
@@ -420,7 +420,7 @@ The project includes an autonomous end-to-end testing harness that exercises all
 
 The E2E harness is built on three principles:
 
-1. **Structural assertions, not domain assertions.** "A governed task is blocked from birth" is true regardless of whether the domain is Pet Adoption or Fleet Management. All 172+ assertions check structural properties of the system.
+1. **Structural assertions, not domain assertions.** "A governed task is blocked from birth" is true regardless of whether the domain is Pet Adoption or Fleet Management. All 292+ assertions check structural properties of the system.
 
 2. **Unique project per run.** Each execution randomly selects a domain, fills templates with randomized components, and generates a fresh workspace. This prevents tests from passing due to hardcoded values.
 
@@ -496,7 +496,7 @@ Each domain provides:
 
 ### 13.3 Scenario Inventory
 
-All 11 scenarios inherit from `BaseScenario` (in `e2e/scenarios/base.py`) which provides assertion helpers and timing/error-handling wrappers.
+All 14 scenarios inherit from `BaseScenario` (in `e2e/scenarios/base.py`) which provides assertion helpers and timing/error-handling wrappers.
 
 | ID | Scenario | Assertions | What It Validates |
 |----|----------|------------|-------------------|
@@ -511,8 +511,8 @@ All 11 scenarios inherit from `BaseScenario` (in `e2e/scenarios/base.py`) which 
 | s09 | Scope Change Detection | ~10 | `scope_change` and `deviation` categories -> automatic `needs_human_review` verdict. No AI review invoked. |
 | s10 | Completion Guard | ~15 | Unresolved review blocks prevent completion. Missing plan reviews are caught. `submit_completion_review` validates all decisions were reviewed. |
 | s12 | Cross-Server Integration | 25 | KG + Governance + Task system interplay. Vision standards loaded from KG for governance review. Decisions recorded back to KG. Task lifecycle spans all three servers. |
-
-**Note:** There is no s11 in the current implementation.
+| s13 | Hook Pipeline at Scale | ~24 | 50 rapid + 20 concurrent tasks with 100% hook interception rate. Validates governance enforcement under load. |
+| s14 | Persistence Lifecycle | ~71 | Two-phase test: populates all 6 persistence stores via all data flow paths (ingestion, agent CRUD, governance decisions, trust engine, curation, archival sync, session state), then validates cleanup. |
 
 **BaseScenario assertion helpers** (from `e2e/scenarios/base.py`):
 - `assert_true(condition, message)` -- basic boolean assertion
@@ -717,8 +717,8 @@ The researcher subagent (`.claude/agents/researcher.md`) operates in two modes, 
 
 **Model selection criteria:**
 
-| Criterion | Use Opus | Use Sonnet |
-|-----------|----------|------------|
+| Criterion | Use Opus 4.6 | Use Sonnet 4.5 |
+|-----------|--------------|----------------|
 | Novel or unfamiliar domain | Yes | |
 | Architectural decision research | Yes | |
 | Security analysis | Yes | |

@@ -41,7 +41,7 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 | **Governance Architecture** | PostToolUse hook on TaskCreate (core enforcement), governed tasks (blocked-from-birth), transactional decision review, multi-blocker support, AI-powered review via `claude --print` |
 | **Three-Tier Protection Hierarchy** | Vision > Architecture > Quality — lower tiers cannot modify higher tiers |
 | **Project Rules System** | Behavioral guidelines (enforce/prefer) injected into agent prompts from `.avt/project-config.json` |
-| **E2E Testing Harness** | 11 scenarios, 172+ structural assertions, parallel execution with full isolation |
+| **E2E Testing Harness** | 14 scenarios, 292+ structural assertions, parallel execution with full isolation |
 | **VS Code Extension** | Setup wizard (9 steps), workflow tutorial (10 steps), governance panel, document editor, research prompts panel, 3 MCP clients |
 | **CLAUDE.md Orchestration Protocol** | Orchestrator instructions defining task decomposition, governance checkpoints, quality review, memory curation |
 | **Research System** | Research prompts, researcher agent (dual-mode), research briefs |
@@ -64,12 +64,12 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 |------|------------|
 | **Orchestrator** | The primary Claude Code session (Opus 4.6) that decomposes tasks, spawns subagents, and coordinates work. Defined by `CLAUDE.md`. |
 | **Subagent** | A specialized Claude Code agent spawned via the Task tool, with a scoped system prompt from `.claude/agents/`. |
-| **Worker** | Subagent (Opus, 9 tools) that implements scoped tasks within governance constraints. |
-| **Quality Reviewer** | Subagent (Opus, 6 tools) that evaluates work through three ordered lenses: vision, architecture, quality. |
-| **KG Librarian** | Subagent (Sonnet, 5 tools) that curates institutional memory — consolidates, promotes patterns, syncs archival files. |
-| **Governance Reviewer** | Subagent (Sonnet, 4 tools) that evaluates decisions and plans for vision/architecture alignment. **Not spawned by the orchestrator** — called internally by the Governance Server via `claude --print`. |
-| **Researcher** | Subagent (Opus, 7 tools) that gathers intelligence in two modes: periodic/maintenance monitoring and exploratory/design research. |
-| **Project Steward** | Subagent (Sonnet, 7 tools) that maintains project hygiene: naming conventions, organization, documentation completeness, cruft detection. |
+| **Worker** | Subagent (Opus 4.6, 9 tools) that implements scoped tasks within governance constraints. |
+| **Quality Reviewer** | Subagent (Opus 4.6, 6 tools) that evaluates work through three ordered lenses: vision, architecture, quality. |
+| **KG Librarian** | Subagent (Sonnet 4.5, 5 tools) that curates institutional memory — consolidates, promotes patterns, syncs archival files. |
+| **Governance Reviewer** | Subagent (Sonnet 4.5, 4 tools) that evaluates decisions and plans for vision/architecture alignment. **Not spawned by the orchestrator** — called internally by the Governance Server via `claude --print`. |
+| **Researcher** | Subagent (Opus 4.6, 7 tools) that gathers intelligence in two modes: periodic/maintenance monitoring and exploratory/design research. |
+| **Project Steward** | Subagent (Sonnet 4.5, 7 tools) that maintains project hygiene: naming conventions, organization, documentation completeness, cruft detection. |
 | **MCP Server** | Model Context Protocol server providing tools to Claude Code sessions. Spawned as child processes via stdio transport. |
 | **Knowledge Graph (KG)** | Entity-relation graph stored in `.avt/knowledge-graph.jsonl`. Contains vision standards, architectural patterns, components, observations. |
 | **Protection Tier** | Access control level on KG entities: **vision** (human-only modification), **architecture** (human or orchestrator with approval), **quality** (any agent). |
@@ -113,9 +113,10 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
      ▼      ▼      ▼      ▼      ▼      ▼
 ┌────────┐┌────────┐┌────────┐       ┌────────┐┌────────┐
 │Worker  ││Quality ││  KG    │       │Research││Project │
-│(Opus)  ││Reviewer││Librar- │       │  -er   ││Steward │
-│9 tools ││(Opus)  ││ian     │       │(Opus)  ││(Sonnet)│
-│        ││6 tools ││(Sonnet)│       │7 tools ││7 tools │
+│(Opus   ││Reviewer││Librar- │       │  -er   ││Steward │
+│4.6)    ││(Opus   ││ian     │       │(Opus   ││(Sonnet │
+│9 tools ││4.6)    ││(Sonnet │       │4.6)    ││4.5)    │
+│        ││6 tools ││4.5)    │       │7 tools ││7 tools │
 │        ││        ││5 tools │       │        ││        │
 └───┬────┘└───┬────┘└───┬────┘       └───┬────┘└───┬────┘
     │         │         │                │         │
@@ -162,7 +163,8 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 └─────────────────────────────────────────────────────────────────────────┘
 
                     ┌──────────────────────────────────┐
-                    │  GOVERNANCE REVIEWER (Sonnet)     │
+                    │  GOVERNANCE REVIEWER             │
+                    │  (Sonnet 4.5)                    │
                     │  4 tools | NOT spawned by         │
                     │  orchestrator — called internally │
                     │  by Governance Server via         │
@@ -215,11 +217,11 @@ Developer Machine (macOS / Linux)
 ├── Claude Code (binary)
 │   ├── Primary session (orchestrator, Opus 4.6)
 │   └── Subagent sessions (spawned via Task tool)
-│       ├── Workers (Opus)
-│       ├── Quality Reviewer (Opus)
-│       ├── KG Librarian (Sonnet)
-│       ├── Researcher (Opus)
-│       └── Project Steward (Sonnet)
+│       ├── Workers (Opus 4.6)
+│       ├── Quality Reviewer (Opus 4.6)
+│       ├── KG Librarian (Sonnet 4.5)
+│       ├── Researcher (Opus 4.6)
+│       └── Project Steward (Sonnet 4.5)
 │
 ├── MCP Servers (spawned as child processes via stdio)
 │   ├── collab-kg (Python/uv)        ← knowledge-graph.jsonl
@@ -256,12 +258,12 @@ Six custom subagent definitions live in `.claude/agents/`:
 
 ```
 .claude/agents/
-├── worker.md                # Opus  | 9 tools | KG + Quality + Governance
-├── quality-reviewer.md      # Opus  | 6 tools | KG + Quality
-├── kg-librarian.md          # Sonnet | 5 tools | KG
-├── governance-reviewer.md   # Sonnet | 4 tools | KG (called via claude --print)
-├── researcher.md            # Opus  | 7 tools | KG + Governance + WebSearch + WebFetch
-└── project-steward.md       # Sonnet | 7 tools | KG + Write + Edit + Bash
+├── worker.md                # Opus 4.6  | 9 tools | KG + Quality + Governance
+├── quality-reviewer.md      # Opus 4.6  | 6 tools | KG + Quality
+├── kg-librarian.md          # Sonnet 4.5 | 5 tools | KG
+├── governance-reviewer.md   # Sonnet 4.5 | 4 tools | KG (called via claude --print)
+├── researcher.md            # Opus 4.6  | 7 tools | KG + Governance + WebSearch + WebFetch
+└── project-steward.md       # Sonnet 4.5 | 7 tools | KG + Write + Edit + Bash
 ```
 
 Each definition contains:
@@ -1529,12 +1531,12 @@ The system defines six specialized subagents in `.claude/agents/`. Each is a Mar
 
 | Agent | Model | Tool Count | MCP Access | Role | Spawned By |
 |-------|-------|------------|------------|------|------------|
-| **Worker** | Opus | 9 | KG + Quality + Governance | Implement scoped tasks with full governance integration | Orchestrator |
-| **Quality Reviewer** | Opus | 6 | KG + Quality | Three-lens review (vision, architecture, quality) | Orchestrator |
-| **KG Librarian** | Sonnet | 5 | KG | Curate institutional memory, consolidate observations | Orchestrator |
-| **Governance Reviewer** | Sonnet | 4 | KG | AI-powered decision review against vision/architecture standards | Governance Server (via `claude --print`) |
-| **Researcher** | Opus | 7 | KG + Governance | Periodic monitoring + exploratory design research | Orchestrator |
-| **Project Steward** | Sonnet | 7 | KG | Project hygiene, naming conventions, cruft detection | Orchestrator |
+| **Worker** | Opus 4.6 | 9 | KG + Quality + Governance | Implement scoped tasks with full governance integration | Orchestrator |
+| **Quality Reviewer** | Opus 4.6 | 6 | KG + Quality | Three-lens review (vision, architecture, quality) | Orchestrator |
+| **KG Librarian** | Sonnet 4.5 | 5 | KG | Curate institutional memory, consolidate observations | Orchestrator |
+| **Governance Reviewer** | Sonnet 4.5 | 4 | KG | AI-powered decision review against vision/architecture standards | Governance Server (via `claude --print`) |
+| **Researcher** | Opus 4.6 | 7 | KG + Governance | Periodic monitoring + exploratory design research | Orchestrator |
+| **Project Steward** | Sonnet 4.5 | 7 | KG | Project hygiene, naming conventions, cruft detection | Orchestrator |
 
 > **Note on Governance Reviewer**: Unlike the other five agents, the governance-reviewer is NOT spawned by the orchestrator. It is invoked internally by the Governance MCP server via `claude --print` when `submit_decision()`, `submit_plan_for_review()`, or `submit_completion_review()` are called. It runs as a headless subprocess, not a Task tool subagent.
 
@@ -1794,8 +1796,8 @@ tools:
 
 | Complexity | Model | Use When |
 |------------|-------|----------|
-| High | Opus | Novel domains, architectural decisions, security analysis, ambiguous requirements |
-| Routine | Sonnet | Changelog monitoring, version updates, straightforward API documentation |
+| High | Opus 4.6 | Novel domains, architectural decisions, security analysis, ambiguous requirements |
+| Routine | Sonnet 4.5 | Changelog monitoring, version updates, straightforward API documentation |
 
 **Constraints**:
 - Do not modify vision-tier or architecture-tier KG entities (observations only)
@@ -2274,8 +2276,8 @@ The researcher subagent gathers intelligence in two modes:
 
 | Mode | Purpose | Output | Model |
 |------|---------|--------|-------|
-| **Periodic/Maintenance** | Monitor APIs, frameworks, dependencies for breaking changes, deprecations, or new features | Change reports | Sonnet (straightforward monitoring) |
-| **Exploratory/Design** | Deep investigation before architectural decisions, technology comparisons, unfamiliar domains | Research briefs | Opus (complex, novel analysis) |
+| **Periodic/Maintenance** | Monitor APIs, frameworks, dependencies for breaking changes, deprecations, or new features | Change reports | Sonnet 4.5 (straightforward monitoring) |
+| **Exploratory/Design** | Deep investigation before architectural decisions, technology comparisons, unfamiliar domains | Research briefs | Opus 4.6 (complex, novel analysis) |
 
 Research prompts are defined in `.avt/research-prompts/` and managed via the dashboard or manually. Completed research is stored in `.avt/research-briefs/`. The orchestrator references research briefs in task briefs when spawning workers.
 
@@ -2700,7 +2702,7 @@ agent-vision-team/
 │   ├── generator/
 │   │   ├── project_generator.py
 │   │   └── domain_templates.py
-│   ├── scenarios/                           # 11 test scenarios
+│   ├── scenarios/                           # 14 test scenarios
 │   │   ├── base.py
 │   │   ├── s01_kg_tier_protection.py
 │   │   ├── s02_governance_decision_flow.py
@@ -2712,7 +2714,10 @@ agent-vision-team/
 │   │   ├── s08_multi_blocker_task.py
 │   │   ├── s09_scope_change_detection.py
 │   │   ├── s10_completion_guard.py
-│   │   └── s12_cross_server_integration.py
+│   │   ├── s11_hook_based_governance.py
+│   │   ├── s12_cross_server_integration.py
+│   │   ├── s13_hook_pipeline_at_scale.py
+│   │   └── s14_persistence_lifecycle.py
 │   ├── parallel/
 │   │   └── executor.py
 │   └── validation/
@@ -3247,7 +3252,7 @@ The project-steward subagent maintains project organization, naming conventions,
 
 ## 13. E2E Testing Architecture
 
-The project includes an autonomous end-to-end testing harness that exercises all three MCP servers across 11 scenarios with 172+ structural assertions. Every run generates a unique project from a pool of 8 domains, ensuring tests validate structural properties rather than domain-specific content.
+The project includes an autonomous end-to-end testing harness that exercises all three MCP servers across 14 scenarios with 292+ structural assertions. Every run generates a unique project from a pool of 8 domains, ensuring tests validate structural properties rather than domain-specific content.
 
 ---
 
@@ -3255,7 +3260,7 @@ The project includes an autonomous end-to-end testing harness that exercises all
 
 The E2E harness is built on three principles:
 
-1. **Structural assertions, not domain assertions.** "A governed task is blocked from birth" is true regardless of whether the domain is Pet Adoption or Fleet Management. All 172+ assertions check structural properties of the system.
+1. **Structural assertions, not domain assertions.** "A governed task is blocked from birth" is true regardless of whether the domain is Pet Adoption or Fleet Management. All 292+ assertions check structural properties of the system.
 
 2. **Unique project per run.** Each execution randomly selects a domain, fills templates with randomized components, and generates a fresh workspace. This prevents tests from passing due to hardcoded values.
 
@@ -3331,7 +3336,7 @@ Each domain provides:
 
 ### 13.3 Scenario Inventory
 
-All 11 scenarios inherit from `BaseScenario` (in `e2e/scenarios/base.py`) which provides assertion helpers and timing/error-handling wrappers.
+All 14 scenarios inherit from `BaseScenario` (in `e2e/scenarios/base.py`) which provides assertion helpers and timing/error-handling wrappers.
 
 | ID | Scenario | Assertions | What It Validates |
 |----|----------|------------|-------------------|
@@ -3552,8 +3557,8 @@ The researcher subagent (`.claude/agents/researcher.md`) operates in two modes, 
 
 **Model selection criteria:**
 
-| Criterion | Use Opus | Use Sonnet |
-|-----------|----------|------------|
+| Criterion | Use Opus 4.6 | Use Sonnet 4.5 |
+|-----------|--------------|----------------|
 | Novel or unfamiliar domain | Yes | |
 | Architectural decision research | Yes | |
 | Security analysis | Yes | |
@@ -3886,7 +3891,7 @@ Claude Code provides the execution environment for the entire system. The follow
 | MCP servers (SSE) | **Active** | 3 servers registered in `.claude/settings.json`: collab-kg (port 3101), collab-quality (port 3102), collab-governance (port 3103) |
 | PostToolUse hooks | **Active** | `TaskCreate` hook runs `scripts/hooks/governance-task-intercept.py` to enforce "blocked from birth" invariant on every task creation (core enforcement mechanism) |
 | PreToolUse hooks | **Active** | `ExitPlanMode` hook runs `scripts/hooks/verify-governance-review.sh` as safety net for plan review |
-| Model routing | **Active** | Per-agent model assignment in `.claude/settings.json` agents block: Opus for worker/quality-reviewer, Sonnet (default) for kg-librarian/governance-reviewer |
+| Model routing | **Active** | Per-agent model assignment in `.claude/settings.json` agents block: Opus 4.6 for worker/quality-reviewer, Sonnet 4.5 (default) for kg-librarian/governance-reviewer |
 | Skills | **Active** | `/e2e` skill for E2E test harness execution |
 | Commands | **Active** | `/project-overview` command for project context |
 | Task List (native) | **Active** | `CLAUDE_CODE_ENABLE_TASKS=true` + `CLAUDE_CODE_TASK_LIST_ID` for native task system with cross-session persistence; PostToolUse hook writes governance pairs to native task files |
@@ -3913,13 +3918,13 @@ This section replaces the v1 "Implementation Phases" checklist, which listed unc
 | Quality Server | **Operational (partial gate stubs)** | 8 tools exposed. Trust engine with SQLite persistence is fully functional. `auto_format`, `run_lint`, `run_tests`, and `check_coverage` make real subprocess calls (ruff, prettier, pytest, eslint). The **build gate** and **findings gate** in `check_all_gates()` are stubs returning `passed: true` |
 | Governance Server | **Operational** | 10 tools, SQLite persistence, AI-powered review via `claude --print` with governance-reviewer agent, governed task lifecycle with multi-blocker support, KG integration for standard loading |
 | Worker Agent | **Operational** | Full governance integration: reads task brief, checks project rules from `.avt/project-config.json`, queries KG for context (`search_nodes`, `get_entities_by_tier`), submits decisions via `submit_decision` (blocks until verdict), implements within task brief scope, runs `check_all_gates()`, calls `submit_completion_review` before reporting done |
-| Quality Reviewer Agent | **Operational** | Three-lens review protocol (vision > architecture > quality). Model: Opus. 6 tools including KG and Quality server access |
-| KG Librarian Agent | **Operational** | Memory curation: consolidation, promotion, stale entry removal, archival file sync to `.avt/memory/`. Model: Sonnet. 5 tools |
-| Governance Reviewer Agent | **Operational** | AI review called internally by governance server via `claude --print`. Reviews decisions and plans through vision alignment and architectural conformance lenses. Model: Sonnet. 4 tools |
-| Researcher Agent | **Operational** | Dual-mode research: periodic/maintenance (dependency monitoring, breaking change detection) and exploratory/design (technology evaluation, architectural decisions). Model: Opus. 7 tools |
-| Project Steward Agent | **Operational** | Project hygiene: naming conventions, folder organization, documentation completeness, cruft detection. Periodic cadence: weekly/monthly/quarterly. Model: Sonnet. 7 tools |
+| Quality Reviewer Agent | **Operational** | Three-lens review protocol (vision > architecture > quality). Model: Opus 4.6. 6 tools including KG and Quality server access |
+| KG Librarian Agent | **Operational** | Memory curation: consolidation, promotion, stale entry removal, archival file sync to `.avt/memory/`. Model: Sonnet 4.5. 5 tools |
+| Governance Reviewer Agent | **Operational** | AI review called internally by governance server via `claude --print`. Reviews decisions and plans through vision alignment and architectural conformance lenses. Model: Sonnet 4.5. 4 tools |
+| Researcher Agent | **Operational** | Dual-mode research: periodic/maintenance (dependency monitoring, breaking change detection) and exploratory/design (technology evaluation, architectural decisions). Model: Opus 4.6. 7 tools |
+| Project Steward Agent | **Operational** | Project hygiene: naming conventions, folder organization, documentation completeness, cruft detection. Periodic cadence: weekly/monthly/quarterly. Model: Sonnet 4.5. 7 tools |
 | VS Code Extension | **Operational** | Dashboard webview, 9-step setup wizard, 10-step workflow tutorial, 6-step VS Code walkthrough, governance panel, research prompts panel, 3 MCP clients (KG, Quality, Governance), 4 TreeViews, 15 commands (12 user-facing, 3 internal) |
-| E2E Test Harness | **Operational** | 11 scenarios (s01-s10, s12), 172+ structural domain-agnostic assertions, parallel execution with full isolation, random domain generation from 8 templates, mock review mode |
+| E2E Test Harness | **Operational** | 14 scenarios (s01-s14), 292+ structural domain-agnostic assertions, parallel execution with full isolation, random domain generation from 8 templates, mock review mode |
 | CLAUDE.md Orchestration | **Operational** | All protocols documented: task decomposition, governance checkpoints, quality review, memory curation, research, project hygiene, drift detection |
 
 ### 17.2 Known Gaps
@@ -3930,7 +3935,7 @@ These are known deficiencies in the current implementation. They do not block op
 
 **Extension-system state drift.** The extension dashboard was built incrementally as the system evolved. Some UI components may reference patterns or display states that have since changed. The gap analysis (February 2026) identified that the extension's scope has grown far beyond "observability only" but some internal state representations have not kept pace with governance and research system evolution.
 
-**Agent definitions outside settings.json.** The researcher and project-steward agents are defined in `.claude/agents/` but are not listed in the `agents` block of `.claude/settings.json`. They inherit the `defaultModel: sonnet` setting. The researcher should be explicitly configured for Opus to match its documented model assignment.
+**Agent definitions outside settings.json.** The researcher and project-steward agents are defined in `.claude/agents/` but are not listed in the `agents` block of `.claude/settings.json`. They inherit the `defaultModel: sonnet` setting. The researcher should be explicitly configured for Opus 4.6 to match its documented model assignment.
 
 **v1 scaffolding remnants.** Code from the v1 architecture (Communication Hub server scaffolding, extension session management) is preserved in the codebase and in `docs/v1-full-architecture/`. This is intentional (available for reactivation) but adds cognitive load for new contributors.
 
@@ -3943,7 +3948,7 @@ Items are ordered by priority. Effort and dependency information is included to 
 | **Immediate** | Enable MCP Tool Search | Config only | — | Set `ENABLE_TOOL_SEARCH=auto:5` in settings. 85% context reduction for tool loading |
 | **Immediate** | Set effort controls per agent | Config only | — | Add effort levels to agent definitions in `.claude/settings.json` |
 | **Immediate** | Update model references to Opus 4.6 | Trivial | — | Replace Opus 4.5 references in documentation. Code references are model-agnostic |
-| **Immediate** | Add researcher/steward to settings.json agents | Config only | — | Explicitly configure model and tools for researcher (Opus) and project-steward (Sonnet) |
+| **Immediate** | Add researcher/steward to settings.json agents | Config only | — | Explicitly configure model and tools for researcher (Opus 4.6) and project-steward (Sonnet 4.5) |
 | **Done** | ~~Replace Quality server gate stubs~~ | Medium | — | Build gate reads `.avt/project-config.json` build commands, findings gate queries trust engine for unresolved critical/high findings. Completed February 2026 |
 | **Short-term** | Convert common workflows to model-invocable skills | Low | — | Identify orchestrator patterns that repeat across sessions. Candidates: governance review flow, worker spawn-and-review cycle, KG curation trigger |
 | **Short-term** | Add setup hooks (`--init`, `--maintenance`) | Low | — | `--init`: validate project config, seed KG with vision/architecture docs, verify MCP server connectivity. `--maintenance`: run cruft detection, check dependency updates |
@@ -3963,7 +3968,7 @@ For historical context, the following summarizes what the v1 "Implementation Pha
 | **Phase 1: Make MCP Servers Real** | KG: JSONL persistence, delete tools, compaction. Quality: real subprocess calls, SQLite trust engine | KG: fully operational with 11 tools (3 beyond plan), JSONL persistence, tier protection. Quality: 8 tools operational with real subprocess calls, trust engine with SQLite complete. All 5 quality gates now fully connected |
 | **Phase 2: Create Subagents + Validate E2E** | 3 agents (worker, quality-reviewer, kg-librarian), CLAUDE.md orchestration, settings.json hooks, end-to-end validation | 6 agents (added governance-reviewer, researcher, project-steward), full CLAUDE.md orchestration with governance/research/hygiene protocols, PostToolUse + PreToolUse hooks, end-to-end workflow validated |
 | **Phase 3: Build Extension as Monitoring Layer** | MCP clients, TreeView wiring, file watchers, diagnostics, dashboard, status bar | 3 MCP clients, 4 TreeViews, dashboard webview with React 19, 9-step wizard, 10-step tutorial, VS Code walkthrough, governance panel, research prompts panel, 15 commands (12 user-facing, 3 internal). Scope significantly exceeded plan |
-| **Phase 4: Expand and Harden** | Event logging, cross-project memory, multi-worker parallelism, FastMCP 3.0 migration, installation script | E2E test harness (11 scenarios, 172+ assertions), full governance system (not in original plan), research system (not in original plan), project hygiene system (not in original plan). Cross-project memory and FastMCP migration remain future items |
+| **Phase 4: Expand and Harden** | Event logging, cross-project memory, multi-worker parallelism, FastMCP 3.0 migration, installation script | E2E test harness (14 scenarios, 292+ assertions), full governance system (not in original plan), research system (not in original plan), project hygiene system (not in original plan). Cross-project memory and FastMCP migration remain future items |
 
 ---
 
@@ -3974,8 +3979,8 @@ For historical context, the following summarizes what the v1 "Implementation Pha
 The E2E test harness is the primary verification mechanism for all three MCP servers. It exercises the Python library APIs directly with structural, domain-agnostic assertions.
 
 **Characteristics:**
-- 11 scenarios covering KG, Quality, and Governance servers
-- 172+ assertions that are structural (not domain-specific)
+- 14 scenarios covering KG, Quality, and Governance servers
+- 292+ assertions that are structural (not domain-specific)
 - Parallel execution via `ThreadPoolExecutor` with full isolation per scenario (separate JSONL, SQLite, task directories)
 - Each run generates a unique project from 8 domain templates (Pet Adoption, Restaurant Reservation, Fitness Tracking, etc.)
 - `GOVERNANCE_MOCK_REVIEW` environment variable enables deterministic testing without a live `claude` binary

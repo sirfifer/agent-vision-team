@@ -720,6 +720,14 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Toggle Demo Mode command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('collab.toggleDemo', () => {
+      dashboardProvider.openPanel();
+      setTimeout(() => dashboardProvider.toggleDemo(), 300);
+    })
+  );
+
   // Ingest documents command (called by dashboard wizard)
   context.subscriptions.push(
     vscode.commands.registerCommand('collab.ingestDocuments', async (tier: 'vision' | 'architecture') => {

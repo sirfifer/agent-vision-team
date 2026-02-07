@@ -131,6 +131,8 @@ When an agent calls `submit_decision`:
 | `store.py` | SQLite persistence: decisions table, reviews table, history/status queries |
 | `kg_client.py` | Direct JSONL reader for KG vision/architecture data |
 | `reviewer.py` | `claude --print` orchestration with prompt templates and JSON parsing |
+| `session_state.py` | Generates `.avt/session-state.md` from governance DB (task stats, decision history) |
+| `task_integration.py` | Direct manipulation of Claude Code task files for governance-gated execution |
 
 ## SQLite Schema
 

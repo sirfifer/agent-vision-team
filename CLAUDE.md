@@ -234,8 +234,8 @@ The researcher subagent gathers intelligence to inform development decisions and
 ### Model Selection
 
 The researcher uses different models based on complexity:
-- **Opus**: Novel domains, architectural decisions, security analysis, ambiguous requirements
-- **Sonnet**: Changelog monitoring, version updates, straightforward API documentation
+- **Opus 4.6**: Novel domains, architectural decisions, security analysis, ambiguous requirements
+- **Sonnet 4.5**: Changelog monitoring, version updates, straightforward API documentation
 
 When spawning the researcher, specify `model: opus` or `model: sonnet` based on complexity, or use `model_hint: auto` to let the system decide.
 
@@ -478,7 +478,7 @@ e2e/                                     # Autonomous E2E testing harness
 ├── run-e2e.py                           # Python orchestrator
 ├── pyproject.toml                       # Dependencies
 ├── generator/                           # Unique project generation per run
-├── scenarios/                           # 11 test scenarios (s01–s12)
+├── scenarios/                           # 14 test scenarios (s01–s14)
 ├── parallel/                            # ThreadPoolExecutor + isolation
 └── validation/                          # Assertion engine + report generator
 ```
@@ -505,7 +505,7 @@ All servers will be available to all Claude Code sessions and subagents.
 
 ## E2E Testing
 
-The project includes an autonomous end-to-end testing harness that exercises all three MCP servers (KG, Governance, Quality) across 11 scenarios with 172+ structural assertions.
+The project includes an autonomous end-to-end testing harness that exercises all three MCP servers (KG, Governance, Quality) across 14 scenarios with 292+ structural assertions.
 
 ### Quick Start
 
@@ -539,6 +539,9 @@ Scenarios run in parallel with full isolation: each gets its own KnowledgeGraph 
 | Scope Change Detection | scope_change/deviation → needs_human_review verdict |
 | Completion Guard | Unresolved blocks and missing plan reviews are caught |
 | Cross-Server Integration | KG + Governance + Task system interplay |
+| Hook-Based Governance | PostToolUse interception, pair creation, loop prevention |
+| Hook Pipeline at Scale | 50 rapid + 20 concurrent tasks, 100% interception |
+| Persistence Lifecycle | Full two-phase test: populate all 6 stores via all data flow paths, validate, clean up |
 
 ### When to Run
 
@@ -561,7 +564,7 @@ e2e/
 ├── generator/                  # Unique project generation
 │   ├── project_generator.py    # Domain selection + template filling
 │   └── domain_templates.py     # 8 domain vocabulary pools
-├── scenarios/                  # 11 test scenarios (s01–s12)
+├── scenarios/                  # 14 test scenarios (s01–s14)
 │   └── base.py                 # BaseScenario + assertion helpers
 ├── parallel/
 │   └── executor.py             # ThreadPoolExecutor + per-scenario isolation

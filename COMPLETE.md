@@ -2,7 +2,7 @@
 
 **Status**: ✅ All phases complete
 **Date**: 2026-02-06
-**Validation**: ✅ E2E harness: 11 scenarios, 172+ assertions passed
+**Validation**: ✅ E2E harness: 14 scenarios, 292+ assertions passed
 
 ## System Overview
 
@@ -60,18 +60,18 @@ Claude Code provides natively:
 Knowledge Graph: 18 tests ✅ (74% coverage)
 Quality Server:  26 tests ✅ (48% coverage)
 Extension:        9 unit tests ✅
-E2E Harness:     11 scenarios ✅ (172+ structural assertions)
+E2E Harness:     14 scenarios ✅ (292+ structural assertions)
 ```
 
 ### Phase 2: Subagents + Orchestration ✅
 
 **Subagent Definitions** (`.claude/agents/`):
-- `worker.md` - Implements scoped tasks within governance constraints (Opus, 9 tools)
-- `quality-reviewer.md` - Three-lens review: Vision → Architecture → Quality (Opus, 6 tools)
-- `kg-librarian.md` - Curates institutional memory, syncs archival files (Sonnet, 5 tools)
-- `governance-reviewer.md` - AI review called by Governance Server via `claude --print` (Sonnet, 4 tools)
-- `researcher.md` - Dual-mode research: periodic/maintenance + exploratory/design (Opus, 7 tools)
-- `project-steward.md` - Project hygiene: naming, organization, cruft detection (Sonnet, 7 tools)
+- `worker.md` - Implements scoped tasks within governance constraints (Opus 4.6, 9 tools)
+- `quality-reviewer.md` - Three-lens review: Vision → Architecture → Quality (Opus 4.6, 6 tools)
+- `kg-librarian.md` - Curates institutional memory, syncs archival files (Sonnet 4.5, 5 tools)
+- `governance-reviewer.md` - AI review called by Governance Server via `claude --print` (Sonnet 4.5, 4 tools)
+- `researcher.md` - Dual-mode research: periodic/maintenance + exploratory/design (Opus 4.6, 7 tools)
+- `project-steward.md` - Project hygiene: naming, organization, cruft detection (Sonnet 4.5, 7 tools)
 
 **Orchestration**:
 - `CLAUDE.md` - Comprehensive orchestrator instructions
@@ -154,7 +154,7 @@ E2E Harness:     11 scenarios ✅ (172+ structural assertions)
 - PreToolUse hook (`ExitPlanMode`) as safety net for governance review
 
 **E2E Testing Harness**:
-- 11 scenarios (s01-s10, s12) with 172+ structural, domain-agnostic assertions
+- 14 scenarios (s01-s14) with 292+ structural, domain-agnostic assertions
 - 8 domain templates (Pet Adoption, Restaurant Reservation, Fitness Tracking, etc.)
 - Parallel execution via `ThreadPoolExecutor` with full isolation per scenario
 - Each scenario gets its own JSONL, SQLite, and task directories
@@ -165,7 +165,7 @@ E2E Harness:     11 scenarios ✅ (172+ structural assertions)
 - Researcher subagent with dual modes: periodic/maintenance + exploratory/design
 - Research prompts stored in `.avt/research-prompts/` with schedule configuration
 - Research briefs stored in `.avt/research-briefs/` and referenced by task briefs
-- Model selection: Opus for novel domains, Sonnet for monitoring tasks
+- Model selection: Opus 4.6 for novel domains, Sonnet 4.5 for monitoring tasks
 
 **Project Rules System**:
 - Behavioral guidelines in `.avt/project-config.json`
@@ -186,15 +186,15 @@ E2E Harness:     11 scenarios ✅ (172+ structural assertions)
 | Knowledge Graph | 18 | 74% | ✅ |
 | Quality Server | 26 | 48% | ✅ |
 | Extension (Unit) | 9 | N/A | ✅ |
-| E2E Harness | 11 scenarios (172+ assertions) | N/A | ✅ |
-| **Total** | **64 tests + 11 E2E scenarios** | — | ✅ |
+| E2E Harness | 14 scenarios (292+ assertions) | N/A | ✅ |
+| **Total** | **64 tests + 14 E2E scenarios** | — | ✅ |
 
 ### Key Metrics
 
 - **Core Business Logic**: 98%+ (graph, storage, trust engine, models)
 - **Integration Points**: 0% (expected - MCP server.py files, tested via E2E harness)
 - **Tool Execution**: 13-72% (branches require external tools: ruff, eslint, pytest)
-- **E2E Coverage**: All 3 MCP servers exercised across 11 scenarios with 172+ structural assertions
+- **E2E Coverage**: All 3 MCP servers exercised across 14 scenarios with 292+ structural assertions
 
 ### Test Execution
 
@@ -206,7 +206,7 @@ cd mcp-servers/quality && uv run pytest          # 26 ✅
 cd extension && npm test                          # 9 ✅
 
 # E2E tests (exercises all 3 MCP servers)
-./e2e/run-e2e.sh                                  # 11 scenarios ✅
+./e2e/run-e2e.sh                                  # 14 scenarios ✅
 ./e2e/run-e2e.sh --keep                           # preserve workspace for debugging
 ./e2e/run-e2e.sh --seed 42                        # reproducible runs
 ```
@@ -246,7 +246,7 @@ cd extension && npm test                          # 9 ✅
 Run `./e2e/run-e2e.sh`:
 
 ```
-11 scenarios, 172+ structural assertions across all 3 MCP servers
+14 scenarios, 292+ structural assertions across all 3 MCP servers
 
 | Scenario | What It Validates |
 |----------|-------------------|
@@ -260,7 +260,10 @@ Run `./e2e/run-e2e.sh`:
 | s08 | Multi-Blocker Task: 3 stacked blockers released one at a time |
 | s09 | Scope Change Detection: scope_change → needs_human_review verdict |
 | s10 | Completion Guard: unresolved blocks and missing plan reviews caught |
+| s11 | Hook-Based Governance: PostToolUse interception, pair creation, loop prevention |
 | s12 | Cross-Server Integration: KG + Governance + Task system interplay |
+| s13 | Hook Pipeline at Scale: 50 rapid + 20 concurrent tasks, 100% interception |
+| s14 | Persistence Lifecycle: two-phase populate/cleanup of all 6 persistence stores |
 ```
 
 ### Manual Validation Checklist
@@ -275,7 +278,7 @@ Run `./e2e/run-e2e.sh`:
 ✅ Extension activates on workspace detection
 ✅ Extension builds without errors (esbuild + vite)
 ✅ All documentation cross-referenced
-✅ E2E harness passes all 11 scenarios with 172+ assertions
+✅ E2E harness passes all 14 scenarios with 292+ assertions
 
 ## Usage
 
@@ -345,12 +348,12 @@ curl http://localhost:3103/health  # Should return 200
 agent-vision-team/
 ├── .claude/
 │   ├── agents/                     # 6 subagent definitions
-│   │   ├── worker.md               # Opus, 9 tools
-│   │   ├── quality-reviewer.md     # Opus, 6 tools
-│   │   ├── kg-librarian.md         # Sonnet, 5 tools
-│   │   ├── governance-reviewer.md  # Sonnet, 4 tools (called via claude --print)
-│   │   ├── researcher.md           # Opus, 7 tools
-│   │   └── project-steward.md      # Sonnet, 7 tools
+│   │   ├── worker.md               # Opus 4.6, 9 tools
+│   │   ├── quality-reviewer.md     # Opus 4.6, 6 tools
+│   │   ├── kg-librarian.md         # Sonnet 4.5, 5 tools
+│   │   ├── governance-reviewer.md  # Sonnet 4.5, 4 tools (called via claude --print)
+│   │   ├── researcher.md           # Opus 4.6, 7 tools
+│   │   └── project-steward.md      # Sonnet 4.5, 7 tools
 │   ├── settings.json               # MCP server configs, hooks, agent tool mappings
 │   ├── VALIDATION.md               # Validation guide
 │   └── PHASE3-STATUS.md            # Phase 3 status
@@ -394,7 +397,7 @@ agent-vision-team/
 │   ├── run-e2e.sh                   # Shell entry point
 │   ├── run-e2e.py                   # Python orchestrator
 │   ├── generator/                   # Unique project generation (8 domain templates)
-│   ├── scenarios/                   # 11 test scenarios (s01-s10, s12)
+│   ├── scenarios/                   # 14 test scenarios (s01-s14)
 │   ├── parallel/                    # ThreadPoolExecutor + per-scenario isolation
 │   └── validation/                  # Assertion engine + report generator
 ├── docs/
@@ -430,7 +433,7 @@ The system is complete and ready for use. Optional enhancements:
 ✅ **Governed Tasks**: Blocked-from-birth lifecycle with multi-blocker support and AI-powered review
 ✅ **Tier Protection**: Three-tier hierarchy (Vision > Architecture > Quality) enforced at tool level
 ✅ **No Silent Dismissals**: Every finding dismissal requires justification with audit trail
-✅ **E2E Testing**: 11 scenarios, 172+ structural assertions, parallel execution, 8 domain templates
+✅ **E2E Testing**: 14 scenarios, 292+ structural assertions, parallel execution, 8 domain templates
 ✅ **Research System**: Dual-mode researcher (periodic + exploratory) with research prompts and briefs
 ✅ **Project Rules**: Enforce/prefer behavioral guidelines injected into agent contexts
 ✅ **VS Code Extension**: 9-step wizard, 10-step tutorial, 6-step walkthrough, governance panel, 12 commands
@@ -455,6 +458,6 @@ The system is complete and ready for use. Optional enhancements:
 **All Phases**: Phases 1-4 Complete ✅ (Phase 5: Expand is future work)
 **MCP Servers**: 3 servers, 29 tools ✅
 **Subagents**: 6 definitions ✅
-**Test Coverage**: 44 unit tests + 11 E2E scenarios (172+ assertions), 98%+ core logic ✅
+**Test Coverage**: 44 unit tests + 14 E2E scenarios (292+ assertions), 98%+ core logic ✅
 **Documentation**: Complete ✅
-**E2E Validation**: 11 scenarios passed ✅
+**E2E Validation**: 14 scenarios passed ✅

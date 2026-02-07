@@ -19,7 +19,7 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 | **Governance Architecture** | Transactional decision review, governed tasks (blocked-from-birth), multi-blocker support, AI-powered review via `claude --print` |
 | **Three-Tier Protection Hierarchy** | Vision > Architecture > Quality — lower tiers cannot modify higher tiers |
 | **Project Rules System** | Behavioral guidelines (enforce/prefer) injected into agent prompts from `.avt/project-config.json` |
-| **E2E Testing Harness** | 11 scenarios, 172+ structural assertions, parallel execution with full isolation |
+| **E2E Testing Harness** | 14 scenarios, 292+ structural assertions, parallel execution with full isolation |
 | **VS Code Extension** | Setup wizard (10 steps), workflow tutorial (9 steps), governance panel, document editor, research prompts panel, 3 MCP clients |
 | **CLAUDE.md Orchestration Protocol** | Orchestrator instructions defining task decomposition, governance checkpoints, quality review, memory curation |
 | **Research System** | Research prompts, researcher agent (dual-mode), research briefs |
@@ -42,12 +42,12 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 |------|------------|
 | **Orchestrator** | The primary Claude Code session (Opus 4.6) that decomposes tasks, spawns subagents, and coordinates work. Defined by `CLAUDE.md`. |
 | **Subagent** | A specialized Claude Code agent spawned via the Task tool, with a scoped system prompt from `.claude/agents/`. |
-| **Worker** | Subagent (Opus, 9 tools) that implements scoped tasks within governance constraints. |
-| **Quality Reviewer** | Subagent (Opus, 6 tools) that evaluates work through three ordered lenses: vision, architecture, quality. |
-| **KG Librarian** | Subagent (Sonnet, 5 tools) that curates institutional memory — consolidates, promotes patterns, syncs archival files. |
-| **Governance Reviewer** | Subagent (Sonnet, 4 tools) that evaluates decisions and plans for vision/architecture alignment. **Not spawned by the orchestrator** — called internally by the Governance Server via `claude --print`. |
-| **Researcher** | Subagent (Opus, 7 tools) that gathers intelligence in two modes: periodic/maintenance monitoring and exploratory/design research. |
-| **Project Steward** | Subagent (Sonnet, 7 tools) that maintains project hygiene: naming conventions, organization, documentation completeness, cruft detection. |
+| **Worker** | Subagent (Opus 4.6, 9 tools) that implements scoped tasks within governance constraints. |
+| **Quality Reviewer** | Subagent (Opus 4.6, 6 tools) that evaluates work through three ordered lenses: vision, architecture, quality. |
+| **KG Librarian** | Subagent (Sonnet 4.5, 5 tools) that curates institutional memory — consolidates, promotes patterns, syncs archival files. |
+| **Governance Reviewer** | Subagent (Sonnet 4.5, 4 tools) that evaluates decisions and plans for vision/architecture alignment. **Not spawned by the orchestrator** — called internally by the Governance Server via `claude --print`. |
+| **Researcher** | Subagent (Opus 4.6, 7 tools) that gathers intelligence in two modes: periodic/maintenance monitoring and exploratory/design research. |
+| **Project Steward** | Subagent (Sonnet 4.5, 7 tools) that maintains project hygiene: naming conventions, organization, documentation completeness, cruft detection. |
 | **MCP Server** | Model Context Protocol server providing tools to Claude Code sessions. Spawned as child processes via stdio transport. |
 | **Knowledge Graph (KG)** | Entity-relation graph stored in `.claude/collab/knowledge-graph.jsonl`. Contains vision standards, architectural patterns, components, observations. |
 | **Protection Tier** | Access control level on KG entities: **vision** (human-only modification), **architecture** (human or orchestrator with approval), **quality** (any agent). |
@@ -91,9 +91,10 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
      ▼      ▼      ▼      ▼      ▼      ▼
 ┌────────┐┌────────┐┌────────┐       ┌────────┐┌────────┐
 │Worker  ││Quality ││  KG    │       │Research││Project │
-│(Opus)  ││Reviewer││Librar- │       │  -er   ││Steward │
-│9 tools ││(Opus)  ││ian     │       │(Opus)  ││(Sonnet)│
-│        ││6 tools ││(Sonnet)│       │7 tools ││7 tools │
+│(Opus   ││Reviewer││Librar- │       │  -er   ││Steward │
+│ 4.6)   ││(Opus   ││ian     │       │(Opus   ││(Sonnet │
+│9 tools ││ 4.6)   ││(Sonnet │       │ 4.6)   ││ 4.5)   │
+│        ││6 tools ││ 4.5)   │       │7 tools ││7 tools │
 │        ││        ││5 tools │       │        ││        │
 └───┬────┘└───┬────┘└───┬────┘       └───┬────┘└───┬────┘
     │         │         │                │         │
@@ -132,7 +133,7 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 └─────────────────────────────────────────────────────────────────────────┘
 
                     ┌──────────────────────────────────┐
-                    │  GOVERNANCE REVIEWER (Sonnet)     │
+                    │  GOVERNANCE REVIEWER (Sonnet 4.5) │
                     │  4 tools | NOT spawned by         │
                     │  orchestrator — called internally │
                     │  by Governance Server via         │
@@ -185,11 +186,11 @@ Developer Machine (macOS / Linux)
 ├── Claude Code (binary)
 │   ├── Primary session (orchestrator, Opus 4.6)
 │   └── Subagent sessions (spawned via Task tool)
-│       ├── Workers (Opus)
-│       ├── Quality Reviewer (Opus)
-│       ├── KG Librarian (Sonnet)
-│       ├── Researcher (Opus)
-│       └── Project Steward (Sonnet)
+│       ├── Workers (Opus 4.6)
+│       ├── Quality Reviewer (Opus 4.6)
+│       ├── KG Librarian (Sonnet 4.5)
+│       ├── Researcher (Opus 4.6)
+│       └── Project Steward (Sonnet 4.5)
 │
 ├── MCP Servers (spawned as child processes via stdio)
 │   ├── collab-kg (Python/uv)        ← knowledge-graph.jsonl
@@ -226,12 +227,12 @@ Six custom subagent definitions live in `.claude/agents/`:
 
 ```
 .claude/agents/
-├── worker.md                # Opus  | 9 tools | KG + Quality + Governance
-├── quality-reviewer.md      # Opus  | 6 tools | KG + Quality
-├── kg-librarian.md          # Sonnet | 5 tools | KG
-├── governance-reviewer.md   # Sonnet | 4 tools | KG (called via claude --print)
-├── researcher.md            # Opus  | 7 tools | KG + Governance + WebSearch + WebFetch
-└── project-steward.md       # Sonnet | 7 tools | KG + Write + Edit + Bash
+├── worker.md                # Opus 4.6  | 9 tools | KG + Quality + Governance
+├── quality-reviewer.md      # Opus 4.6  | 6 tools | KG + Quality
+├── kg-librarian.md          # Sonnet 4.5 | 5 tools | KG
+├── governance-reviewer.md   # Sonnet 4.5 | 4 tools | KG (called via claude --print)
+├── researcher.md            # Opus 4.6  | 7 tools | KG + Governance + WebSearch + WebFetch
+└── project-steward.md       # Sonnet 4.5 | 7 tools | KG + Write + Edit + Bash
 ```
 
 Each definition contains:
@@ -465,7 +466,7 @@ The system's `task_integration.py` (in `mcp-servers/governance/collab_governance
 When MCP tools exceed 10% of the context window, Claude Code auto lazy-loads only the 3-5 most relevant tools per task — an 85% reduction in MCP tool context overhead.
 
 - **Enable**: `ENABLE_TOOL_SEARCH=auto:5` or rely on automatic activation
-- **Requires**: Sonnet 4+ or Opus 4+
+- **Requires**: Sonnet 4.5+ or Opus 4.6+
 - **Impact**: Significant for this system (29 tools across 3 servers)
 
 #### Effort Controls (OPPORTUNITY)

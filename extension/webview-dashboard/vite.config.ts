@@ -1,16 +1,17 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  base: mode === 'web' ? '/' : './',
   build: {
-    outDir: 'dist',
+    outDir: mode === 'web' ? '../../server/static' : 'dist',
     rollupOptions: {
       output: {
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]',
+        entryFileNames: mode === 'web' ? 'assets/[name].[hash].js' : 'assets/[name].js',
+        chunkFileNames: mode === 'web' ? 'assets/[name].[hash].js' : 'assets/[name].js',
+        assetFileNames: mode === 'web' ? 'assets/[name].[hash].[ext]' : 'assets/[name].[ext]',
       },
     },
   },
-});
+}));

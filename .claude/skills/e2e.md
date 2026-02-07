@@ -1,12 +1,12 @@
 # /e2e — Run the End-to-End Test Suite
 
-Run the autonomous E2E testing harness for the Collaborative Intelligence System. This exercises all three MCP servers (Knowledge Graph, Governance, Quality) across 11 scenarios with 172+ structural assertions.
+Run the autonomous E2E testing harness for the Collaborative Intelligence System. This exercises all three MCP servers (Knowledge Graph, Governance, Quality) across 14 scenarios with 292+ structural assertions.
 
 ## What This Does
 
 Each run:
 1. **Generates a unique project** from a pool of 8 domains (Pet Adoption, Restaurant Reservation, Fitness Tracking, Online Learning, Smart Home, Inventory Management, Event Ticketing, Fleet Management). The domain is randomly selected, and all vision standards, architecture patterns, and components are filled from domain-specific templates.
-2. **Runs 11 test scenarios in parallel**, each with fully isolated storage (separate KG JSONL, SQLite DB, and task directory per scenario).
+2. **Runs 14 test scenarios in parallel**, each with fully isolated storage (separate KG JSONL, SQLite DB, and task directory per scenario).
 3. **Validates deterministic outcomes** using structural, domain-agnostic assertions. "Vision entity is immutable" is true regardless of whether the domain is Pet Adoption or Fleet Management.
 
 ## Steps
@@ -28,7 +28,7 @@ Each run:
 
 Followed by per-scenario PASS/FAIL lines and a totals section.
 
-3. **If all 11 scenarios pass**: Report the results — domain name, assertion count, and that all scenarios passed. Note the randomly selected domain to confirm uniqueness.
+3. **If all 14 scenarios pass**: Report the results, including domain name, assertion count, and that all scenarios passed. Note the randomly selected domain to confirm uniqueness.
 
 4. **If any scenario fails**: Diagnose the failure.
 
@@ -47,7 +47,10 @@ Followed by per-scenario PASS/FAIL lines and a totals section.
       - **s08 (Multi-Blocker Task)**: Check `task_integration.py` multi-blocker release logic
       - **s09 (Scope Change Detection)**: Check governance store `needs_human_review` flagging for scope_change/deviation
       - **s10 (Completion Guard)**: Check `has_unresolved_blocks()` and `has_plan_review()` guards
+      - **s11 (Hook-Based Governance)**: Check `scripts/hooks/governance-task-intercept.py` hook mechanics
       - **s12 (Cross-Server Integration)**: Check interplay between KG, Governance, and Task systems
+      - **s13 (Hook Pipeline at Scale)**: Check hook interception under concurrent load (50 rapid + 20 concurrent tasks)
+      - **s14 (Persistence Lifecycle)**: Full two-phase test of all 6 persistence stores via all data flow paths
 
    d. Fix the server code, then re-run to confirm the fix.
 
@@ -86,4 +89,7 @@ This uses a fixed RNG seed (same domain every time) and preserves the workspace 
 | 08 | Multi-Blocker Task | 3 stacked blockers released one at a time | ~18 |
 | 09 | Scope Change Detection | scope_change/deviation → needs_human_review | ~14 |
 | 10 | Completion Guard | has_unresolved_blocks() and has_plan_review() | ~11 |
+| 11 | Hook-Based Governance | PostToolUse interception, pair creation, loop prevention | ~25 |
 | 12 | Cross-Server Integration | KG + Governance + Task system interplay | ~23 |
+| 13 | Hook Pipeline at Scale | 50 rapid + 20 concurrent tasks, 100% interception | ~24 |
+| 14 | Persistence Lifecycle | Two-phase: populate all stores, validate, clean up | ~71 |

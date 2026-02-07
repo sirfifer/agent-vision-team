@@ -7,6 +7,9 @@
 | **Orchestration** | Claude Code CLI + subagents | Latest | Native orchestration platform |
 | **AI Models** | Opus 4.6 (worker, quality-reviewer, researcher), Sonnet 4.5 (kg-librarian, governance-reviewer, project-steward), Haiku 4.5 (mechanical tasks) | Feb 2026 | Per-agent model routing based on task complexity |
 | **MCP Servers** | Python + FastMCP | Python >=3.12, FastMCP >=2.0.0 | Consistent language across all three servers; FastMCP simplifies server creation |
+| **AVT Gateway** | Python + FastAPI + uvicorn + httpx + websockets | Python >=3.12, FastAPI >=0.115 | Standalone web backend for remote operation: REST API, WebSocket push, job runner |
+| **Web Server** | Nginx | Latest | Reverse proxy, TLS termination, SPA static file serving |
+| **Container** | Docker + docker-compose | Latest | Standalone deployment packaging, GitHub Codespaces support |
 | **KG Storage** | JSONL | — | Simple, portable, matches Anthropic's KG Memory format |
 | **Quality Storage** | SQLite | — | Trust engine history, quality gate state |
 | **Governance Storage** | SQLite | — | Decision history, review verdicts, governed task state |
@@ -23,9 +26,9 @@
 
 ### 16.2 Version Pinning Notes
 
-All three MCP servers (`collab-kg`, `collab-quality`, `collab-governance`) share the same dependency floor: `fastmcp>=2.0.0`, `pydantic>=2.0.0`, Python `>=3.12`. The E2E harness (`avt-e2e`) depends on `pydantic>=2.0.0` and Python `>=3.12`. All use Hatchling as the build backend.
+All three MCP servers (`collab-kg`, `collab-quality`, `collab-governance`) share the same dependency floor: `fastmcp>=2.0.0`, `pydantic>=2.0.0`, Python `>=3.12`. The AVT Gateway (`avt-gateway`) adds `fastapi>=0.115`, `uvicorn`, `httpx`, and `websockets`. The E2E harness (`avt-e2e`) depends on `pydantic>=2.0.0` and Python `>=3.12`. All use Hatchling as the build backend.
 
-The extension backend pins `typescript>=5.7.0` and `esbuild>=0.24.0`. The webview dashboard pins `react>=19.0.0`, `vite>=6.0.0`, and `tailwindcss>=3.4.0`. The extension targets VS Code engine `>=1.95.0`.
+The extension backend pins `typescript>=5.7.0` and `esbuild>=0.24.0`. The webview dashboard pins `react>=19.0.0`, `vite>=6.0.0`, and `tailwindcss>=3.4.0`. The dashboard supports dual build modes: VS Code mode (output to `dist/`) and web mode (output to `server/static/` with hashed filenames). The extension targets VS Code engine `>=1.95.0`.
 
 All packages are at version `0.1.0` (pre-release).
 
@@ -38,12 +41,12 @@ Claude Code provides the execution environment for the entire system. The follow
 | Custom subagents | **Active** | 6 agents defined in `.claude/agents/`: worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward |
 | MCP servers (SSE) | **Active** | 3 servers registered in `.claude/settings.json`: collab-kg (port 3101), collab-quality (port 3102), collab-governance (port 3103) |
 | PreToolUse hooks | **Active** | `ExitPlanMode` hook runs `scripts/hooks/verify-governance-review.sh` to enforce governance review before plan presentation |
-| Model routing | **Active** | Per-agent model assignment in `.claude/settings.json` agents block: Opus for worker/quality-reviewer, Sonnet (default) for kg-librarian/governance-reviewer |
+| Model routing | **Active** | Per-agent model assignment in `.claude/settings.json` agents block: Opus 4.6 for worker/quality-reviewer, Sonnet 4.5 (default) for kg-librarian/governance-reviewer |
 | Skills | **Active** | `/e2e` skill for E2E test harness execution |
 | Commands | **Active** | `/project-overview` command for project context |
 | Task List (native) | **Active** | `CLAUDE_CODE_TASK_LIST_ID` for cross-session task persistence; governed task system writes to native task files |
 | Git worktrees | **Active** | Worker isolation via `git worktree add ../project-worker-N -b task/NNN-description` |
-| MCP Tool Search | **Planned (immediate)** | 85% context reduction for MCP tool loading. Config-only change: set `ENABLE_TOOL_SEARCH=auto:5`. Requires Sonnet 4+ or Opus 4+ (not Haiku) |
+| MCP Tool Search | **Planned (immediate)** | 85% context reduction for MCP tool loading. Config-only change: set `ENABLE_TOOL_SEARCH=auto:5`. Requires Sonnet 4.5+ or Opus 4.6+ (not Haiku 4.5) |
 | Effort controls | **Planned (immediate)** | Per-agent effort levels: max for worker/quality-reviewer, medium for kg-librarian, low for project-steward. Config change in agent definitions |
 | Context compaction | **Available** | Automatic with Opus 4.6 for long-running orchestrator sessions. No configuration needed |
 | 1M context window | **Available** | Automatic with Opus 4.6. Enables extended code reviews and larger session contexts without truncation |
@@ -65,13 +68,16 @@ This section replaces the v1 "Implementation Phases" checklist, which listed unc
 | Quality Server | **Operational (partial stubs)** | 8 tools exposed. Trust engine with SQLite persistence is fully functional. `auto_format`, `run_lint`, `run_tests`, and `check_coverage` delegate to stubs rather than real subprocess calls (ruff, prettier, pytest, eslint) |
 | Governance Server | **Operational** | 10 tools, SQLite persistence, AI-powered review via `claude --print` with governance-reviewer agent, governed task lifecycle with multi-blocker support, KG integration for standard loading |
 | Worker Agent | **Operational** | Full governance integration: reads task brief, checks project rules from `.avt/project-config.json`, queries KG for context (`search_nodes`, `get_entities_by_tier`), submits decisions via `submit_decision` (blocks until verdict), implements within task brief scope, runs `check_all_gates()`, calls `submit_completion_review` before reporting done |
-| Quality Reviewer Agent | **Operational** | Three-lens review protocol (vision > architecture > quality). Model: Opus. 6 tools including KG and Quality server access |
-| KG Librarian Agent | **Operational** | Memory curation: consolidation, promotion, stale entry removal, archival file sync to `.avt/memory/`. Model: Sonnet. 5 tools |
-| Governance Reviewer Agent | **Operational** | AI review called internally by governance server via `claude --print`. Reviews decisions and plans through vision alignment and architectural conformance lenses. Model: Sonnet. 4 tools |
-| Researcher Agent | **Operational** | Dual-mode research: periodic/maintenance (dependency monitoring, breaking change detection) and exploratory/design (technology evaluation, architectural decisions). Model: Opus. 7 tools |
-| Project Steward Agent | **Operational** | Project hygiene: naming conventions, folder organization, documentation completeness, cruft detection. Periodic cadence: weekly/monthly/quarterly. Model: Sonnet. 7 tools |
-| VS Code Extension | **Operational** | Dashboard webview, 10-step setup wizard, 9-step workflow tutorial, 6-step VS Code walkthrough, governance panel, research prompts panel, 3 MCP clients (KG, Quality, Governance), 4 TreeViews, 12 commands |
-| E2E Test Harness | **Operational** | 11 scenarios (s01-s10, s12), 172+ structural domain-agnostic assertions, parallel execution with full isolation, random domain generation from 8 templates, mock review mode |
+| Quality Reviewer Agent | **Operational** | Three-lens review protocol (vision > architecture > quality). Model: Opus 4.6. 6 tools including KG and Quality server access |
+| KG Librarian Agent | **Operational** | Memory curation: consolidation, promotion, stale entry removal, archival file sync to `.avt/memory/`. Model: Sonnet 4.5. 5 tools |
+| Governance Reviewer Agent | **Operational** | AI review called internally by governance server via `claude --print`. Reviews decisions and plans through vision alignment and architectural conformance lenses. Model: Sonnet 4.5. 4 tools |
+| Researcher Agent | **Operational** | Dual-mode research: periodic/maintenance (dependency monitoring, breaking change detection) and exploratory/design (technology evaluation, architectural decisions). Model: Opus 4.6. 7 tools |
+| Project Steward Agent | **Operational** | Project hygiene: naming conventions, folder organization, documentation completeness, cruft detection. Periodic cadence: weekly/monthly/quarterly. Model: Sonnet 4.5. 7 tools |
+| VS Code Extension | **Operational** | Dashboard webview, 9-step setup wizard, 10-step workflow tutorial, 6-step VS Code walkthrough, governance panel, decision explorer, quality gates panel, findings panel, research prompts panel, job submission, 3 MCP clients (KG, Quality, Governance), 4 TreeViews, 12 commands |
+| AVT Gateway | **Operational** | FastAPI backend with 35 REST endpoints, WebSocket push, job runner with Claude CLI integration, API-key auth, 8 router modules. Ports of ProjectConfigService and McpClientService from TypeScript to Python |
+| Container Packaging | **Operational** | Dockerfile (python:3.12-slim + Node.js 22 + Claude CLI + Nginx), docker-compose.yml, entrypoint.sh, nginx.conf, .devcontainer/devcontainer.json for GitHub Codespaces |
+| Dual-Mode Dashboard | **Operational** | React dashboard runs in VS Code (postMessage) or standalone browser (HTTP + WebSocket) via transport abstraction. Web build outputs to `server/static/` with hashed filenames. Mobile-responsive layout |
+| E2E Test Harness | **Operational** | 13 scenarios (s01-s13), 221 structural domain-agnostic assertions, parallel execution with full isolation, random domain generation from 8 templates, mock review mode |
 | CLAUDE.md Orchestration | **Operational** | All protocols documented: task decomposition, governance checkpoints, quality review, memory curation, research, project hygiene, drift detection |
 
 ### 17.2 Known Gaps
@@ -82,7 +88,7 @@ These are known deficiencies in the current implementation. They do not block op
 
 **Extension-system state drift.** The extension dashboard was built incrementally as the system evolved. Some UI components may reference patterns or display states that have since changed. The gap analysis (February 2026) identified that the extension's scope has grown far beyond "observability only" but some internal state representations have not kept pace with governance and research system evolution.
 
-**Agent definitions outside settings.json.** The researcher and project-steward agents are defined in `.claude/agents/` but are not listed in the `agents` block of `.claude/settings.json`. They inherit the `defaultModel: sonnet` setting. The researcher should be explicitly configured for Opus to match its documented model assignment.
+**Agent definitions outside settings.json.** The researcher and project-steward agents are defined in `.claude/agents/` but are not listed in the `agents` block of `.claude/settings.json`. They inherit the `defaultModel: sonnet` setting. The researcher should be explicitly configured for Opus 4.6 to match its documented model assignment.
 
 **v1 scaffolding remnants.** Code from the v1 architecture (Communication Hub server scaffolding, extension session management) is preserved in the codebase and in `docs/v1-full-architecture/`. This is intentional (available for reactivation) but adds cognitive load for new contributors.
 
@@ -94,12 +100,12 @@ Items are ordered by priority. Effort and dependency information is included to 
 |----------|------|--------|-----------|-------|
 | **Immediate** | Enable MCP Tool Search | Config only | — | Set `ENABLE_TOOL_SEARCH=auto:5` in settings. 85% context reduction for tool loading |
 | **Immediate** | Set effort controls per agent | Config only | — | Add effort levels to agent definitions in `.claude/settings.json` |
-| **Immediate** | Update model references to Opus 4.6 | Trivial | — | Replace Opus 4.5 references in documentation. Code references are model-agnostic |
-| **Immediate** | Add researcher/steward to settings.json agents | Config only | — | Explicitly configure model and tools for researcher (Opus) and project-steward (Sonnet) |
+| ~~**Immediate**~~ | ~~Update model references to Opus 4.6~~ | ~~Trivial~~ | — | **Done.** All model references updated to Opus 4.6, Sonnet 4.5, Haiku 4.5 |
+| **Immediate** | Add researcher/steward to settings.json agents | Config only | — | Explicitly configure model and tools for researcher (Opus 4.6) and project-steward (Sonnet 4.5) |
 | **Short-term** | Replace Quality server stubs with real subprocess calls | Medium | — | Connect `auto_format`/`run_lint`/`run_tests`/`check_coverage` to ruff, prettier, eslint, pytest via `subprocess.run`. Requires specialist routing config per language |
 | **Short-term** | Convert common workflows to model-invocable skills | Low | — | Identify orchestrator patterns that repeat across sessions. Candidates: governance review flow, worker spawn-and-review cycle, KG curation trigger |
 | **Short-term** | Add setup hooks (`--init`, `--maintenance`) | Low | — | `--init`: validate project config, seed KG with vision/architecture docs, verify MCP server connectivity. `--maintenance`: run cruft detection, check dependency updates |
-| **Short-term** | Align extension UI with current system state | Medium | Architecture doc v2 | Audit dashboard components against current MCP server APIs. Update state representations, add missing governance/research views, remove stale references |
+| ~~**Short-term**~~ | ~~Align extension UI with current system state~~ | ~~Medium~~ | — | **Done.** Dashboard now includes DecisionExplorer, FindingsPanel, QualityGatesPanel, JobSubmission, JobList. Dual-mode transport supports VS Code and standalone web |
 | **Medium-term** | Plugin packaging evaluation | Medium | API stability | Assess whether MCP server APIs, agent definitions, and hook contracts are stable enough to package. Define plugin boundaries. Prototype single-plugin extraction |
 | **Medium-term** | Agent Teams evaluation | Evaluate | Platform maturation | Monitor experimental status. When session resumption is supported and nested teams are available, prototype worker swarm team alongside governance policy layer |
 | **Future** | Cross-project memory | High | KG design | KG entities that travel between projects. Requires namespace design, conflict resolution, tier portability rules |
@@ -108,14 +114,15 @@ Items are ordered by priority. Effort and dependency information is included to 
 
 ### 17.4 What Was Completed Since v1
 
-For historical context, the following summarizes what the v1 "Implementation Phases" planned and what actually shipped. All four phases are substantially complete, with the Quality server stubs being the primary remaining item from Phase 1.
+For historical context, the following summarizes what the v1 "Implementation Phases" planned and what actually shipped. All five phases are substantially complete, with the Quality server stubs being the primary remaining item from Phase 1.
 
 | v1 Phase | What Was Planned | What Shipped |
 |----------|-----------------|-------------|
 | **Phase 1: Make MCP Servers Real** | KG: JSONL persistence, delete tools, compaction. Quality: real subprocess calls, SQLite trust engine | KG: fully operational with 11 tools (3 beyond plan), JSONL persistence, tier protection. Quality: 8 tools operational, trust engine with SQLite complete. **Gap**: formatting/linting/testing still delegate to stubs |
 | **Phase 2: Create Subagents + Validate E2E** | 3 agents (worker, quality-reviewer, kg-librarian), CLAUDE.md orchestration, settings.json hooks, end-to-end validation | 6 agents (added governance-reviewer, researcher, project-steward), full CLAUDE.md orchestration with governance/research/hygiene protocols, PreToolUse hooks, end-to-end workflow validated |
 | **Phase 3: Build Extension as Monitoring Layer** | MCP clients, TreeView wiring, file watchers, diagnostics, dashboard, status bar | 3 MCP clients, 4 TreeViews, dashboard webview with React 19, 10-step wizard, 9-step tutorial, VS Code walkthrough, governance panel, research prompts panel, 12 commands. Scope significantly exceeded plan |
-| **Phase 4: Expand and Harden** | Event logging, cross-project memory, multi-worker parallelism, FastMCP 3.0 migration, installation script | E2E test harness (11 scenarios, 172+ assertions), full governance system (not in original plan), research system (not in original plan), project hygiene system (not in original plan). Cross-project memory and FastMCP migration remain future items |
+| **Phase 4: Expand and Harden** | Event logging, cross-project memory, multi-worker parallelism, FastMCP 3.0 migration, installation script | E2E test harness (13 scenarios, 221 assertions), full governance system (not in original plan), research system (not in original plan), project hygiene system (not in original plan). Cross-project memory and FastMCP migration remain future items |
+| **Phase 5: Remote Operation** | (Not in original plan) | AVT Gateway (FastAPI, 35 REST endpoints, WebSocket push, job runner), dual-mode React dashboard (VS Code + standalone web), container packaging (Dockerfile, docker-compose, Codespaces), mobile-responsive layout, API-key auth. Zero changes to MCP servers, hooks, or agents |
 
 ---
 
@@ -126,8 +133,8 @@ For historical context, the following summarizes what the v1 "Implementation Pha
 The E2E test harness is the primary verification mechanism for all three MCP servers. It exercises the Python library APIs directly with structural, domain-agnostic assertions.
 
 **Characteristics:**
-- 11 scenarios covering KG, Quality, and Governance servers
-- 172+ assertions that are structural (not domain-specific)
+- 13 scenarios covering KG, Quality, and Governance servers
+- 221 assertions that are structural (not domain-specific)
 - Parallel execution via `ThreadPoolExecutor` with full isolation per scenario (separate JSONL, SQLite, task directories)
 - Each run generates a unique project from 8 domain templates (Pet Adoption, Restaurant Reservation, Fitness Tracking, etc.)
 - `GOVERNANCE_MOCK_REVIEW` environment variable enables deterministic testing without a live `claude` binary
@@ -180,7 +187,9 @@ Each component can be verified independently. The following table provides concr
 | **Governance reviewer agent** | Tested indirectly via governance server. Call `submit_decision` or `submit_plan_for_review` with `GOVERNANCE_MOCK_REVIEW` unset -- verify `claude --print` invocation with governance-reviewer agent produces a structured `ReviewVerdict` JSON response |
 | **Researcher agent** | Spawn with a research prompt (periodic or exploratory mode). Verify: research brief written to `.avt/research-briefs/` with structured sections (findings, recommendations, action items). For periodic mode, verify change report format. For exploratory mode, verify comparison analysis |
 | **Project steward agent** | Spawn with "Perform a full project hygiene review". Verify: report output with categorized findings (naming conventions, folder organization, documentation completeness, cruft detection), priority levels, and specific file references |
-| **VS Code extension** | Launch VS Code with extension installed. Verify: Activity Bar shows "Collab Intelligence" container with 4 views (Actions, Memory Browser, Findings, Tasks). Click "Connect to Servers" -- verify 3 MCP clients connect. Open Dashboard -- verify React webview loads with agent cards, activity feed, governance panel. Open Setup Wizard -- verify 10-step flow renders. Open Workflow Tutorial -- verify 9-step flow renders |
+| **VS Code extension** | Launch VS Code with extension installed. Verify: Activity Bar shows "Collab Intelligence" container with 4 views (Actions, Memory Browser, Findings, Tasks). Click "Connect to Servers" -- verify 3 MCP clients connect. Open Dashboard -- verify React webview loads with agent cards, activity feed, governance panel, decision explorer, quality gates, job submission. Open Setup Wizard -- verify 9-step flow renders. Open Workflow Tutorial -- verify 10-step flow renders |
+| **AVT Gateway** | Start all 3 MCP servers, then start Gateway: `cd server && uv run uvicorn avt_gateway.app:app --port 8080`. Verify: `GET /api/health` returns 200. `GET /api/dashboard` returns full dashboard state. `POST /api/mcp/connect` connects to all 3 MCP servers. `POST /api/jobs` with a prompt creates a queued job. WebSocket at `/api/ws?token=<key>` receives push events. Web dashboard at `http://localhost:8080` loads and displays live data |
+| **Container deployment** | Build: `docker compose build`. Run: `docker compose up -d`. Verify: `https://localhost` serves the React dashboard. API key is displayed in container logs. Dashboard shows connected MCP server status. Job submission form is functional. Mobile layout (resize browser) shows stacked panels |
 
 ### 18.3 Integration Verification
 

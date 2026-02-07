@@ -81,7 +81,7 @@ class KGClient:
         record = {
             "type": "entity",
             "name": f"governance_decision_{decision_id}",
-            "entityType": "solution_pattern",
+            "entityType": "governance_decision",
             "observations": [
                 f"Governance decision by {agent}: {summary}",
                 f"Verdict: {verdict}",

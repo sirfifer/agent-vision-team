@@ -1,18 +1,20 @@
 # Agent Vision Team — Project Overview
 
-> A platform-native multi-agent system for software development built on Claude Code, providing tier-protected institutional memory, transactional governance, and deterministic quality verification through three MCP servers and six specialized subagents.
+> A platform-native multi-agent system for software development built on Claude Code, providing tier-protected institutional memory, transactional governance, and deterministic quality verification through three MCP servers, six specialized subagents, and a standalone web gateway for remote operation.
 
-**Last Updated**: 2026-02-04
+**Last Updated**: 2026-02-07
 
 ---
 
 ## What This Project Is
 
-Agent Vision Team is a collaborative intelligence system that coordinates multiple specialized AI agents to accomplish complex development tasks. It runs entirely on Claude Code Max — no API keys, no external orchestration frameworks — and extends Claude Code's native capabilities with three MCP servers that provide what the platform cannot do on its own: persistent institutional memory, transactional governance checkpoints, and deterministic quality verification.
+Agent Vision Team is a collaborative intelligence system that coordinates multiple specialized AI agents to accomplish complex development tasks. It runs entirely on Claude Code Max and extends Claude Code's native capabilities with three MCP servers that provide what the platform cannot do on its own: persistent institutional memory, transactional governance checkpoints, and deterministic quality verification.
 
 The system is organized around a three-tier governance hierarchy: **Vision** (immutable project principles), **Architecture** (human-gated structural patterns), and **Quality** (automated code standards). Every piece of work an agent produces is measured against this hierarchy. A perfectly linted function that violates the project's design philosophy is a failure, not a success.
 
-A human developer, working through a primary Claude Code session (the orchestrator), decomposes complex tasks and delegates them to six specialized subagents. Workers implement scoped tasks. The quality reviewer evaluates work through a three-lens model. The KG librarian curates institutional memory so knowledge survives across sessions. The governance reviewer provides AI-powered decision review inside the governance server. The researcher gathers intelligence — monitoring external dependencies and investigating unfamiliar domains — so workers implement from informed positions rather than guessing. The project steward maintains organizational hygiene: naming conventions, folder structure, documentation completeness, and cruft detection. Each agent has a distinct role, and together they sustain coherent, high-quality development over extended autonomous sessions.
+A human developer, working through a primary Claude Code session (the orchestrator), decomposes complex tasks and delegates them to six specialized subagents. Workers implement scoped tasks. The quality reviewer evaluates work through a three-lens model. The KG librarian curates institutional memory so knowledge survives across sessions. The governance reviewer provides AI-powered decision review inside the governance server. The researcher gathers intelligence, monitoring external dependencies and investigating unfamiliar domains, so workers implement from informed positions rather than guessing. The project steward maintains organizational hygiene: naming conventions, folder structure, documentation completeness, and cruft detection. Each agent has a distinct role, and together they sustain coherent, high-quality development over extended autonomous sessions.
+
+The system operates in two modes: **locally** via the VS Code extension for developers at their workstation, or **remotely** via a standalone web gateway that serves the same React dashboard over HTTPS. The remote mode enables job submission from any device (including phones), persistent container-based deployment, and full management without VS Code.
 
 ---
 
@@ -26,12 +28,13 @@ A human developer, working through a primary Claude Code session (the orchestrat
 │    Uses: Task tool to spawn all subagents                        │
 └──┬──────────┬──────────┬──────────┬──────────┬───────────────────┘
    │          │          │          │          │
-┌──▼───────┐ ┌▼────────┐ ┌▼────────┐ ┌▼────────┐ ┌▼────────────┐
-│ WORKER   │ │QUALITY  │ │  KG     │ │RESEARCH-│ │  PROJECT    │
-│          │ │REVIEWER │ │LIBRARIAN│ │  ER     │ │  STEWARD    │
-│ (Opus)   │ │ (Opus)  │ │(Sonnet) │ │(Opus/  │ │  (Sonnet)   │
-│          │ │         │ │         │ │ Sonnet) │ │             │
-└──┬───────┘ └──┬──────┘ └──┬──────┘ └──┬──────┘ └──┬──────────┘
+┌──▼───────┐ ┌▼────────┐ ┌▼────────┐ ┌▼────────┐ ┌▼──────────────┐
+│ WORKER   │ │QUALITY  │ │  KG     │ │RESEARCH-│ │  PROJECT      │
+│          │ │REVIEWER │ │LIBRARIAN│ │  ER     │ │  STEWARD      │
+│(Opus 4.6)│ │(Opus 4.6│ │(Sonnet │ │(Opus 4.6│ │  (Sonnet 4.5) │
+│          │ │)        │ │ 4.5)    │ │/Sonnet │ │               │
+│          │ │         │ │         │ │  4.5)   │ │               │
+└──┬───────┘ └──┬──────┘ └──┬──────┘ └──┬──────┘ └──┬────────────┘
    │            │            │           │           │
 ┌──▼────────────▼────────────▼───────────▼───────────▼───────────┐
 │                     THREE MCP SERVERS                           │
@@ -44,20 +47,31 @@ A human developer, working through a primary Claude Code session (the orchestrat
 │                                          ┌────────▼──────────┐  │
 │                                          │   GOVERNANCE      │  │
 │                                          │    REVIEWER       │  │
-│                                          │    (Sonnet)       │  │
+│                                          │  (Sonnet 4.5)     │  │
 │                                          │ Called internally  │  │
 │                                          │ via claude --print │  │
 │                                          └───────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-   │
-┌──▼──────────────────────────────────────────────────────────────────┐
-│                      VS CODE EXTENSION                              │
-│  Setup Wizard (9 steps)  │ Workflow Tutorial (10 steps)             │
-│  Governance Panel        │ Research Prompts Panel                   │
-│  Document Editor         │ VS Code Walkthrough (6 steps)           │
-│  3 MCP Clients           │ 4 TreeViews + Actions view              │
-│  12 Commands             │ Status Bar                              │
-└─────────────────────────────────────────────────────────────────────┘
+└──────────────┬──────────────────────────────────────────────────┘
+               │
+    ┌──────────┴──────────┐
+    │                     │
+┌───▼─────────────────┐ ┌─▼──────────────────────────────────────────┐
+│  VS CODE EXTENSION  │ │            AVT GATEWAY (FastAPI)            │
+│  (Local mode)       │ │            (Remote mode)                    │
+│                     │ │                                             │
+│  Setup Wizard       │ │  ┌────────────┐  ┌─────────────────────┐   │
+│  Governance Panel   │ │  │ REST API   │  │ WebSocket (push)    │   │
+│  Research Prompts   │ │  │ 35 routes  │  │ Dashboard updates   │   │
+│  3 MCP Clients      │ │  └────────────┘  └─────────────────────┘   │
+│  4 TreeViews        │ │  ┌────────────┐  ┌─────────────────────┐   │
+│  12 Commands        │ │  │ Job Runner │  │ Claude CLI queue    │   │
+│                     │ │  └────────────┘  └─────────────────────┘   │
+└─────────────────────┘ └──────────┬──────────────────────────────────┘
+                                   │
+                          ┌────────▼────────┐
+                          │  Nginx + SPA    │
+                          │  Browser / Phone │
+                          └─────────────────┘
 ```
 
 ### Platform-Native Philosophy
@@ -148,12 +162,12 @@ All defined in `.claude/agents/` as markdown files with YAML frontmatter specify
 
 | Agent | Model | Role | MCP Access |
 |-------|-------|------|------------|
-| **Worker** | Opus | Implements scoped tasks from task briefs. Queries KG for constraints, submits decisions for governance review, runs quality gates before completion. | KG, Quality, Governance |
-| **Quality Reviewer** | Opus | Three-lens evaluation: Vision (highest) → Architecture → Quality. Returns structured findings with project-specific rationale. | KG, Quality |
-| **KG Librarian** | Sonnet | Curates institutional memory after work sessions. Consolidates observations, promotes recurring solutions to patterns, removes stale entries, syncs to archival files. | KG |
-| **Governance Reviewer** | Sonnet | Evaluates decisions and plans against vision and architecture standards. Called internally by the governance server via `claude --print`. Returns structured verdicts. | KG |
-| **Researcher** | Opus/Sonnet | Gathers intelligence in two modes: periodic/maintenance (tracking external dependencies) and exploratory/design (informing architectural decisions). Produces research briefs. | KG, Governance |
-| **Project Steward** | Sonnet | Maintains project hygiene: naming conventions, folder organization, documentation completeness, cruft detection, consistency checks. | KG |
+| **Worker** | Opus 4.6 | Implements scoped tasks from task briefs. Queries KG for constraints, submits decisions for governance review, runs quality gates before completion. | KG, Quality, Governance |
+| **Quality Reviewer** | Opus 4.6 | Three-lens evaluation: Vision (highest) → Architecture → Quality. Returns structured findings with project-specific rationale. | KG, Quality |
+| **KG Librarian** | Sonnet 4.5 | Curates institutional memory after work sessions. Consolidates observations, promotes recurring solutions to patterns, removes stale entries, syncs to archival files. | KG |
+| **Governance Reviewer** | Sonnet 4.5 | Evaluates decisions and plans against vision and architecture standards. Called internally by the governance server via `claude --print`. Returns structured verdicts. | KG |
+| **Researcher** | Opus 4.6/Sonnet 4.5 | Gathers intelligence in two modes: periodic/maintenance (tracking external dependencies) and exploratory/design (informing architectural decisions). Produces research briefs. | KG, Governance |
+| **Project Steward** | Sonnet 4.5 | Maintains project hygiene: naming conventions, folder organization, documentation completeness, cruft detection, consistency checks. | KG |
 
 ### The Quality Reviewer — Three-Lens Evaluation
 
@@ -173,7 +187,7 @@ The researcher operates in two distinct modes:
 
 **Exploratory/Design Research** is spawned before architectural decisions or when entering unfamiliar domains. It surveys the landscape, evaluates competing approaches, documents tradeoffs, and synthesizes recommendations. Output is research briefs stored in `.avt/research-briefs/` that feed directly into task briefs for workers.
 
-The model is selected based on complexity: **Opus** for novel domains, architectural decisions, security analysis, and ambiguous requirements. **Sonnet** for routine changelog monitoring, version updates, and straightforward documentation lookups.
+The model is selected based on complexity: **Opus 4.6** for novel domains, architectural decisions, security analysis, and ambiguous requirements. **Sonnet 4.5** for routine changelog monitoring, version updates, and straightforward documentation lookups.
 
 The researcher creates `research_finding` entities in the KG, establishing baselines so future research produces net-new insights rather than rediscovering what's already known. Key discoveries are synced to `.avt/memory/research-findings.md` by the KG librarian.
 
@@ -323,9 +337,13 @@ Rules are configured in the setup wizard (the "Rules" step after "Quality Config
 
 ---
 
-## VS Code Extension
+## Observability and Management Layer
 
-**Role**: Setup, monitoring, and management layer. Provides interactive onboarding, system observability, governance management, research prompt management, and document authoring. Does NOT orchestrate or spawn agents. The system works fully from CLI without the extension.
+The system provides two interfaces for observability, management, and job submission. Both share the same React dashboard (29+ components, zero VS Code imports) and connect to the same three MCP servers.
+
+### VS Code Extension (Local Mode)
+
+**Role**: Setup, monitoring, and management for developers at their workstation. Provides interactive onboarding, system observability, governance management, research prompt management, and document authoring. Does NOT orchestrate or spawn agents. The system works fully from CLI without the extension.
 
 **Implementation**: TypeScript + React (dashboard webview), esbuild + Vite
 
@@ -333,7 +351,7 @@ Rules are configured in the setup wizard (the "Rules" step after "Quality Config
 - **Setup Wizard**: 9-step interactive onboarding (welcome, vision docs, architecture docs, quality config, rules, permissions, settings, KG ingestion, completion) with AI-assisted document formatting
 - **Workflow Tutorial**: 10-step interactive guide covering the full system lifecycle
 - **VS Code Walkthrough**: Native 6-step walkthrough (`avt-getting-started`) covering system overview, three-tier hierarchy, agent team, work cycle, institutional memory, and project setup
-- **Dashboard Webview**: React/Tailwind application showing session status, agent cards, governance panel, governed tasks, activity feed, and setup readiness banner
+- **Dashboard Webview**: React/Tailwind application showing session status, agent cards, governance panel, governed tasks, decision explorer, quality gates, activity feed, job submission, and setup readiness banner
 - **Governance Panel**: Governed tasks, pending reviews, decision history, and governance statistics
 - **Research Prompts Panel**: CRUD management for periodic and exploratory research prompts with schedule configuration
 - **Document Editor**: Claude CLI-based auto-formatting for vision and architecture documents using temp-file I/O pattern
@@ -348,11 +366,56 @@ Rules are configured in the setup wizard (the "Rules" step after "Quality Config
 
 **Key files**: `extension/src/extension.ts` (entry point), `extension/src/providers/DashboardWebviewProvider.ts` (React dashboard host), `extension/src/services/McpClientService.ts` (MCP connections), `extension/webview-dashboard/` (React app)
 
+### AVT Gateway (Remote Mode)
+
+**Role**: Standalone HTTP/WebSocket backend that replaces the VS Code extension's message-routing role, enabling full remote operation from any browser. Serves the same React dashboard as a standalone web application with API-key authentication.
+
+**Implementation**: Python + FastAPI + uvicorn + httpx, served behind Nginx
+
+**Architecture**:
+```
+Browser / Phone
+     |
+HTTPS (443)
+     |
+  Nginx         -- reverse proxy, TLS, serves SPA static files
+   /    \
+ /api    /static
+  |        \
+Gateway    React Dashboard (Vite SPA build)
+(FastAPI)
+port 8080
+  |
+  +-- MCP SSE connections (:3101, :3102, :3103)
+  +-- File I/O (.avt/, docs/, .claude/)
+  +-- Claude CLI (job submission, formatting)
+```
+
+**Capabilities**:
+- **35 REST API endpoints** mapping every VS Code `postMessage` type to HTTP: dashboard state, config CRUD, document CRUD, governance tasks/status/decisions, quality validation/findings, research prompts/briefs, job submission
+- **WebSocket server-push** at `/api/ws`: real-time dashboard updates, governance status changes, job progress events. Background poller broadcasts diffs every 5 seconds
+- **Job runner**: Submit work from any device (prompt, agent type, model selection). Jobs queue and execute via Claude CLI with temp-file I/O pattern. Max 1 concurrent job (configurable). Job state persists to `.avt/jobs/` as JSON
+- **API-key authentication**: Auto-generated bearer token stored in `.avt/api-key.txt`. All `/api/*` endpoints require `Authorization: Bearer <key>`. WebSocket uses `?token=<key>` query param
+- **Dual-mode transport**: The React dashboard detects its environment at runtime. In VS Code it uses `postMessage`; in a browser it uses HTTP + WebSocket. Same components, same state management, zero duplication
+
+**Key files**: `server/avt_gateway/app.py` (FastAPI app, 35 routes), `server/avt_gateway/services/` (project config, MCP client, file service, job runner, Claude CLI), `server/avt_gateway/routers/` (8 router modules), `server/avt_gateway/ws/manager.py` (WebSocket manager)
+
+### Transport Abstraction
+
+The React dashboard uses a transport abstraction (`useTransport.ts`) that provides a unified interface for both modes:
+
+- **VS Code mode**: Wraps `acquireVsCodeApi().postMessage` and `window.addEventListener('message')` (existing behavior)
+- **Web mode**: Maps all message types to HTTP endpoints via a route lookup table, manages WebSocket connection with auto-reconnect for server-push events
+
+This means `DashboardContext.tsx` (the central state manager) required exactly one line change: swapping `useVsCodeApi()` for `useTransport()`. All 29+ React components are unchanged.
+
+**Web theme**: A standalone CSS file (`web-theme.css`) provides the same `--vscode-*` CSS custom properties that the Tailwind config references, so all component styles work without modification in browser mode.
+
 ---
 
 ## E2E Testing Harness
 
-An autonomous end-to-end testing system that exercises all three MCP servers across 11 scenarios with 172+ structural assertions.
+An autonomous end-to-end testing system that exercises all three MCP servers across 13 scenarios with 221 structural assertions.
 
 **How it works**: Each run generates a unique project from a pool of 8 domains (Pet Adoption Platform, Restaurant Reservation System, Fitness Tracking App, Online Learning Platform, Smart Home Automation, Inventory Management System, Event Ticketing Platform, Fleet Management System). Vision standards, architecture patterns, and components are filled from domain-specific templates. All assertions are structural and domain-agnostic — behavioral contracts hold regardless of domain.
 
@@ -380,7 +443,7 @@ An autonomous end-to-end testing system that exercises all three MCP servers acr
 ./e2e/run-e2e.sh --verbose    # debug logging
 ```
 
-**Key files**: `e2e/run-e2e.sh` (entry point), `e2e/run-e2e.py` (Python orchestrator), `e2e/generator/` (project generation + 8 domain templates), `e2e/scenarios/` (11 test scenarios), `e2e/parallel/executor.py` (ThreadPoolExecutor with isolation)
+**Key files**: `e2e/run-e2e.sh` (entry point), `e2e/run-e2e.py` (Python orchestrator), `e2e/generator/` (project generation + 8 domain templates), `e2e/scenarios/` (14 test scenarios), `e2e/parallel/executor.py` (ThreadPoolExecutor with isolation)
 
 ---
 
@@ -393,6 +456,8 @@ An autonomous end-to-end testing system that exercises all three MCP servers acr
 | `.avt/knowledge-graph.jsonl` | KG entity/relation persistence | KG Server |
 | `.avt/trust-engine.db` | Quality finding audit trails | Quality Server |
 | `.avt/governance.db` | Decision store with verdicts | Governance Server |
+| `.avt/api-key.txt` | Gateway API authentication key (auto-generated) | AVT Gateway |
+| `.avt/jobs/` | Job submission state and output (JSON files) | AVT Gateway |
 
 ### Project Configuration
 
@@ -444,27 +509,32 @@ The KG Librarian syncs important graph entries to human-readable files:
 |-----------|-----------|---------|
 | Orchestration | Claude Code CLI + native subagents | Agent spawning, coordination, session management |
 | MCP Servers | Python 3.12+ / FastMCP 2.x | Three servers: KG, Quality, Governance |
+| AVT Gateway | Python 3.12+ / FastAPI + uvicorn + httpx | Standalone web backend, REST API, WebSocket, job runner |
+| Web Server | Nginx | Reverse proxy, TLS termination, SPA static serving |
 | KG Persistence | JSONL | Lightweight, version-controllable, matches Anthropic's KG Memory format |
 | Decision/Trust Store | SQLite | Zero-config transactional storage for governance and trust engine |
-| VS Code Extension | TypeScript + esbuild | Extension host runtime |
-| Dashboard | React 19 + Vite | Rich observability webview |
+| VS Code Extension | TypeScript + esbuild | Extension host runtime (local mode) |
+| Dashboard | React 19 + Vite | Rich observability webview (dual-mode: VS Code + standalone web) |
 | E2E Testing | Python + Pydantic + ThreadPoolExecutor | Autonomous scenario-based testing |
 | Quality Tools | ruff, eslint, prettier, swiftlint, clippy, pytest | Deterministic verification |
 | AI Models | Opus 4.6 (judgment), Sonnet 4.5 (routine) | Capability-first model routing |
-| Package Management | npm (extension), uv (Python servers) | Standard per ecosystem |
+| Container | Docker + docker-compose | Standalone deployment, GitHub Codespaces support |
+| Package Management | npm (extension), uv (Python servers + gateway) | Standard per ecosystem |
 | Version Control | Git + worktrees | Code state, worker isolation, checkpoints |
 
 ---
 
 ## Getting Started
 
-### Prerequisites
+### Option A: Local Development (VS Code)
+
+#### Prerequisites
 
 - Claude Code with Max subscription
 - Python 3.12+ with `uv` package manager
 - Node.js 18+ (for VS Code extension, optional)
 
-### Install Dependencies
+#### Install Dependencies
 
 ```bash
 cd mcp-servers/knowledge-graph && uv sync
@@ -475,7 +545,7 @@ cd mcp-servers/governance && uv sync
 cd extension && npm install
 ```
 
-### Start MCP Servers
+#### Start MCP Servers
 
 ```bash
 # Terminal 1: Knowledge Graph (port 3101)
@@ -488,6 +558,50 @@ cd mcp-servers/quality && uv run python -m collab_quality.server
 cd mcp-servers/governance && uv run python -m collab_governance.server
 ```
 
+#### Start a Session
+
+```bash
+claude   # CLAUDE.md provides orchestrator instructions automatically
+```
+
+### Option B: Remote / Container Deployment
+
+#### Docker Compose (Self-Hosted)
+
+```bash
+# Set your API key
+export ANTHROPIC_API_KEY=your-key-here
+
+# Build and start all services (MCP servers + Gateway + Nginx + dashboard)
+docker compose up -d
+
+# Access the dashboard
+open https://localhost
+```
+
+The container runs all 3 MCP servers, the AVT Gateway, and Nginx in a single image. Mount your project repo as a volume:
+
+```yaml
+# docker-compose.yml
+services:
+  avt:
+    build: server/
+    ports: ["443:443"]
+    volumes:
+      - ./my-project:/project
+      - avt-state:/project/.avt
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+```
+
+#### GitHub Codespaces
+
+The repository includes a `.devcontainer/devcontainer.json` that configures a full Codespaces environment. Open the repo in Codespaces and all services start automatically. Codespaces provides automatic HTTPS via port forwarding, shareable URLs with GitHub auth, and access from any device including phones.
+
+#### Cloud VPS
+
+Deploy on any machine with Docker (DigitalOcean, Hetzner, AWS Lightsail). Use `docker compose up -d` and configure Let's Encrypt for public TLS. Cost: $5-20/month.
+
 ### Run Tests
 
 ```bash
@@ -496,14 +610,8 @@ cd mcp-servers/knowledge-graph && uv run pytest   # 18 tests, 74% coverage
 cd mcp-servers/quality && uv run pytest            # 26 tests, 48% coverage
 cd extension && npm test                           # 9 unit tests
 
-# E2E (exercises all 3 servers, 11 scenarios, 172+ assertions)
+# E2E (exercises all 3 servers, 13 scenarios, 221 assertions)
 ./e2e/run-e2e.sh
-```
-
-### Start a Session
-
-```bash
-claude   # CLAUDE.md provides orchestrator instructions automatically
 ```
 
 ---
@@ -524,12 +632,13 @@ These principles, drawn from the system's development, govern how it's built and
 
 ## Current Status
 
-All four implementation phases are complete:
+All five implementation phases are complete:
 
 - **Phase 1** (MCP Servers): KG with JSONL persistence and tier protection, Quality with trust engine and multi-language tool wrapping, Governance with transactional review and governed tasks
 - **Phase 2** (Subagents + Validation): Six custom subagent definitions, orchestrator CLAUDE.md, settings and hooks
 - **Phase 3** (Extension): VS Code extension with Memory Browser, Findings Panel, Tasks Panel, Dashboard webview, setup wizard
-- **Phase 4** (Governance + E2E): Governance server, governed task system, AI-powered review, E2E harness with 11 scenarios
+- **Phase 4** (Governance + E2E): Governance server, governed task system, AI-powered review, E2E harness with 13 scenarios and 221 assertions
+- **Phase 5** (Remote Operation): AVT Gateway (FastAPI, 35 REST endpoints, WebSocket push, job runner), dual-mode React dashboard, container packaging (Docker, Codespaces), mobile-responsive layout
 
 **Planned**: Cross-project memory, multi-worker parallelism patterns, installation script for target projects.
 
@@ -537,10 +646,11 @@ All four implementation phases are complete:
 
 ## Related Documentation
 
-- [CLAUDE.md](../CLAUDE.md) — Orchestrator instructions and protocols
-- [COLLABORATIVE_INTELLIGENCE_VISION.md](../COLLABORATIVE_INTELLIGENCE_VISION.md) — Original vision document (conceptual foundation)
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — Engineering-level architecture specification
-- [E2E Testing Harness](../e2e/README.md) — Autonomous test suite documentation
-- [Knowledge Graph Server](../mcp-servers/knowledge-graph/README.md) — KG API and tier protection
-- [Quality Server](../mcp-servers/quality/README.md) — Quality tools and trust engine
-- [Governance Server](../mcp-servers/governance/README.md) — Governance tools and governed tasks
+- [CLAUDE.md](../CLAUDE.md) -- Orchestrator instructions and protocols
+- [COLLABORATIVE_INTELLIGENCE_VISION.md](../COLLABORATIVE_INTELLIGENCE_VISION.md) -- Original vision document (conceptual foundation)
+- [ARCHITECTURE.md](../ARCHITECTURE.md) -- Engineering-level architecture specification
+- [E2E Testing Harness](../e2e/README.md) -- Autonomous test suite documentation
+- [Knowledge Graph Server](../mcp-servers/knowledge-graph/README.md) -- KG API and tier protection
+- [Quality Server](../mcp-servers/quality/README.md) -- Quality tools and trust engine
+- [Governance Server](../mcp-servers/governance/README.md) -- Governance tools and governed tasks
+- [AVT Gateway](../server/pyproject.toml) -- Standalone web gateway for remote operation

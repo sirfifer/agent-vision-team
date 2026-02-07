@@ -6,12 +6,12 @@ The system defines six specialized subagents in `.claude/agents/`. Each is a Mar
 
 | Agent | Model | Tool Count | MCP Access | Role | Spawned By |
 |-------|-------|------------|------------|------|------------|
-| **Worker** | Opus | 9 | KG + Quality + Governance | Implement scoped tasks with full governance integration | Orchestrator |
-| **Quality Reviewer** | Opus | 6 | KG + Quality | Three-lens review (vision, architecture, quality) | Orchestrator |
-| **KG Librarian** | Sonnet | 5 | KG | Curate institutional memory, consolidate observations | Orchestrator |
-| **Governance Reviewer** | Sonnet | 4 | KG | AI-powered decision review against vision/architecture standards | Governance Server (via `claude --print`) |
-| **Researcher** | Opus | 8 | KG + Governance | Periodic monitoring + exploratory design research | Orchestrator |
-| **Project Steward** | Sonnet | 7 | KG | Project hygiene, naming conventions, cruft detection | Orchestrator |
+| **Worker** | Opus 4.6 | 9 | KG + Quality + Governance | Implement scoped tasks with full governance integration | Orchestrator |
+| **Quality Reviewer** | Opus 4.6 | 6 | KG + Quality | Three-lens review (vision, architecture, quality) | Orchestrator |
+| **KG Librarian** | Sonnet 4.5 | 5 | KG | Curate institutional memory, consolidate observations | Orchestrator |
+| **Governance Reviewer** | Sonnet 4.5 | 4 | KG | AI-powered decision review against vision/architecture standards | Governance Server (via `claude --print`) |
+| **Researcher** | Opus 4.6 | 8 | KG + Governance | Periodic monitoring + exploratory design research | Orchestrator |
+| **Project Steward** | Sonnet 4.5 | 7 | KG | Project hygiene, naming conventions, cruft detection | Orchestrator |
 
 > **Note on Governance Reviewer**: Unlike the other five agents, the governance-reviewer is NOT spawned by the orchestrator. It is invoked internally by the Governance MCP server via `claude --print` when `submit_decision()`, `submit_plan_for_review()`, or `submit_completion_review()` are called. It runs as a headless subprocess, not a Task tool subagent.
 
@@ -271,8 +271,8 @@ tools:
 
 | Complexity | Model | Use When |
 |------------|-------|----------|
-| High | Opus | Novel domains, architectural decisions, security analysis, ambiguous requirements |
-| Routine | Sonnet | Changelog monitoring, version updates, straightforward API documentation |
+| High | Opus 4.6 | Novel domains, architectural decisions, security analysis, ambiguous requirements |
+| Routine | Sonnet 4.5 | Changelog monitoring, version updates, straightforward API documentation |
 
 **Constraints**:
 - Do not modify vision-tier or architecture-tier KG entities (observations only)

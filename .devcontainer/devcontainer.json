@@ -1,0 +1,18 @@
+{
+  "name": "Agent Vision Team",
+  "dockerFile": "../server/Dockerfile",
+  "forwardPorts": [443, 8080, 3101, 3102, 3103],
+  "postCreateCommand": "echo 'Container ready. Run /entrypoint.sh to start all services.'",
+  "postStartCommand": "/entrypoint.sh &",
+  "remoteEnv": {
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}",
+    "PROJECT_DIR": "/workspaces/agent-vision-team",
+    "CLAUDE_CODE_ENABLE_TASKS": "true",
+    "CLAUDE_CODE_TASK_LIST_ID": "avt-codespace"
+  },
+  "customizations": {
+    "codespaces": {
+      "openFiles": ["CLAUDE.md"]
+    }
+  }
+}

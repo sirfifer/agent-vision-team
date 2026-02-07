@@ -48,7 +48,7 @@ All agentic work runs through Claude Code sessions on a Max subscription. This m
 - MCP servers provide unique capabilities the platform lacks: persistent institutional memory, deterministic quality verification, and transactional governance review
 - Git coordinates code state; the filesystem stores artifacts and human-readable archives
 - The human developer is always the ultimate orchestrator with Claude Code as the instrument
-- Model selection follows "capability first": Opus 4.6 is the default for anything requiring judgment; Sonnet 4.5 for genuinely routine tasks where speed is an advantage; Haiku only for purely mechanical operations
+- Model selection follows "capability first": Opus 4.6 is the default for anything requiring judgment; Sonnet 4.5 for genuinely routine tasks where speed is an advantage; Haiku 4.5 only for purely mechanical operations
 
 **P9: Build Only What the Platform Cannot Do**
 Before building any custom infrastructure, verify that Claude Code's native capabilities don't already solve the problem. Custom MCP servers are justified only for capabilities the platform genuinely lacks. Custom orchestration code is justified only when declarative configuration (CLAUDE.md, subagent definitions, hooks) cannot express the needed behavior. This principle kept us from building a Communication Hub server and extension-driven session management — Claude Code's subagent system, Task tool, and lifecycle hooks already handle those concerns.
@@ -84,7 +84,7 @@ Claude Code provides the orchestration primitives natively. MCP servers extend t
 | **Lifecycle hooks** | `SubagentStart`, `SubagentStop`, `PreToolUse`, `PostToolUse` | Track when subagents begin/end, validate operations |
 | **Worker isolation** | Git worktrees + parallel sessions | Each worker subagent operates in its own worktree |
 | **Session configuration** | CLAUDE.md + skills injection | Project CLAUDE.md instructs the orchestrator; skills preload domain knowledge |
-| **Model routing** | Per-subagent model selection | Opus for judgment, Sonnet for routine, Haiku for mechanical |
+| **Model routing** | Per-subagent model selection | Opus 4.6 for judgment, Sonnet 4.5 for routine, Haiku 4.5 for mechanical |
 | **Session persistence** | `--resume`, session IDs, transcript storage | Multi-day continuity for long-running work |
 | **Permission control** | `permissionMode`, tool restrictions per subagent | Quality subagent is read-focused, workers have edit access |
 
@@ -223,7 +223,7 @@ The three-tier oversight model maps onto Claude Code's native subagent system. S
 - Gathers intelligence to inform development decisions: evaluates technologies, compares approaches, monitors external dependencies.
 - Operates in two modes: periodic/maintenance research (tracking API changes, deprecations, security advisories) and exploratory/design research (deep investigation before architectural decisions).
 - Outputs structured research briefs stored in `.avt/research-briefs/`.
-- Uses Opus for novel domains and architectural analysis, Sonnet for routine changelog monitoring.
+- Uses Opus 4.6 for novel domains and architectural analysis, Sonnet 4.5 for routine changelog monitoring.
 - Workers implement; researchers investigate. This separation keeps workers focused on execution.
 
 **Project Steward Subagent: Hygiene Guardian**
@@ -420,7 +420,7 @@ Checkpoint creation: After each meaningful unit of work, the orchestrator update
 | Routine code generation | Sonnet 4.5 | Well-defined tasks following established patterns |
 | Research (novel domains) | Opus 4.6 | Architectural decisions, security analysis, ambiguous requirements |
 | Research (routine monitoring) | Sonnet 4.5 | Changelog monitoring, version updates, API documentation |
-| Fast exploration | Haiku (Explore subagent) | Speed is the advantage; exploration is about breadth |
+| Fast exploration | Haiku 4.5 (Explore subagent) | Speed is the advantage; exploration is about breadth |
 | KG librarian | Sonnet 4.5 | Curation is structured and pattern-based |
 | Project steward | Sonnet 4.5 | Hygiene checks are pattern-based and well-defined |
 
@@ -703,7 +703,7 @@ Added the Governance MCP server and comprehensive end-to-end testing:
 
 **Governance Server (port 3103):** Transactional decision review, governed task lifecycle (create, block, release), plan and completion verification. Integrates with Claude Code's Task List for persistence. Uses the governance-reviewer subagent internally via `claude --print`.
 
-**E2E Testing Harness:** 11 scenarios with 172+ structural assertions exercising all three MCP servers. Random domain generation, parallel execution with full isolation, domain-agnostic validation.
+**E2E Testing Harness:** 14 scenarios with 292+ structural assertions exercising all three MCP servers. Random domain generation, parallel execution with full isolation, domain-agnostic validation.
 
 ### Phase 5: Expand -- IN PROGRESS
 

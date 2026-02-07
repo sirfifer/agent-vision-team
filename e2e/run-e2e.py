@@ -69,6 +69,7 @@ from e2e.scenarios.s10_completion_guard import S10CompletionGuard
 from e2e.scenarios.s12_cross_server_integration import S12CrossServerIntegration
 from e2e.scenarios.s11_hook_based_governance import HookBasedGovernanceScenario
 from e2e.scenarios.s13_hook_pipeline_at_scale import HookPipelineAtScaleScenario
+from e2e.scenarios.s14_persistence_lifecycle import S14PersistenceLifecycle
 
 # Registry of all scenario classes to instantiate.
 ALL_SCENARIO_CLASSES: list[type[BaseScenario]] = [
@@ -85,6 +86,7 @@ ALL_SCENARIO_CLASSES: list[type[BaseScenario]] = [
     HookBasedGovernanceScenario,
     S12CrossServerIntegration,
     HookPipelineAtScaleScenario,
+    S14PersistenceLifecycle,
 ]
 
 # ---------------------------------------------------------------------------

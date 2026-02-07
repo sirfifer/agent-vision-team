@@ -1,6 +1,6 @@
 # E2E Testing Harness
 
-Autonomous end-to-end testing for the Collaborative Intelligence System. Exercises all three MCP servers (Knowledge Graph, Governance, Quality) across 11 scenarios with 172+ structural assertions.
+Autonomous end-to-end testing for the Collaborative Intelligence System. Exercises all three MCP servers (Knowledge Graph, Governance, Quality) across 14 scenarios with 292+ structural assertions.
 
 ## Table of Contents
 
@@ -24,7 +24,10 @@ Autonomous end-to-end testing for the Collaborative Intelligence System. Exercis
   - [s08 — Multi-Blocker Task](#s08--multi-blocker-task)
   - [s09 — Scope Change Detection](#s09--scope-change-detection)
   - [s10 — Completion Guard](#s10--completion-guard)
+  - [s11 — Hook-Based Governance](#s11--hook-based-governance)
   - [s12 — Cross-Server Integration](#s12--cross-server-integration)
+  - [s13 — Hook Pipeline at Scale](#s13--hook-pipeline-at-scale)
+  - [s14 — Persistence Lifecycle](#s14--persistence-lifecycle)
 - [Architecture](#architecture)
   - [Directory Structure](#directory-structure)
   - [Execution Flow](#execution-flow)
@@ -313,6 +316,35 @@ uv run python run-e2e.py --workspace /tmp/my-test --seed 42 --verbose
 - KG standards are loadable by the governance reviewer's KG client
 - Governed tasks can be created referencing governance decisions
 - Status queries return accurate cross-system aggregates
+
+### s11 — Hook-Based Governance
+
+**File:** `scenarios/s11_hook_based_governance.py`
+**What it tests:** PostToolUse hook interception mechanics for task governance.
+**Key assertions (~25):**
+- Hook fires on every TaskCreate call
+- Governance pair (review task + implementation task) created atomically
+- Implementation task is blocked from birth
+- Loop prevention skips governance-prefixed tasks
+- Async review queued and completed
+
+### s13 — Hook Pipeline at Scale
+
+**File:** `scenarios/s13_hook_pipeline_at_scale.py`
+**What it tests:** Hook interception under concurrent load.
+**Key assertions (~24):**
+- 50 rapid sequential task creations, 100% interception
+- 20 concurrent task creations, 100% interception
+- No race conditions in governance pair creation
+- Governance DB integrity under load
+
+### s14 — Persistence Lifecycle
+
+**File:** `scenarios/s14_persistence_lifecycle.py`
+**What it tests:** Full two-phase integration test exercising all 6 persistence stores via all data flow paths.
+**Key assertions (~71):**
+- **Phase 1 (Populate):** Document ingestion, agent entity creation, governance decisions with KG context, governed task lifecycle, trust engine findings/dismissals, KG Librarian curation (consolidation, pattern promotion, stale removal), archival file sync (KG to .avt/memory/*.md), session state generation, cross-store validation
+- **Phase 2 (Cleanup):** Delete quality-tier entities, reset memory files to templates, verify vision/architecture entities preserved, verify all stores queryable
 
 ## Architecture
 
@@ -677,8 +709,8 @@ When a scenario fails, the root cause is in the MCP server code, not the test. U
 
 ## FAQ
 
-**Q: Why are there no s11 scenarios?**
-A: s11 was reserved for HTTP-mode transport testing and has not been implemented yet. The current scenarios all use library-mode (direct Python imports).
+**Q: What do the scenario numbers mean?**
+A: s01-s10 are the original core scenarios. s11-s13 test hook-based governance (added during governance hook implementation). s14 is the full persistence lifecycle test (added during the persistence audit). All scenarios use library-mode (direct Python imports).
 
 **Q: Can I run a single scenario?**
 A: Edit the `ALL_SCENARIO_CLASSES` list in `run-e2e.py` to include only the scenario you want. There is no CLI flag for this yet.

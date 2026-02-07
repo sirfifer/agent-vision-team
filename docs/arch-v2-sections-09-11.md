@@ -82,8 +82,8 @@ The researcher subagent gathers intelligence in two modes:
 
 | Mode | Purpose | Output | Model |
 |------|---------|--------|-------|
-| **Periodic/Maintenance** | Monitor APIs, frameworks, dependencies for breaking changes, deprecations, or new features | Change reports | Sonnet (straightforward monitoring) |
-| **Exploratory/Design** | Deep investigation before architectural decisions, technology comparisons, unfamiliar domains | Research briefs | Opus (complex, novel analysis) |
+| **Periodic/Maintenance** | Monitor APIs, frameworks, dependencies for breaking changes, deprecations, or new features | Change reports | Sonnet 4.5 (straightforward monitoring) |
+| **Exploratory/Design** | Deep investigation before architectural decisions, technology comparisons, unfamiliar domains | Research briefs | Opus 4.6 (complex, novel analysis) |
 
 Research prompts are defined in `.avt/research-prompts/` and managed via the dashboard or manually. Completed research is stored in `.avt/research-briefs/`. The orchestrator references research briefs in task briefs when spawning workers.
 
@@ -115,9 +115,65 @@ The trust engine enforces a key audit principle: every dismissed finding require
 
 ---
 
-## 10. VS Code Extension
+## 10. Observability and Management Layer
 
-The Collab Intelligence VS Code extension has evolved significantly beyond the original "observability only" scope. It now provides setup wizards, interactive tutorials, document authoring with AI-assisted formatting, governance management, research prompt management, and a comprehensive React-based dashboard -- all while coexisting cleanly with the Claude Code extension.
+The system provides two interfaces for observability, management, and job submission: the VS Code extension (local mode) and the AVT Gateway (remote mode). Both share the same React dashboard (29+ components with zero VS Code imports) and connect to the same three MCP servers. A transport abstraction (`useTransport.ts`) allows the dashboard to run in either environment without any component changes.
+
+### 10.0 AVT Gateway (Remote Mode)
+
+The AVT Gateway is a standalone FastAPI backend that replaces the VS Code extension's message-routing role for remote operation. It enables full system management from any browser, including phones.
+
+**Implementation**: Python 3.12+ / FastAPI + uvicorn + httpx, served behind Nginx with TLS
+
+**Key components**:
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `app.py` | `server/avt_gateway/app.py` | FastAPI app with lifespan, CORS, 35 routes, WebSocket endpoint |
+| `config.py` | `server/avt_gateway/config.py` | Environment-based configuration (ports, project dir, API key) |
+| `auth.py` | `server/avt_gateway/auth.py` | Bearer token auth middleware with WebSocket query param fallback |
+| `project_config.py` | `server/avt_gateway/services/` | Port of `ProjectConfigService.ts`: config CRUD, document management, setup readiness |
+| `mcp_client.py` | `server/avt_gateway/services/` | Port of `McpClientService.ts`: SSE protocol client for 3 MCP servers |
+| `job_runner.py` | `server/avt_gateway/services/` | Job queue with Claude CLI execution, temp-file I/O pattern |
+| `manager.py` | `server/avt_gateway/ws/` | WebSocket connection manager with 5-second background poller |
+| 8 routers | `server/avt_gateway/routers/` | health, dashboard, config, documents, governance, quality, research, jobs |
+
+**API endpoint mapping**: Every VS Code `postMessage` type maps to a REST endpoint. Examples:
+
+| VS Code Message | HTTP Endpoint | Method |
+|----------------|---------------|--------|
+| `connect` | `POST /api/mcp/connect` | POST |
+| `saveProjectConfig` | `PUT /api/config` | PUT |
+| `createVisionDoc` | `POST /api/documents/vision` | POST |
+| `requestGovernedTasks` | `GET /api/governance/tasks` | GET |
+| `validate` | `POST /api/quality/validate` | POST |
+| (new) job submission | `POST /api/jobs` | POST |
+
+**WebSocket protocol**: Single connection at `/api/ws`. Server-push only (client actions use REST). Events pushed: `dashboard_update`, `governance_update`, `job_status`.
+
+**Authentication**: API-key auth. On first run, a random key is generated and stored in `.avt/api-key.txt`. All `/api/*` endpoints require `Authorization: Bearer <key>`.
+
+**Job runner**: The key capability for remote operation. Users submit work via `POST /api/jobs` with a prompt, agent type, and model selection. Jobs execute via Claude CLI with temp-file I/O pattern. State persists to `.avt/jobs/` as JSON. Max 1 concurrent job (configurable).
+
+**Container packaging**:
+
+| File | Purpose |
+|------|---------|
+| `server/Dockerfile` | python:3.12-slim base, Node.js 22, uv, Claude Code CLI, Nginx |
+| `server/entrypoint.sh` | Starts 3 MCP servers, waits for health, starts Gateway, starts Nginx |
+| `server/nginx.conf` | Reverse proxy: `/api/` to Gateway:8080, `/api/ws` with WebSocket upgrade, `/` serves SPA |
+| `docker-compose.yml` | Single service with volume mounts for project and `.avt` state |
+| `.devcontainer/devcontainer.json` | GitHub Codespaces with port forwarding (443, 8080, 3101-3103) |
+
+**Deployment options**:
+- **Docker Compose**: Run on any machine with Docker. `docker compose up -d`.
+- **GitHub Codespaces**: Automatic HTTPS via port forwarding, shareable URLs with GitHub auth, phone access.
+- **Cloud VPS**: DigitalOcean, Hetzner, AWS Lightsail ($5-20/month) with Let's Encrypt for TLS.
+- **Tailscale**: Private access from any device via mesh VPN. No public exposure.
+
+### 10.0.1 VS Code Extension (Local Mode)
+
+The Collab Intelligence VS Code extension provides setup wizards, interactive tutorials, document authoring with AI-assisted formatting, governance management, research prompt management, and a comprehensive React-based dashboard, all while coexisting cleanly with the Claude Code extension.
 
 ### 10.1 Extension Capabilities
 
@@ -195,16 +251,18 @@ Additional commands registered directly in `extension.ts`: `collab.connectMcpSer
 
 ### 10.3 Dashboard Components
 
-The dashboard is a React + Tailwind CSS application built with Vite, rendered inside a VS Code webview panel titled "Agent Operations Center."
+The dashboard is a React + Tailwind CSS application built with Vite. It renders inside a VS Code webview panel (local mode) or as a standalone SPA served by Nginx (remote mode). All 29+ components have zero VS Code imports.
 
 **Application Shell** (`extension/webview-dashboard/src/`):
 
 | File | Purpose |
 |------|---------|
-| `App.tsx` | Root layout: `SessionBar` + `SetupBanner` + `ConnectionBanner` + `AgentCards` + split pane (`GovernancePanel` left 2/5, tabbed `TaskBoard`/`ActivityFeed` right 3/5) + overlay modals (`SetupWizard`, `SettingsPanel`, `ResearchPromptsPanel`, `WorkflowTutorial`) |
-| `context/DashboardContext.tsx` | React context providing dashboard state, VS Code API bridge, wizard/settings/tutorial visibility toggles, document format results, research prompt state |
-| `hooks/useVsCodeApi.ts` | Hook wrapping the `acquireVsCodeApi()` bridge for message posting |
+| `App.tsx` | Root layout: `SessionBar` + `SetupBanner` + `ConnectionBanner` + `AgentCards` + `QualityGatesPanel` + responsive split pane (`GovernancePanel` left 2/5, tabbed `TaskBoard`/`DecisionExplorer`/`ActivityFeed`/`Jobs` right 3/5) + overlay modals (`SetupWizard`, `SettingsPanel`, `ResearchPromptsPanel`, `WorkflowTutorial`). Mobile-responsive with stacked panels on small screens |
+| `context/DashboardContext.tsx` | React context providing dashboard state, transport bridge, wizard/settings/tutorial visibility toggles, document format results, research prompt state |
+| `hooks/useTransport.ts` | Dual-mode transport abstraction. Detects environment via `acquireVsCodeApi` availability. VS Code mode: `postMessage`. Web mode: HTTP + WebSocket with auto-reconnect. Maps all message types to API endpoints via route lookup table |
 | `hooks/useDocEditor.ts` | State machine hook for document authoring: `idle` -> `drafting` -> `formatting` -> `reviewing` -> `saving`, with error recovery |
+| `hooks/useVsCodeApi.ts` | Legacy hook (still present for reference), superseded by `useTransport.ts` |
+| `web-theme.css` | CSS custom properties (`--vscode-*` values) for standalone web mode, providing the same theme variables the Tailwind config references |
 | `types.ts` | Shared type definitions mirroring extension backend models |
 
 **Main Dashboard Components** (`extension/webview-dashboard/src/components/`):
@@ -221,6 +279,11 @@ The dashboard is a React + Tailwind CSS application built with Vite, rendered in
 | `ActivityEntry.tsx` | `ActivityEntry` | Individual activity entry with tier-colored badges |
 | `SettingsPanel.tsx` | `SettingsPanel` | Modal overlay for editing project settings post-wizard |
 | `ResearchPromptsPanel.tsx` | `ResearchPromptsPanel` | Modal overlay for creating, editing, deleting, and running research prompts |
+| `DecisionExplorer.tsx` | `DecisionExplorer` | Governance decision history with filtering by agent, category, and verdict |
+| `FindingsPanel.tsx` | `FindingsPanel` | Quality findings display with dismissal workflow |
+| `QualityGatesPanel.tsx` | `QualityGatesPanel` | Build/lint/tests/coverage gate status display |
+| `JobSubmission.tsx` | `JobSubmission` | Job submission form with prompt textarea, agent type selector, and model picker |
+| `JobList.tsx` | `JobList` | Submitted job list with status badges and expandable output viewer |
 
 **Setup Wizard** (`extension/webview-dashboard/src/components/wizard/`):
 
@@ -388,8 +451,10 @@ agent-vision-team/
 │   │   │   ├── context/
 │   │   │   │   └── DashboardContext.tsx
 │   │   │   ├── hooks/
-│   │   │   │   ├── useVsCodeApi.ts
+│   │   │   │   ├── useTransport.ts             # Dual-mode transport (VS Code + web)
+│   │   │   │   ├── useVsCodeApi.ts             # Legacy (superseded by useTransport)
 │   │   │   │   └── useDocEditor.ts
+│   │   │   ├── web-theme.css                   # CSS custom properties for web mode
 │   │   │   └── components/
 │   │   │       ├── SessionBar.tsx
 │   │   │       ├── SetupBanner.tsx
@@ -399,6 +464,11 @@ agent-vision-team/
 │   │   │       ├── TaskBoard.tsx
 │   │   │       ├── ActivityFeed.tsx
 │   │   │       ├── ActivityEntry.tsx
+│   │   │       ├── DecisionExplorer.tsx
+│   │   │       ├── FindingsPanel.tsx
+│   │   │       ├── QualityGatesPanel.tsx
+│   │   │       ├── JobSubmission.tsx
+│   │   │       ├── JobList.tsx
 │   │   │       ├── SettingsPanel.tsx
 │   │   │       ├── ResearchPromptsPanel.tsx
 │   │   │       ├── ui/
@@ -513,7 +583,7 @@ agent-vision-team/
 │   ├── generator/
 │   │   ├── project_generator.py
 │   │   └── domain_templates.py
-│   ├── scenarios/                           # 11 test scenarios
+│   ├── scenarios/                           # 14 test scenarios
 │   │   ├── base.py
 │   │   ├── s01_kg_tier_protection.py
 │   │   ├── s02_governance_decision_flow.py
@@ -525,12 +595,48 @@ agent-vision-team/
 │   │   ├── s08_multi_blocker_task.py
 │   │   ├── s09_scope_change_detection.py
 │   │   ├── s10_completion_guard.py
-│   │   └── s12_cross_server_integration.py
+│   │   ├── s11_hook_based_governance.py
+│   │   ├── s12_cross_server_integration.py
+│   │   ├── s13_hook_pipeline_at_scale.py
+│   │   └── s14_persistence_lifecycle.py
 │   ├── parallel/
 │   │   └── executor.py
 │   └── validation/
 │       ├── assertion_engine.py
 │       └── report_generator.py
+│
+├── server/                                 # AVT Gateway (remote mode)
+│   ├── avt_gateway/
+│   │   ├── __init__.py
+│   │   ├── app.py                          # FastAPI app, CORS, lifespan, WebSocket
+│   │   ├── config.py                       # Environment-based configuration
+│   │   ├── auth.py                         # API-key auth middleware
+│   │   ├── app_state.py                    # Shared service singletons
+│   │   ├── models/
+│   │   │   ├── dashboard.py                # Pydantic models matching TS types
+│   │   │   └── jobs.py                     # Job submission/status models
+│   │   ├── services/
+│   │   │   ├── project_config.py           # Port of ProjectConfigService
+│   │   │   ├── mcp_client.py               # SSE client to 3 MCP servers
+│   │   │   ├── file_service.py             # File I/O for session state, tasks
+│   │   │   ├── claude_cli.py               # Document formatting via Claude CLI
+│   │   │   └── job_runner.py               # Job queue with Claude CLI execution
+│   │   ├── routers/
+│   │   │   ├── health.py                   # GET /api/health
+│   │   │   ├── dashboard.py                # GET /api/dashboard, connect, refresh
+│   │   │   ├── config_router.py            # GET/PUT /api/config
+│   │   │   ├── documents.py                # CRUD /api/documents/{tier}
+│   │   │   ├── governance.py               # GET /api/governance/*
+│   │   │   ├── quality.py                  # POST /api/quality/*
+│   │   │   ├── research.py                 # CRUD /api/research-prompts
+│   │   │   └── jobs.py                     # POST/GET /api/jobs
+│   │   └── ws/
+│   │       └── manager.py                  # WebSocket connection manager
+│   ├── static/                             # Vite web build output (generated)
+│   ├── pyproject.toml
+│   ├── Dockerfile
+│   ├── entrypoint.sh
+│   └── nginx.conf
 │
 ├── docs/
 │   ├── vision/
@@ -580,6 +686,9 @@ agent-vision-team/
 │   ├── launch.json
 │   └── tasks.json
 │
+├── .devcontainer/
+│   └── devcontainer.json                   # GitHub Codespaces configuration
+│
 ├── ARCHITECTURE.md
 ├── CLAUDE.md
 ├── COLLABORATIVE_INTELLIGENCE_VISION.md
@@ -587,6 +696,7 @@ agent-vision-team/
 ├── COMPLETE.md
 ├── DOGFOOD-CHECKLIST.md
 ├── RUNBOOK.md
+├── docker-compose.yml                      # Container deployment config
 ├── package.json
 ├── start-servers.sh
 └── validate.sh

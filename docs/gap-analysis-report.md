@@ -125,29 +125,29 @@ This is the single largest gap. The governance server provides:
 #### Governance Reviewer Agent
 
 **File**: `.claude/agents/governance-reviewer.md`
-**Model**: Sonnet | **Tools**: Read, Glob, Grep, mcp:collab-kg (4 tools)
+**Model**: Sonnet 4.5 | **Tools**: Read, Glob, Grep, mcp:collab-kg (4 tools)
 
 Called internally by the governance server via `claude --print` — not spawned by the orchestrator directly. Reviews decisions/plans through vision alignment and architectural conformance lenses.
 
 #### Researcher Agent
 
 **File**: `.claude/agents/researcher.md`
-**Model**: Opus | **Tools**: Read, Glob, Grep, WebSearch, WebFetch, mcp:collab-kg, mcp:collab-governance (7 tools)
+**Model**: Opus 4.6 | **Tools**: Read, Glob, Grep, WebSearch, WebFetch, mcp:collab-kg, mcp:collab-governance (7 tools)
 
 Two modes: periodic/maintenance (monitoring dependencies, detecting breaking changes) and exploratory/design (informing architectural decisions). Outputs change reports or research briefs to `.avt/research-briefs/`.
 
 #### Project Steward Agent
 
 **File**: `.claude/agents/project-steward.md`
-**Model**: Sonnet | **Tools**: Read, Write, Edit, Glob, Grep, Bash, mcp:collab-kg (7 tools)
+**Model**: Sonnet 4.5 | **Tools**: Read, Write, Edit, Glob, Grep, Bash, mcp:collab-kg (7 tools)
 
 Maintains project hygiene: naming conventions, folder organization, documentation completeness, cruft detection. Periodic cadence: weekly (cruft), monthly (naming audit), quarterly (deep review).
 
 #### E2E Testing Harness
 
-**Location**: `e2e/` | **Scenarios**: 12 | **Assertions**: 172+ | **Execution**: Parallel with full isolation
+**Location**: `e2e/` | **Scenarios**: 14 | **Assertions**: 292+ | **Execution**: Parallel with full isolation
 
-Tests all 3 MCP servers across 11 scenarios (s01-s10, s12 — numbering skips s11): KG tier protection, governance decision flow, governed task lifecycle, vision violations, architecture deviations, quality gates, trust engine, multi-blocker tasks, scope change detection, completion guards, cross-server integration. Uses `GOVERNANCE_MOCK_REVIEW` to avoid live `claude` binary dependency. Generates unique projects from 8 domain templates.
+Tests all 3 MCP servers across 14 scenarios (s01-s14): KG tier protection, governance decision flow, governed task lifecycle, vision violations, architecture deviations, quality gates, trust engine, multi-blocker tasks, scope change detection, completion guards, hook-based governance, cross-server integration, hook pipeline at scale, and persistence lifecycle. Uses `GOVERNANCE_MOCK_REVIEW` to avoid live `claude` binary dependency. Generates unique projects from 8 domain templates.
 
 #### Project Rules System
 
@@ -202,7 +202,7 @@ The extension has evolved far beyond "observability only":
 | Worker protocol | Basic KG + quality | +governance decisions, project rules, governed tasks | **High** — core workflow changed |
 | Extension scope | "Observability only" | Wizard, tutorial, governance panel, 40+ components | **High** — understates by order of magnitude |
 | Governance | Not mentioned | Full transactional system with 10 tools | **Critical** — not mentioned at all |
-| E2E testing | Not mentioned | 11 scenarios, 172+ assertions | **High** — not mentioned at all |
+| E2E testing | Not mentioned | 14 scenarios, 292+ assertions | **High** — not mentioned at all |
 | Task governance | Not mentioned | Blocked-from-birth pattern, multi-blocker | **Critical** — core system behavior |
 | Model references | Opus 4.5 | Opus 4.6 | **Medium** — dated but not structurally wrong |
 | Project rules | Not mentioned | Implemented with enforcement levels | **Medium** — operational feature missing |
@@ -267,12 +267,12 @@ The extension has evolved far beyond "observability only":
 
 | Agent | Model | Tool Count | MCP Access | Role | In ARCHITECTURE.md? |
 |-------|-------|-----------|------------|------|---------------------|
-| **worker** | Opus | 9 | KG + Quality + Governance | Implement scoped tasks, submit decisions, create governed tasks | Partially (missing governance integration) |
-| **quality-reviewer** | Opus | 6 | KG + Quality | Three-lens review (vision > architecture > quality) | Yes (mostly accurate) |
-| **kg-librarian** | Sonnet | 5 | KG | Curate KG, consolidate, promote patterns, sync archival files | Yes (accurate) |
-| **governance-reviewer** | Sonnet | 4 | KG | AI-powered decision/plan review (called via claude --print) | No |
-| **researcher** | Opus | 7 | KG + Governance | Periodic monitoring + exploratory research | No |
-| **project-steward** | Sonnet | 7 | KG | Project hygiene, naming, documentation, cruft detection | No |
+| **worker** | Opus 4.6 | 9 | KG + Quality + Governance | Implement scoped tasks, submit decisions, create governed tasks | Partially (missing governance integration) |
+| **quality-reviewer** | Opus 4.6 | 6 | KG + Quality | Three-lens review (vision > architecture > quality) | Yes (mostly accurate) |
+| **kg-librarian** | Sonnet 4.5 | 5 | KG | Curate KG, consolidate, promote patterns, sync archival files | Yes (accurate) |
+| **governance-reviewer** | Sonnet 4.5 | 4 | KG | AI-powered decision/plan review (called via claude --print) | No |
+| **researcher** | Opus 4.6 | 7 | KG + Governance | Periodic monitoring + exploratory research | No |
+| **project-steward** | Sonnet 4.5 | 7 | KG | Project hygiene, naming, documentation, cruft detection | No |
 
 ---
 
@@ -336,7 +336,7 @@ Agent Teams is experimental with significant limitations. Our governance model p
 - **Shared task list** maps to our governed task system
 - **Plan approval** maps to our governance review
 
-When Agent Teams stabilizes, it could serve as the coordination layer while governance remains the policy layer — similar to our recommended Task List framing (see Choice B).
+When Agent Teams stabilizes, it could serve as the coordination layer while governance remains the policy layer similar to our recommended Task List framing (see Choice B).
 
 **Document in ARCHITECTURE.md v2 as**: "Platform feature under evaluation. Aligns conceptually with our orchestration model. When stable, may replace custom subagent coordination while governance remains the policy layer."
 
@@ -424,7 +424,7 @@ The new document should retain the strong organizational structure of v1 but upd
 | 10 | VS Code Extension | Actual scope: wizard, tutorial, governance panel, 3 MCP clients, 40+ components |
 | 11 | File System Layout | Actual layout including `.avt/`, `e2e/`, `docs/`, `scripts/` |
 | 12 | Data Flow Architecture | Governance flow, research flow, project hygiene flow (new); updated task flow |
-| 13 | **E2E Testing Architecture** (NEW) | 11 scenarios, domain generation, parallel execution, mock review |
+| 13 | **E2E Testing Architecture** (NEW) | 14 scenarios, domain generation, parallel execution, mock review |
 | 14 | **Research System** (NEW) | Researcher agent, dual-mode, research prompts/briefs |
 | 15 | **Project Rules System** (NEW) | project-config.json, enforcement levels, agent scope filtering |
 | 16 | Technology Stack | Opus 4.6, Task List, Agent Teams (monitoring), Plugins (planned) |

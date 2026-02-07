@@ -235,6 +235,19 @@ uv run pytest
 uv run pytest --cov=collab_kg --cov-report=term-missing
 ```
 
+## Modules
+
+| Module | Purpose |
+|--------|---------|
+| `graph.py` | Core `KnowledgeGraph` class: entity/relation CRUD, search, tier enforcement |
+| `models.py` | Pydantic models: Entity, Relation, EntityType, ProtectionTier |
+| `storage.py` | `JSONLStorage` class: load, append, compact with atomic replacement |
+| `ingestion.py` | Document ingestion: parses markdown docs into KG entities |
+| `tier_protection.py` | Tier enforcement: `get_entity_tier()`, `validate_write_access()` |
+| `curation.py` | KG Librarian logic: consolidation, pattern promotion, stale removal, tier validation |
+| `archival.py` | Archival file sync: generates `.avt/memory/*.md` from KG data |
+| `server.py` | FastMCP tool definitions and main entry point |
+
 ## Implementation Details
 
 ### Tier Protection Enforcement
@@ -259,6 +272,25 @@ This server is used by:
 - **Quality reviewer subagents**: Load vision/architecture standards for evaluation
 - **KG librarian subagent**: Curate and consolidate observations after sessions
 - **Orchestrator**: Query for constraints when decomposing tasks
+
+## Known Issues
+
+### KGClient Compact Race Condition
+
+The Governance server's `KGClient.record_decision()` appends entities directly to the JSONL file, bypassing the `KnowledgeGraph` class's in-memory cache. If the `KnowledgeGraph` subsequently runs `compact()` (triggered automatically after 1000 writes, or manually via curation operations), it rewrites the entire JSONL from its in-memory state, silently dropping the KGClient-appended records.
+
+**Impact**: Governance decision entities (`governance_decision` type) may be lost after a compaction cycle.
+
+**Workaround**: After any `KGClient.record_decision()` calls, reload the KG from storage before performing operations that could trigger compaction:
+```python
+kg._load_from_storage()
+```
+
+**Permanent fix (future)**: Either route `KGClient` writes through the `KnowledgeGraph` API (requires network call to KG server), or have `compact()` reload from disk before rewriting.
+
+### EntityType: governance_decision
+
+Governance decisions written to the KG now use `entityType: "governance_decision"` (added to the `EntityType` enum in `models.py`). Previously these were incorrectly written as `solution_pattern`, conflating governance audit records with actual solution patterns.
 
 ## Future Enhancements
 

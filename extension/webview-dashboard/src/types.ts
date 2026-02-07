@@ -442,7 +442,8 @@ export type ExtensionMessage =
   | { type: 'researchBriefContent'; briefPath: string; content: string; error?: string }
   | { type: 'researchBriefsList'; briefs: ResearchBriefInfo[] }
   | { type: 'showWizard' }
-  | { type: 'showTutorial' };
+  | { type: 'showTutorial' }
+  | { type: 'toggleDemo' };
 
 export type WebviewMessage =
   | { type: 'connect' }

@@ -49,4 +49,4 @@ Return findings as a structured list with tier, severity, component, finding, ra
 - Do not modify vision-tier or architecture-tier KG entities
 
 ## Model
-Always Opus 4.5. Vision enforcement and architectural review require deep reasoning.
+Always Opus 4.6. Vision enforcement and architectural review require deep reasoning.

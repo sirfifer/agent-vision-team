@@ -8,7 +8,7 @@
 
 ## Summary
 
-The implementation audit confirms **all core infrastructure is operational**: 3 MCP servers (29 tools), 6 subagent definitions, E2E testing harness (11 scenarios, 172+ assertions), VS Code extension (dashboard, wizard, tutorial, walkthrough, 3 MCP clients, 4 TreeViews). The remaining work falls into three categories:
+The implementation audit confirms **all core infrastructure is operational**: 3 MCP servers (29 tools), 6 subagent definitions, E2E testing harness (14 scenarios, 292+ assertions), VS Code extension (dashboard, wizard, tutorial, walkthrough, 3 MCP clients, 4 TreeViews). The remaining work falls into three categories:
 
 1. **Path consistency bugs** — code and docs still reference the legacy `.claude/collab/` path instead of `.avt/`
 2. **Unwired functionality** — implemented config layers not yet connected to runtime behavior
@@ -39,7 +39,7 @@ The MCP servers all default to `.avt/` paths, but the E2E project generator and 
 | `scripts/dogfood-test.sh` | 50 | Update path reference |
 
 #### Validation:
-- Run `./e2e/run-e2e.sh` — all 11 scenarios must pass
+- Run `./e2e/run-e2e.sh` — all 14 scenarios must pass
 - Verify generated projects put data files under `.avt/`
 
 ---
@@ -279,7 +279,7 @@ These items are defined in ARCHITECTURE.md Phase 5 but are explicitly deferred:
 When this plan is complete:
 
 1. `grep -r '\.claude/collab' . --include='*.md' --include='*.sh' --include='*.json' --include='*.py'` returns zero matches (excluding archived docs in `docs/v1-full-architecture/` and working drafts in `docs/arch-v2-*`)
-2. `./e2e/run-e2e.sh` passes all 11 scenarios with data files under `.avt/`
+2. `./e2e/run-e2e.sh` passes all 14 scenarios with data files under `.avt/`
 3. `cd mcp-servers/knowledge-graph && uv run pytest` — all tests pass
 4. `cd mcp-servers/quality && uv run pytest` — all tests pass (including new gate tests)
 5. `cd extension && npm test` — all tests pass

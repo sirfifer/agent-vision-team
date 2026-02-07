@@ -262,7 +262,7 @@ The current architecture has several concrete strengths:
 
 - **Clean policy/infrastructure separation.** Governance rules can evolve (new review types, different verdict logic, additional checks) without touching the file I/O layer. Conversely, if the task file format changes, only `task_integration.py` adapts.
 
-- **E2E tested.** The governed task lifecycle is validated across 172+ structural assertions. Scenario `s03` tests the full create-block-release cycle (27 assertions). Scenario `s08` tests 3-blocker stacking with sequential release (19 assertions).
+- **E2E tested.** The governed task lifecycle is validated across 292+ structural assertions. Scenario `s03` tests the full create-block-release cycle (27 assertions). Scenario `s08` tests 3-blocker stacking with sequential release (19 assertions).
 
 - **Extension-ready.** The `_queue_governance_review()` call in `server.py` (line 397) is designed for async processing, positioning the system for automated review pipelines.
 

@@ -1,17 +1,20 @@
 # Collaborative Intelligence System
 
-A platform-native collaborative intelligence system for software development, leveraging Claude Code's native subagent capabilities with tier-protected institutional memory and deterministic quality verification.
+A platform-native collaborative intelligence system for software development, leveraging Claude Code's native subagent capabilities with tier-protected institutional memory, deterministic quality verification, and standalone remote operation.
 
 ## Overview
 
 This system provides:
 
 - **Tier-Protected Knowledge Graph**: Persistent institutional memory with vision/architecture/quality protection tiers
-- **Hook-Based Governance Enforcement**: PostToolUse hooks intercept every task Claude creates, automatically pairing it with a governance review — no agent cooperation required
+- **Hook-Based Governance Enforcement**: PostToolUse hooks intercept every task Claude creates, automatically pairing it with a governance review -- no agent cooperation required
 - **Quality Verification**: Deterministic tool wrapping (linters, formatters, tests, build checks) with trust engine
-- **Governed Task System**: "Intercept early, redirect early" — implementation tasks are blocked from birth until governance review approves them
+- **Governed Task System**: "Intercept early, redirect early" -- implementation tasks are blocked from birth until governance review approves them
 - **Claude Code Integration**: Custom subagents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward) that leverage native orchestration
-- **E2E Testing Harness**: Autonomous test suite generating unique projects per run across 11 scenarios with 172+ structural assertions
+- **AVT Gateway**: Standalone FastAPI backend with 35 REST endpoints, WebSocket push, and job runner for remote operation from any browser or phone
+- **Dual-Mode Dashboard**: Same React dashboard runs in VS Code (local) or standalone browser (remote) via transport abstraction
+- **Container Deployment**: Docker, docker-compose, and GitHub Codespaces support for persistent remote operation
+- **E2E Testing Harness**: Autonomous test suite generating unique projects per run across 13 scenarios with 221 structural assertions
 - **VS Code Extension**: Observability layer for monitoring system state (optional)
 
 ## Architecture
@@ -36,7 +39,7 @@ The system follows a **platform-native** philosophy (Principle P9: "Build Only W
 │                                                             │
 │  Task tool for subagent coordination                        │
 │  Git worktree management                                    │
-│  Model routing (Opus/Sonnet/Haiku)                         │
+│  Model routing (Opus 4.6/Sonnet 4.5/Haiku 4.5)             │
 └───────┬──────────────────┬──────────────────┬───────────────┘
         │                  │                  │
 ┌───────▼───────┐  ┌───────▼────────┐  ┌─────▼──────────┐
@@ -52,15 +55,18 @@ The system follows a **platform-native** philosophy (Principle P9: "Build Only W
 - **Lifecycle hooks** that enforce governance at the platform level
 - Custom subagent definitions (`.claude/agents/*.md`)
 - Orchestration instructions (`CLAUDE.md`)
+- AVT Gateway for remote operation (FastAPI, 35 REST endpoints, WebSocket, job runner)
+- Dual-mode React dashboard (VS Code + standalone web)
+- Container packaging (Docker, Codespaces)
 - E2E testing harness (`e2e/`)
-- VS Code extension for observability
+- VS Code extension for local observability
 
 **What Claude Code provides natively:**
 - Subagent spawning and coordination (Task tool)
-- **PostToolUse / PreToolUse hooks** — the enforcement mechanism we hook into
+- **PostToolUse / PreToolUse hooks** -- the enforcement mechanism we hook into
 - Session persistence and resume
 - Git worktree management
-- Model routing (Opus/Sonnet/Haiku)
+- Model routing (Opus 4.6/Sonnet 4.5/Haiku 4.5)
 - Tool restrictions and permissions
 - Background execution
 
@@ -148,45 +154,38 @@ Hooks are configured in `.claude/settings.json`:
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Option A: Local Development
+
+#### 1. Install Dependencies
 
 ```bash
-# Knowledge Graph Server
+# MCP Servers
 cd mcp-servers/knowledge-graph && uv sync
-
-# Quality Server
 cd mcp-servers/quality && uv sync
-
-# Governance Server
 cd mcp-servers/governance && uv sync
 
-# Extension (optional)
+# Gateway (optional, for remote mode)
+cd server && uv sync
+
+# Extension (optional, for VS Code mode)
 cd extension && npm install
 ```
 
-### 2. Run Unit Tests
+#### 2. Run Tests
 
 ```bash
-# Knowledge Graph (18 tests, 74% coverage)
-cd mcp-servers/knowledge-graph && uv run pytest
+# Unit tests
+cd mcp-servers/knowledge-graph && uv run pytest   # 18 tests, 74% coverage
+cd mcp-servers/quality && uv run pytest            # 26 tests, 48% coverage
+cd extension && npm test                           # 9 unit tests
 
-# Quality (26 tests, 48% coverage)
-cd mcp-servers/quality && uv run pytest
-
-# Extension (9 unit tests)
-cd extension && npm test
-```
-
-### 3. Run E2E Tests
-
-```bash
-# Full autonomous E2E suite (11 scenarios, 172+ assertions)
+# E2E (exercises all 3 servers, 13 scenarios, 221 assertions)
 ./e2e/run-e2e.sh
 ```
 
 See [E2E Testing Harness documentation](e2e/README.md) for details, options, and debugging guidance.
 
-### 4. Start MCP Servers
+#### 3. Start MCP Servers
 
 ```bash
 # Knowledge Graph (port 3101)
@@ -199,13 +198,46 @@ cd mcp-servers/quality && uv run python -m collab_quality.server
 cd mcp-servers/governance && uv run python -m collab_governance.server
 ```
 
-### 5. Install Extension (Optional)
+#### 4. Install Extension (Optional)
 
 ```bash
 cd extension
 npm install && npm run build
 # Then: Open in VS Code and press F5 to launch Extension Development Host
 ```
+
+### Option B: Remote / Container Deployment
+
+#### Docker Compose
+
+```bash
+export ANTHROPIC_API_KEY=your-key-here
+docker compose up -d
+# Access the dashboard at https://localhost
+# API key is displayed in container logs
+```
+
+The container runs all 3 MCP servers, the AVT Gateway, and Nginx in a single image. Mount your project repo and persist state:
+
+```yaml
+services:
+  avt:
+    build: server/
+    ports: ["443:443"]
+    volumes:
+      - ./my-project:/project
+      - avt-state:/project/.avt
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+```
+
+#### GitHub Codespaces
+
+Open this repository in GitHub Codespaces. The `.devcontainer/devcontainer.json` starts all services automatically with port forwarding. Access from any device including phones via the Codespaces URL.
+
+#### Cloud VPS
+
+Deploy on any machine with Docker (DigitalOcean, Hetzner, AWS Lightsail, $5-20/month). Use `docker compose up -d` and configure Let's Encrypt for public TLS.
 
 ## Project Structure
 
@@ -215,13 +247,19 @@ agent-vision-team/
 │   ├── knowledge-graph/       # Tier-protected institutional memory (port 3101)
 │   ├── governance/             # Transactional governance review (port 3103)
 │   └── quality/                # Deterministic quality verification (port 3102)
+├── server/                     # AVT Gateway (remote mode)
+│   ├── avt_gateway/            # FastAPI app, services, routers, WebSocket
+│   ├── static/                 # Vite web build output (generated)
+│   ├── Dockerfile              # Container image definition
+│   ├── entrypoint.sh           # Multi-service startup script
+│   └── nginx.conf              # Reverse proxy configuration
 ├── scripts/
 │   └── hooks/                  # Claude Code lifecycle hooks
 │       ├── governance-task-intercept.py  # PostToolUse: auto-governance on task creation
 │       └── verify-governance-review.sh   # PreToolUse: block plans without review
 ├── e2e/                        # Autonomous E2E testing harness
 │   ├── generator/              # Unique project generation per run (8 domains)
-│   ├── scenarios/              # 11 test scenarios (s01–s12)
+│   ├── scenarios/              # 13 test scenarios (s01-s13)
 │   ├── parallel/               # ThreadPoolExecutor + per-scenario isolation
 │   └── validation/             # Assertion engine + report generator
 ├── .claude/
@@ -233,11 +271,13 @@ agent-vision-team/
 │   ├── trust-engine.db         # Trust engine (SQLite)
 │   ├── governance.db           # Governance decisions (SQLite)
 │   └── seen-todos.json         # TodoWrite hash tracking (for hook diffing)
-├── extension/                  # VS Code extension (observability only)
+├── .devcontainer/              # GitHub Codespaces configuration
+├── extension/                  # VS Code extension (local mode, optional)
 ├── templates/                  # Installation templates for target projects
 ├── docs/
 │   ├── project-overview.md     # Project overview
 │   └── v1-full-architecture/   # Archived v1 design documents
+├── docker-compose.yml          # Container deployment config
 ├── COLLABORATIVE_INTELLIGENCE_VISION.md  # System vision (principles, topology)
 ├── ARCHITECTURE.md             # Technical architecture specification
 └── CLAUDE.md                   # Orchestrator instructions
@@ -306,11 +346,11 @@ The human + primary Claude Code session acts as orchestrator, using:
 
 ### Phase 2: Subagents + Validation (Complete)
 
-6 agents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward). Full CLAUDE.md orchestration. E2E testing harness with 11 scenarios and 172+ structural assertions.
+6 agents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward). Full CLAUDE.md orchestration. E2E testing harness with 13 scenarios and 221 structural assertions.
 
 ### Phase 3: Extension (Complete)
 
-Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governance panel, research prompts panel. 3 MCP clients, 4 TreeViews, 12 commands.
+Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governance panel, decision explorer, quality gates panel, findings panel, research prompts panel, job submission. 3 MCP clients, 4 TreeViews, 12 commands.
 
 ### Phase 4: Governance + E2E (Complete)
 
@@ -321,7 +361,17 @@ Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governa
 - Multi-blocker support (stack governance + security + architecture reviews)
 - Quality gates fully operational: build, lint, tests, coverage, findings
 
-### Phase 5: Expand
+### Phase 5: Remote Operation (Complete)
+
+- AVT Gateway: FastAPI backend with 35 REST endpoints, WebSocket push, job runner
+- Dual-mode React dashboard via transport abstraction (VS Code postMessage + HTTP/WebSocket)
+- Container packaging: Dockerfile, docker-compose.yml, entrypoint.sh, nginx.conf
+- GitHub Codespaces: .devcontainer/devcontainer.json with port forwarding
+- Mobile-responsive layout with stacked panels on small screens
+- API-key authentication (auto-generated bearer token)
+- Zero changes to MCP servers, hooks, or agents
+
+### Phase 6: Expand
 
 - [ ] Cross-project memory
 - [ ] Installation script for target projects
@@ -356,15 +406,25 @@ Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governa
 - **Quality Gates**: All 5 gates operational — build (runs configured build command), lint, tests, coverage, findings (checks trust engine for unresolved critical/high findings)
 - **No Silent Dismissals**: Every dismissal requires justification and identity
 
+### AVT Gateway (Remote Operation)
+
+- **35 REST Endpoints**: Full API coverage mapping every VS Code `postMessage` type to HTTP
+- **WebSocket Push**: Real-time dashboard updates, governance status, job progress at `/api/ws`
+- **Job Runner**: Submit work from any device (prompt, agent type, model). Executes via Claude CLI with temp-file I/O. Persists to `.avt/jobs/`
+- **API-Key Auth**: Auto-generated bearer token. All endpoints authenticated
+- **Dual-Mode Dashboard**: Same React components in VS Code (postMessage) or browser (HTTP + WebSocket) via transport abstraction
+- **Container Ready**: Dockerfile with all services, docker-compose for deployment, Codespaces for zero-setup cloud access
+- **Mobile Responsive**: Stacked panels on small screens for phone access
+
 ### E2E Testing Harness
 
 - **Autonomous Execution**: Single command (`./e2e/run-e2e.sh`) runs the full suite
 - **Domain Randomization**: Each run randomly selects from 8 project domains
-- **Structural Assertions**: 172+ domain-agnostic assertions that verify behavioral contracts
-- **Full Isolation**: Per-scenario KG, SQLite, and task directory — scenarios never interfere
+- **Structural Assertions**: 221 domain-agnostic assertions that verify behavioral contracts
+- **Full Isolation**: Per-scenario KG, SQLite, and task directory -- scenarios never interfere
 - **Parallel Execution**: Library-mode scenarios run concurrently via `ThreadPoolExecutor`
 - **Reproducibility**: `--seed` flag for deterministic domain selection; `--keep` preserves workspace
-- **Comprehensive Coverage**: 11 scenarios spanning KG, Governance, Quality, and cross-server integration
+- **Comprehensive Coverage**: 13 scenarios spanning KG, Governance, Quality, and cross-server integration
 
 See [e2e/README.md](e2e/README.md) for complete documentation.
 
@@ -377,8 +437,8 @@ See [e2e/README.md](e2e/README.md) for complete documentation.
 | Knowledge Graph | 18 | 74% | All passing |
 | Quality Server | 26 | 48% | All passing |
 | Extension (Unit) | 9 | N/A | All passing |
-| E2E Harness | 11 scenarios / 172+ assertions | N/A | All passing |
-| **Total** | **53 unit + 11 E2E scenarios** | — | **All passing** |
+| E2E Harness | 13 scenarios / 221 assertions | N/A | All passing |
+| **Total** | **53 unit + 13 E2E scenarios** | -- | **All passing** |
 
 ### Detailed Coverage
 
@@ -457,6 +517,10 @@ This is an experimental system exploring platform-native architecture. The v1 fu
 
 - [Collaborative Intelligence Vision](COLLABORATIVE_INTELLIGENCE_VISION.md)
 - [Technical Architecture](ARCHITECTURE.md)
+- [Project Overview](docs/project-overview.md)
 - [Orchestrator Instructions (CLAUDE.md)](CLAUDE.md)
 - [E2E Testing Harness](e2e/README.md)
+- [Knowledge Graph Server](mcp-servers/knowledge-graph/README.md)
+- [Quality Server](mcp-servers/quality/README.md)
+- [Governance Server](mcp-servers/governance/README.md)
 - [V1 Architecture (Archived)](docs/v1-full-architecture/README.md)

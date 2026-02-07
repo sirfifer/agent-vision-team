@@ -87,14 +87,14 @@ The orchestrator selects your model based on research complexity:
 | **High** | opus | Novel domains, architectural decisions, security analysis, ambiguous requirements |
 | **Routine** | sonnet | Changelog monitoring, version updates, straightforward API documentation |
 
-Indicators for **Opus**:
+Indicators for **Opus 4.6**:
 - Multiple competing approaches to evaluate
 - Novel technology the team hasn't used
 - Security-sensitive decisions
 - High-stakes architectural choices
 - Ambiguous or conflicting information sources
 
-Indicators for **Sonnet**:
+Indicators for **Sonnet 4.5**:
 - Single source of truth (official docs)
 - Routine version/changelog checks
 - Well-documented, stable technologies

@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, ResearchBriefInfo } from '../types';
-import { useVsCodeApi } from '../hooks/useVsCodeApi';
+import { useTransport } from '../hooks/useTransport';
+import { DEMO_DATA } from '../data/demoData';
 
 const defaultData: DashboardData = {
   connectionStatus: 'disconnected',
@@ -47,6 +48,8 @@ interface DashboardContextValue {
   // Tutorial
   showTutorial: boolean;
   setShowTutorial: (show: boolean) => void;
+  // Demo mode
+  demoMode: boolean;
 }
 
 export interface FormatDocResult {
@@ -65,7 +68,7 @@ declare global {
 }
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
-  const vscodeApi = useVsCodeApi();
+  const vscodeApi = useTransport();
   const [data, setData] = useState<DashboardData>(
     () => window.__INITIAL_DATA__ ?? defaultData
   );
@@ -94,11 +97,37 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
 
+  // Demo mode state
+  const [demoMode, setDemoMode] = useState(false);
+  const savedDataRef = useRef<DashboardData | null>(null);
+  const demoModeRef = useRef(false);
+
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const msg = event.data;
       switch (msg.type) {
+        case 'toggleDemo':
+          if (!demoModeRef.current) {
+            // Entering demo mode: save current data, swap in demo
+            setData(prev => {
+              savedDataRef.current = prev;
+              return DEMO_DATA;
+            });
+            demoModeRef.current = true;
+            setDemoMode(true);
+          } else {
+            // Leaving demo mode: restore saved data
+            demoModeRef.current = false;
+            setDemoMode(false);
+            if (savedDataRef.current) {
+              setData(savedDataRef.current);
+              savedDataRef.current = null;
+            }
+          }
+          break;
         case 'update':
+          // Ignore live updates while demo mode is active
+          if (demoModeRef.current) break;
           setData(msg.data);
           // Extract setup readiness and config from update if present
           if (msg.data.setupReadiness) {
@@ -118,6 +147,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           }
           break;
         case 'activityAdd':
+          if (demoModeRef.current) break;
           setData(prev => ({
             ...prev,
             activities: [msg.entry, ...prev.activities],
@@ -247,6 +277,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       researchBriefs,
       researchBriefContent,
       showTutorial, setShowTutorial,
+      demoMode,
     }}>
       {children}
     </DashboardContext.Provider>

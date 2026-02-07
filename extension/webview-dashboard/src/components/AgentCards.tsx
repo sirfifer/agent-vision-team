@@ -1,13 +1,13 @@
 import { useDashboard } from '../context/DashboardContext';
 import type { AgentStatus } from '../types';
 
-const roleLabels: Record<string, string> = {
-  orchestrator: 'Orch',
+const roleDisplayNames: Record<string, string> = {
+  orchestrator: 'Orchestrator',
   worker: 'Worker',
-  'quality-reviewer': 'QR',
-  'kg-librarian': 'KG-Lib',
-  'governance-reviewer': 'Gov',
-  researcher: 'Research',
+  'quality-reviewer': 'Quality Rev.',
+  'kg-librarian': 'KG Librarian',
+  'governance-reviewer': 'Gov. Rev.',
+  researcher: 'Researcher',
   'project-steward': 'Steward',
 };
 
@@ -68,29 +68,29 @@ function AgentCard({ agent, isSelected, onSelect }: {
     ? `\nBlocked by: ${agent.blockedBy.join(', ')}`
     : '';
   const label = statusLabel(agent.status);
+  const displayName = roleDisplayNames[agent.role] ?? agent.name;
 
   return (
     <button
       onClick={onSelect}
       title={`${roleDesc}\n\nStatus: ${statusDesc}${blockedByHint}\n${filterHint}`}
-      className={`flex-1 min-w-0 p-2.5 rounded border transition-colors text-left ${statusBorderClass(agent.status, isSelected)}`}
+      className={`flex-1 min-w-0 p-2 rounded border transition-colors text-left ${statusBorderClass(agent.status, isSelected)}`}
     >
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-1.5 mb-0.5">
         <span
           className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass[agent.status] ?? 'bg-agent-idle'}`}
           title={statusDesc}
         />
-        <span className="font-semibold text-xs truncate">{agent.name}</span>
+        <span className="font-semibold text-xs truncate">{displayName}</span>
         {label && (
-          <span className={`text-2xs px-1 rounded ${
+          <span className={`ml-auto text-2xs px-1 rounded shrink-0 ${
             agent.status === 'blocked' ? 'bg-red-500/20 text-red-400' :
             agent.status === 'reviewing' ? 'bg-amber-500/20 text-amber-400' :
             'bg-agent-active/20 text-agent-active'
           }`}>{label}</span>
         )}
-        <span className="ml-auto text-2xs text-vscode-muted uppercase">{roleLabels[agent.role] ?? agent.role}</span>
       </div>
-      <div className="text-2xs text-vscode-muted truncate">
+      <div className="text-2xs text-vscode-muted truncate pl-3.5">
         {agent.currentTask ?? (agent.status === 'not-configured' ? 'Not configured' : 'Idle')}
       </div>
     </button>
@@ -104,13 +104,13 @@ export function AgentCards() {
   if (agents.length === 0) {
     return (
       <div className="flex gap-2 px-4 py-2" title="Agent cards appear here after connecting. Each card shows an agent's status and current task.">
-        {['Orchestrator', 'Worker', 'QR', 'KG-Lib', 'Gov', 'Research', 'Steward'].map(name => (
-          <div key={name} className="flex-1 p-2.5 rounded border border-vscode-border bg-vscode-widget-bg opacity-50" title={`${name}: no data yet. Connect to MCP servers to detect agents.`}>
-            <div className="flex items-center gap-2 mb-1">
+        {Object.values(roleDisplayNames).map(name => (
+          <div key={name} className="flex-1 p-2 rounded border border-vscode-border bg-vscode-widget-bg opacity-50" title={`${name}: no data yet. Connect to MCP servers to detect agents.`}>
+            <div className="flex items-center gap-1.5 mb-0.5">
               <span className="w-2 h-2 rounded-full border border-agent-idle" />
               <span className="font-semibold text-xs">{name}</span>
             </div>
-            <div className="text-2xs text-vscode-muted">No data</div>
+            <div className="text-2xs text-vscode-muted pl-3.5">No data</div>
           </div>
         ))}
       </div>

@@ -12,8 +12,10 @@ import { SetupWizard } from './components/wizard/SetupWizard';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ResearchPromptsPanel } from './components/ResearchPromptsPanel';
 import { WorkflowTutorial } from './components/tutorial/WorkflowTutorial';
+import { JobSubmission } from './components/JobSubmission';
+import { JobList } from './components/JobList';
 
-type RightTab = 'tasks' | 'decisions' | 'activity';
+type RightTab = 'tasks' | 'decisions' | 'activity' | 'jobs';
 
 function ConnectionBanner() {
   const { data, sendCommand } = useDashboard();
@@ -91,12 +93,28 @@ function RightPanel({ className }: { className?: string }) {
         >
           Activity
         </button>
+        <button
+          onClick={() => setActiveTab('jobs')}
+          className={`px-4 py-1.5 text-xs font-medium transition-colors ${
+            activeTab === 'jobs'
+              ? 'text-vscode-fg border-b-2 border-tier-quality'
+              : 'text-vscode-muted hover:text-vscode-fg'
+          }`}
+        >
+          Jobs
+        </button>
       </div>
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'tasks' && <TaskBoard />}
         {activeTab === 'decisions' && <DecisionExplorer />}
         {activeTab === 'activity' && <ActivityFeed />}
+        {activeTab === 'jobs' && (
+          <div>
+            <JobSubmission />
+            <JobList />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -111,9 +129,9 @@ export default function App() {
         <ConnectionBanner />
         <AgentCards />
         <QualityGatesPanel />
-        <div className="flex-1 flex min-h-0">
-          <GovernancePanel className="w-2/5 overflow-y-auto" />
-          <RightPanel className="w-3/5" />
+        <div className="flex-1 flex flex-col md:flex-row min-h-0">
+          <GovernancePanel className="w-full md:w-2/5 overflow-y-auto" />
+          <RightPanel className="w-full md:w-3/5" />
         </div>
       </div>
       {/* Overlays */}

@@ -84,6 +84,12 @@
         "title": "Create Task Brief",
         "category": "Collab Intelligence",
         "icon": "$(new-file)"
+      },
+      {
+        "command": "collab.toggleDemo",
+        "title": "Toggle Demo Mode",
+        "category": "Collab Intelligence",
+        "icon": "$(beaker)"
       }
     ],
     "viewsContainers": {
@@ -119,7 +125,7 @@
     "viewsWelcome": [
       {
         "view": "collab.actions",
-        "contents": "$(dashboard) [Open Dashboard](command:collab.viewDashboard)\n\n$(plug) [Connect to Servers](command:collab.connectMcpServers)\n\n$(lightbulb) [Setup Wizard](command:collab.openSetupWizard)\n\n$(mortar-board) [Workflow Tutorial](command:collab.openWorkflowTutorial)"
+        "contents": "$(dashboard) [Open Dashboard](command:collab.viewDashboard)\n\n$(plug) [Connect to Servers](command:collab.connectMcpServers)\n\n$(lightbulb) [Setup Wizard](command:collab.openSetupWizard)\n\n$(mortar-board) [Workflow Tutorial](command:collab.openWorkflowTutorial)\n\n$(beaker) [Toggle Demo](command:collab.toggleDemo)"
       }
     ],
     "menus": {

@@ -16,15 +16,15 @@ This document describes how to validate that the Collaborative Intelligence Syst
 
 ### ✅ Subagent Definitions (Phase 2)
 - **Worker**: `.claude/agents/worker.md`
-  - Model: Opus
+  - Model: Opus 4.6
   - Tools: Read, Write, Edit, Bash, Glob, Grep, KG, Quality
   - Role: Implements scoped tasks with quality checks
 - **Quality Reviewer**: `.claude/agents/quality-reviewer.md`
-  - Model: Opus
+  - Model: Opus 4.6
   - Tools: Read, Glob, Grep, Bash, KG, Quality (read-only)
   - Role: Three-lens review (Vision → Architecture → Quality)
 - **KG Librarian**: `.claude/agents/kg-librarian.md`
-  - Model: Sonnet
+  - Model: Sonnet 4.5
   - Tools: Read, Write, Glob, Grep, KG
   - Role: Curates institutional memory after work sessions
 

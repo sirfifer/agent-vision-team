@@ -231,6 +231,12 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage(msg);
   }
 
+  public toggleDemo(): void {
+    const msg = { type: 'toggleDemo' };
+    this.panel?.webview.postMessage(msg);
+    this.view?.webview.postMessage(msg);
+  }
+
   private postMessage(msg: unknown): void {
     this.panel?.webview.postMessage(msg);
     this.view?.webview.postMessage(msg);

@@ -20,11 +20,16 @@ const statusTooltips: Record<string, string> = {
 };
 
 export function SessionBar() {
-  const { data, sendCommand, sendMessage, setShowSettings, setShowWizard, setShowTutorial, setShowResearchPrompts, researchPrompts } = useDashboard();
+  const { data, sendCommand, sendMessage, setShowSettings, setShowWizard, setShowTutorial, setShowResearchPrompts, researchPrompts, demoMode } = useDashboard();
   const { connectionStatus, sessionPhase, tasks } = data;
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 border-b border-vscode-border bg-vscode-widget-bg text-xs">
+      {demoMode && (
+        <span className="px-2 py-0.5 rounded bg-purple-600 text-white font-bold text-2xs uppercase tracking-wider animate-pulse" title="Demo mode is active. Data shown is synthetic. Click Toggle Demo in the sidebar to deactivate.">
+          Demo
+        </span>
+      )}
       <div className="flex items-center gap-1.5" title="Current orchestration phase. Tracks where the session is in its lifecycle (planning, implementing, reviewing).">
         <span className="text-vscode-muted uppercase tracking-wider">Phase</span>
         <span className="font-semibold">{sessionPhase || 'inactive'}</span>
