@@ -461,6 +461,55 @@ class GovernanceStore:
         ).fetchall()
         return [self._row_to_task_review(r) for r in rows]
 
+    def get_all_governed_tasks(
+        self,
+        status: Optional[str] = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Get all governed tasks with their review details."""
+        conn = self._get_conn()
+        query = "SELECT * FROM governed_tasks WHERE 1=1"
+        params: list = []
+        if status:
+            query += " AND current_status = ?"
+            params.append(status)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+
+        rows = conn.execute(query, params).fetchall()
+        result = []
+        for row in rows:
+            impl_id = row["implementation_task_id"]
+            reviews = conn.execute(
+                "SELECT * FROM task_reviews WHERE implementation_task_id = ? ORDER BY created_at",
+                (impl_id,),
+            ).fetchall()
+            review_list = []
+            for r in reviews:
+                findings_raw = json.loads(r["findings"] or "[]")
+                review_list.append({
+                    "id": r["id"],
+                    "review_task_id": r["review_task_id"],
+                    "review_type": r["review_type"],
+                    "status": r["status"],
+                    "verdict": r["verdict"],
+                    "guidance": r["guidance"] or "",
+                    "findings": findings_raw,
+                    "created_at": r["created_at"],
+                    "completed_at": r["completed_at"],
+                })
+            result.append({
+                "id": row["id"],
+                "implementation_task_id": impl_id,
+                "subject": row["subject"],
+                "description": row["description"] or "",
+                "current_status": row["current_status"],
+                "created_at": row["created_at"],
+                "released_at": row["released_at"],
+                "reviews": review_list,
+            })
+        return result
+
     def get_task_governance_stats(self) -> dict:
         """Get statistics about task governance."""
         conn = self._get_conn()

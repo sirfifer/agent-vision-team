@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useDashboard } from '../context/DashboardContext';
 import { GovernanceItem } from './GovernanceItem';
+import { FindingsPanel } from './FindingsPanel';
 
 export function GovernancePanel({ className = '' }: { className?: string }) {
   const { data } = useDashboard();
@@ -68,6 +69,9 @@ export function GovernancePanel({ className = '' }: { className?: string }) {
           </div>
         )}
       </div>
+
+      {/* Quality Findings */}
+      <FindingsPanel />
     </div>
   );
 }

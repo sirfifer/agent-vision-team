@@ -239,6 +239,93 @@ export interface GovernanceStats {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Quality Gate Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface GateResult {
+  name: string;
+  passed: boolean;
+  detail?: string;
+}
+
+export interface QualityGateResults {
+  build: GateResult;
+  lint: GateResult;
+  tests: GateResult;
+  coverage: GateResult;
+  findings: GateResult;
+  all_passed: boolean;
+  timestamp?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Decision History Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DecisionHistoryEntry {
+  id: string;
+  taskId: string;
+  agent: string;
+  category: string;
+  summary: string;
+  confidence: string;
+  verdict: string | null;
+  guidance: string;
+  createdAt: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Trust Engine / Findings Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface TrustFinding {
+  id: string;
+  tool: string;
+  severity: string;
+  component?: string;
+  description: string;
+  createdAt: string;
+  status: 'open' | 'dismissed';
+}
+
+export interface DismissalHistoryEntry {
+  dismissedBy: string;
+  justification: string;
+  dismissedAt: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hook Governance Status Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface HookGovernanceStatus {
+  totalInterceptions: number;
+  lastInterceptionAt?: string;
+  recentInterceptions: Array<{ timestamp: string; subject: string }>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Session State Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface SessionState {
+  phase: string;
+  lastCheckpoint?: string;
+  activeWorktrees?: string[];
+  driftStatus?: { type: string; description: string } | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Research Brief Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ResearchBriefInfo {
+  name: string;
+  path: string;
+  modifiedAt: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Research Prompt Types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -313,6 +400,16 @@ export interface DashboardData {
   // Governed tasks and governance stats
   governedTasks: GovernedTask[];
   governanceStats: GovernanceStats;
+  // Quality gates
+  qualityGateResults?: QualityGateResults;
+  // Decision history
+  decisionHistory?: DecisionHistoryEntry[];
+  // Trust engine findings
+  findings?: TrustFinding[];
+  // Hook governance
+  hookGovernanceStatus?: HookGovernanceStatus;
+  // Session state
+  sessionState?: SessionState;
   // Setup wizard and config
   setupReadiness?: SetupReadiness;
   projectConfig?: ProjectConfig;
@@ -320,6 +417,8 @@ export interface DashboardData {
   architectureDocs?: DocumentInfo[];
   // Research prompts
   researchPrompts?: ResearchPrompt[];
+  // Research briefs
+  researchBriefs?: ResearchBriefInfo[];
 }
 
 // Message types between extension host and webview
@@ -338,6 +437,10 @@ export type ExtensionMessage =
   | { type: 'governedTasks'; tasks: GovernedTask[] }
   | { type: 'governanceStats'; stats: GovernanceStats }
   | { type: 'formatDocContentResult'; requestId: string; success: boolean; formattedContent?: string; error?: string }
+  | { type: 'findingsUpdate'; findings: TrustFinding[] }
+  | { type: 'findingDismissed'; findingId: string; success: boolean }
+  | { type: 'researchBriefContent'; briefPath: string; content: string; error?: string }
+  | { type: 'researchBriefsList'; briefs: ResearchBriefInfo[] }
   | { type: 'showWizard' }
   | { type: 'showTutorial' };
 
@@ -359,7 +462,11 @@ export type WebviewMessage =
   | { type: 'deleteResearchPrompt'; id: string }
   | { type: 'runResearchPrompt'; id: string }
   | { type: 'requestGovernedTasks' }
-  | { type: 'formatDocContent'; tier: 'vision' | 'architecture'; rawContent: string; requestId: string };
+  | { type: 'formatDocContent'; tier: 'vision' | 'architecture'; rawContent: string; requestId: string }
+  | { type: 'dismissFinding'; findingId: string; justification: string; dismissedBy: string }
+  | { type: 'requestFindings' }
+  | { type: 'readResearchBrief'; briefPath: string }
+  | { type: 'listResearchBriefs' };
 
 export interface IngestionResult {
   tier: 'vision' | 'architecture';

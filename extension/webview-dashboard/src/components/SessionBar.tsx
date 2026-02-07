@@ -44,6 +44,48 @@ export function SessionBar() {
         <span className="capitalize">{connectionStatus}</span>
       </div>
 
+      {/* Hook governance indicator */}
+      {data.hookGovernanceStatus && data.hookGovernanceStatus.totalInterceptions > 0 && (
+        <>
+          <div className="w-px h-4 bg-vscode-border" />
+          <div
+            className="flex items-center gap-1.5"
+            title={`Hook governance: ${data.hookGovernanceStatus.totalInterceptions} interception(s)${data.hookGovernanceStatus.lastInterceptionAt ? `, last: ${data.hookGovernanceStatus.lastInterceptionAt}` : ''}`}
+          >
+            <span className="w-2 h-2 rounded-full bg-green-400" />
+            <span className="text-vscode-muted">Hook</span>
+            <span className="font-semibold">{data.hookGovernanceStatus.totalInterceptions}</span>
+          </div>
+        </>
+      )}
+
+      {/* Checkpoint badge */}
+      {data.sessionState?.lastCheckpoint && (
+        <>
+          <div className="w-px h-4 bg-vscode-border" />
+          <div className="flex items-center gap-1" title={`Last checkpoint tag: ${data.sessionState.lastCheckpoint}`}>
+            <span className="text-vscode-muted">CP</span>
+            <span className="text-2xs px-1.5 py-0.5 rounded bg-vscode-widget-bg font-mono">
+              {data.sessionState.lastCheckpoint}
+            </span>
+          </div>
+        </>
+      )}
+
+      {/* Worktree count */}
+      {data.sessionState?.activeWorktrees && data.sessionState.activeWorktrees.length > 0 && (
+        <>
+          <div className="w-px h-4 bg-vscode-border" />
+          <div
+            className="flex items-center gap-1"
+            title={`Active worktrees: ${data.sessionState.activeWorktrees.join(', ')}`}
+          >
+            <span className="text-vscode-muted">WT</span>
+            <span className="font-semibold">{data.sessionState.activeWorktrees.length}</span>
+          </div>
+        </>
+      )}
+
       <div className="ml-auto flex gap-1.5">
         <button
           onClick={() => sendCommand('connect')}

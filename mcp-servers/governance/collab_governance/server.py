@@ -637,6 +637,31 @@ def get_task_review_status(
 
 
 @mcp.tool()
+def list_governed_tasks(
+    status: Optional[str] = None,
+    limit: int = 50,
+) -> dict:
+    """List all governed tasks with their review details.
+
+    Returns the full lifecycle of governed tasks, not just pending ones.
+    Use this for dashboard views that need to show completed, approved,
+    and blocked tasks alongside pending reviews.
+
+    Args:
+        status: Optional filter by status (pending_review, approved, blocked, completed).
+        limit: Maximum number of tasks to return (default 50).
+
+    Returns:
+        {governed_tasks: [...], total: int}
+    """
+    tasks = store.get_all_governed_tasks(status=status, limit=limit)
+    return {
+        "governed_tasks": tasks,
+        "total": len(tasks),
+    }
+
+
+@mcp.tool()
 def get_pending_reviews() -> dict:
     """Get all pending governance reviews.
 

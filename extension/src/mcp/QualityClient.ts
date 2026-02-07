@@ -93,4 +93,32 @@ export class QualityClient {
       dismissed_by: dismissedBy,
     })) as { recorded: boolean };
   }
+
+  async getAllFindings(status?: string): Promise<{
+    findings: Array<{
+      id: string;
+      tool: string;
+      severity: string;
+      component: string | null;
+      description: string;
+      created_at: string;
+      status: string;
+    }>;
+  }> {
+    return (await this.mcp.callTool('quality', 'get_all_findings', {
+      ...(status ? { status } : {}),
+    })) as { findings: Array<{ id: string; tool: string; severity: string; component: string | null; description: string; created_at: string; status: string }> };
+  }
+
+  async getDismissalHistory(findingId: string): Promise<{
+    history: Array<{
+      dismissed_by: string;
+      justification: string;
+      dismissed_at: string;
+    }>;
+  }> {
+    return (await this.mcp.callTool('quality', 'get_dismissal_history', {
+      finding_id: findingId,
+    })) as { history: Array<{ dismissed_by: string; justification: string; dismissed_at: string }> };
+  }
 }

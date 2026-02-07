@@ -3,15 +3,17 @@ import { DashboardProvider, useDashboard } from './context/DashboardContext';
 import { SessionBar } from './components/SessionBar';
 import { SetupBanner } from './components/SetupBanner';
 import { AgentCards } from './components/AgentCards';
+import { QualityGatesPanel } from './components/QualityGatesPanel';
 import { GovernancePanel } from './components/GovernancePanel';
 import { ActivityFeed } from './components/ActivityFeed';
 import { TaskBoard } from './components/TaskBoard';
+import { DecisionExplorer } from './components/DecisionExplorer';
 import { SetupWizard } from './components/wizard/SetupWizard';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ResearchPromptsPanel } from './components/ResearchPromptsPanel';
 import { WorkflowTutorial } from './components/tutorial/WorkflowTutorial';
 
-type RightTab = 'tasks' | 'activity';
+type RightTab = 'tasks' | 'decisions' | 'activity';
 
 function ConnectionBanner() {
   const { data, sendCommand } = useDashboard();
@@ -70,6 +72,16 @@ function RightPanel({ className }: { className?: string }) {
           Governed Tasks
         </button>
         <button
+          onClick={() => setActiveTab('decisions')}
+          className={`px-4 py-1.5 text-xs font-medium transition-colors ${
+            activeTab === 'decisions'
+              ? 'text-vscode-fg border-b-2 border-tier-quality'
+              : 'text-vscode-muted hover:text-vscode-fg'
+          }`}
+        >
+          Decisions
+        </button>
+        <button
           onClick={() => setActiveTab('activity')}
           className={`px-4 py-1.5 text-xs font-medium transition-colors ${
             activeTab === 'activity'
@@ -82,7 +94,9 @@ function RightPanel({ className }: { className?: string }) {
       </div>
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 'tasks' ? <TaskBoard /> : <ActivityFeed />}
+        {activeTab === 'tasks' && <TaskBoard />}
+        {activeTab === 'decisions' && <DecisionExplorer />}
+        {activeTab === 'activity' && <ActivityFeed />}
       </div>
     </div>
   );
@@ -96,6 +110,7 @@ export default function App() {
         <SetupBanner />
         <ConnectionBanner />
         <AgentCards />
+        <QualityGatesPanel />
         <div className="flex-1 flex min-h-0">
           <GovernancePanel className="w-2/5 overflow-y-auto" />
           <RightPanel className="w-3/5" />

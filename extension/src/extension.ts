@@ -19,7 +19,8 @@ import { registerTaskCommands } from './commands/taskCommands';
 import { initializeLoggers, disposeLoggers } from './utils/logger';
 import { Entity } from './models/Entity';
 import { AgentStatus, ActivityEntry, GovernedTask, GovernanceStats } from './models/Activity';
-import type { GovernanceStatus, PendingReviewEntry } from './mcp/GovernanceClient';
+import type { GovernanceStatus, PendingReviewEntry, GovernedTaskListEntry } from './mcp/GovernanceClient';
+import type { DecisionHistoryEntry } from './mcp/GovernanceClient';
 
 let activityCounter = 0;
 function makeActivity(
@@ -170,6 +171,74 @@ function getTaskCounts(root: string): { active: number; total: number } {
   return { active: 0, total: 0 };
 }
 
+interface HookGovernanceStatus {
+  totalInterceptions: number;
+  lastInterceptionAt?: string;
+  recentInterceptions: Array<{ timestamp: string; subject: string }>;
+}
+
+function parseHookGovernanceLog(root: string): HookGovernanceStatus {
+  const result: HookGovernanceStatus = { totalInterceptions: 0, recentInterceptions: [] };
+  try {
+    const logPath = path.join(root, '.avt', 'hook-governance.log');
+    if (!fs.existsSync(logPath)) return result;
+    const content = fs.readFileSync(logPath, 'utf-8');
+    const lines = content.split('\n').filter(l => l.includes('[INTERCEPT]'));
+    result.totalInterceptions = lines.length;
+    if (lines.length > 0) {
+      // Parse recent entries (last 10)
+      const recent = lines.slice(-10).reverse();
+      for (const line of recent) {
+        const tsMatch = line.match(/^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})/);
+        const subjectMatch = line.match(/subject="([^"]+)"/);
+        result.recentInterceptions.push({
+          timestamp: tsMatch ? tsMatch[1] : '',
+          subject: subjectMatch ? subjectMatch[1] : 'unknown',
+        });
+      }
+      if (result.recentInterceptions.length > 0) {
+        result.lastInterceptionAt = result.recentInterceptions[0].timestamp;
+      }
+    }
+  } catch { /* ignore */ }
+  return result;
+}
+
+interface SessionState {
+  phase: string;
+  lastCheckpoint?: string;
+  activeWorktrees?: string[];
+}
+
+function getSessionState(root: string): SessionState {
+  const state: SessionState = { phase: getSessionPhase(root) };
+  try {
+    // Parse latest checkpoint from git tags
+    const { execSync } = require('child_process');
+    const tagOutput = execSync(
+      'git tag --list "checkpoint-*" --sort=-version:refname 2>/dev/null | head -1',
+      { cwd: root, encoding: 'utf-8', timeout: 5000 }
+    ).trim();
+    if (tagOutput) {
+      state.lastCheckpoint = tagOutput;
+    }
+
+    // Parse worktrees
+    const wtOutput = execSync(
+      'git worktree list --porcelain 2>/dev/null',
+      { cwd: root, encoding: 'utf-8', timeout: 5000 }
+    );
+    const worktrees = wtOutput.split('\n')
+      .filter((l: string) => l.startsWith('worktree '))
+      .map((l: string) => l.replace('worktree ', ''))
+      .filter((w: string) => w !== root); // exclude main worktree
+    if (worktrees.length > 0) {
+      state.activeWorktrees = worktrees;
+    }
+  } catch { /* ignore */ }
+  return state;
+}
+
 function classifyEntities(allEntities: Entity[]): { vision: Entity[]; architecture: Entity[] } {
   const vision: Entity[] = [];
   const architecture: Entity[] = [];
@@ -200,6 +269,7 @@ async function fetchGovernanceData(governanceClient: GovernanceClient): Promise<
   pendingReviews: PendingReviewEntry[];
   governanceStats: GovernanceStats;
   governedTasks: GovernedTask[];
+  decisionHistory: DecisionHistoryEntry[];
 }> {
   const defaultStats: GovernanceStats = {
     totalDecisions: 0,
@@ -211,9 +281,11 @@ async function fetchGovernanceData(governanceClient: GovernanceClient): Promise<
   };
 
   try {
-    const [govStatus, pendingResult] = await Promise.all([
+    const [govStatus, pendingResult, taskListResult, decisionResult] = await Promise.all([
       governanceClient.getGovernanceStatus(),
       governanceClient.getPendingReviews(),
+      governanceClient.listGovernedTasks().catch(() => ({ governed_tasks: [] as GovernedTaskListEntry[], total: 0 })),
+      governanceClient.getDecisionHistory().catch(() => ({ decisions: [] as DecisionHistoryEntry[] })),
     ]);
 
     const taskGov = govStatus.task_governance;
@@ -226,19 +298,43 @@ async function fetchGovernanceData(governanceClient: GovernanceClient): Promise<
       totalGovernedTasks: taskGov?.total_governed_tasks ?? 0,
     };
 
-    // Transform pending reviews into governed task representations
-    const governedTasks: GovernedTask[] = pendingResult.pending_reviews.map(r => ({
-      id: r.id,
-      implementationTaskId: r.implementation_task_id,
-      subject: r.context.length > 80 ? r.context.substring(0, 80) + '...' : r.context,
-      status: 'pending_review' as const,
-      reviews: [{
+    // Map full governed task list into dashboard format
+    const statusMap: Record<string, GovernedTask['status']> = {
+      pending_review: 'pending_review',
+      approved: 'approved',
+      blocked: 'blocked',
+      in_progress: 'in_progress',
+      completed: 'completed',
+    };
+    const governedTasks: GovernedTask[] = taskListResult.governed_tasks.map(t => ({
+      id: t.id,
+      implementationTaskId: t.implementation_task_id,
+      subject: t.subject,
+      status: statusMap[t.current_status] ?? 'pending_review',
+      reviews: t.reviews.map(r => ({
         id: r.id,
-        reviewType: r.type,
-        status: 'pending' as const,
+        reviewType: r.review_type,
+        status: (r.status as GovernedTask['reviews'][0]['status']) ?? 'pending',
+        verdict: r.verdict ?? undefined,
+        guidance: r.guidance || undefined,
         createdAt: r.created_at,
-      }],
-      createdAt: r.created_at,
+        completedAt: r.completed_at ?? undefined,
+      })),
+      createdAt: t.created_at,
+      releasedAt: t.released_at ?? undefined,
+    }));
+
+    // Map decision history
+    const decisionHistory: DecisionHistoryEntry[] = decisionResult.decisions.map(d => ({
+      id: d.id,
+      taskId: d.task_id,
+      agent: d.agent,
+      category: d.category,
+      summary: d.summary,
+      confidence: d.confidence,
+      verdict: d.verdict,
+      guidance: d.guidance,
+      createdAt: d.created_at,
     }));
 
     return {
@@ -246,6 +342,7 @@ async function fetchGovernanceData(governanceClient: GovernanceClient): Promise<
       pendingReviews: pendingResult.pending_reviews,
       governanceStats,
       governedTasks,
+      decisionHistory,
     };
   } catch {
     return {
@@ -253,6 +350,7 @@ async function fetchGovernanceData(governanceClient: GovernanceClient): Promise<
       pendingReviews: [],
       governanceStats: defaultStats,
       governedTasks: [],
+      decisionHistory: [],
     };
   }
 }
@@ -337,10 +435,33 @@ export function activate(context: vscode.ExtensionContext): void {
       const tasks = root ? getTaskCounts(root) : { active: 0, total: 0 };
       const sessionPhase = root ? getSessionPhase(root) : 'inactive';
 
-      const { govStatus, pendingReviews, governanceStats, governedTasks } =
+      // Fetch governance data (includes governed tasks + decision history)
+      const { govStatus, pendingReviews, governanceStats, governedTasks, decisionHistory } =
         await fetchGovernanceData(governanceClient);
 
       const agents = enrichAgentStatus(baseAgents, govStatus, pendingReviews);
+
+      // Fetch findings from quality server
+      let findings: Array<{ id: string; tool: string; severity: string; component?: string; description: string; created_at: string; status: string }> = [];
+      try {
+        const findingsResult = await qualityClient.getAllFindings();
+        findings = findingsResult.findings ?? [];
+      } catch { /* quality server may not be running */ }
+
+      // Parse hook governance log and session state
+      const hookGovernanceStatus = root ? parseHookGovernanceLog(root) : undefined;
+      const sessionState = root ? getSessionState(root) : undefined;
+
+      // Map findings to dashboard format
+      const dashboardFindings = findings.map(f => ({
+        id: f.id,
+        tool: f.tool,
+        severity: f.severity,
+        component: f.component,
+        description: f.description,
+        createdAt: f.created_at,
+        status: f.status as 'open' | 'dismissed',
+      }));
 
       dashboardProvider.updateData({
         agents,
@@ -348,6 +469,10 @@ export function activate(context: vscode.ExtensionContext): void {
         sessionPhase,
         governedTasks,
         governanceStats,
+        decisionHistory,
+        findings: dashboardFindings,
+        hookGovernanceStatus,
+        sessionState,
       });
     } catch {
       // Polling failures are non-fatal — dashboard keeps last known state
@@ -398,7 +523,7 @@ export function activate(context: vscode.ExtensionContext): void {
         );
 
         // Fetch governance data and enrich agents
-        const { govStatus, pendingReviews, governanceStats, governedTasks } =
+        const { govStatus, pendingReviews, governanceStats, governedTasks, decisionHistory } =
           await fetchGovernanceData(governanceClient);
 
         const enrichedAgents = enrichAgentStatus(agents, govStatus, pendingReviews);
@@ -406,6 +531,7 @@ export function activate(context: vscode.ExtensionContext): void {
           agents: enrichedAgents,
           governedTasks,
           governanceStats,
+          decisionHistory,
         });
 
         if (govStatus && govStatus.total_decisions > 0) {
@@ -566,6 +692,23 @@ export function activate(context: vscode.ExtensionContext): void {
             detail: result.summary,
           })
         );
+
+        // Push structured gate results to dashboard
+        if (result.gates) {
+          const gates = result.gates;
+          dashboardProvider.updateData({
+            qualityGateResults: {
+              build: { name: 'build', passed: gates.build?.passed ?? false, detail: gates.build?.detail },
+              lint: { name: 'lint', passed: gates.lint?.passed ?? false, detail: gates.lint?.detail },
+              tests: { name: 'tests', passed: gates.tests?.passed ?? false, detail: gates.tests?.detail },
+              coverage: { name: 'coverage', passed: gates.coverage?.passed ?? false, detail: gates.coverage?.detail },
+              findings: { name: 'findings', passed: gates.findings?.passed ?? false, detail: gates.findings?.detail },
+              all_passed: result.all_passed,
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }
+
         if (result.all_passed) {
           vscode.window.showInformationMessage('All quality gates passed.');
         } else {

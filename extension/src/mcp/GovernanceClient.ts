@@ -130,4 +130,35 @@ export class GovernanceClient {
       implementation_task_id: implementationTaskId,
     })) as GovernedTaskEntry;
   }
+
+  async listGovernedTasks(params?: {
+    status?: string;
+    limit?: number;
+  }): Promise<{ governed_tasks: GovernedTaskListEntry[]; total: number }> {
+    return (await this.mcp.callTool('governance', 'list_governed_tasks', params ?? {})) as {
+      governed_tasks: GovernedTaskListEntry[];
+      total: number;
+    };
+  }
+}
+
+export interface GovernedTaskListEntry {
+  id: string;
+  implementation_task_id: string;
+  subject: string;
+  description: string;
+  current_status: string;
+  created_at: string;
+  released_at: string | null;
+  reviews: Array<{
+    id: string;
+    review_task_id: string;
+    review_type: string;
+    status: string;
+    verdict: string | null;
+    guidance: string;
+    findings: unknown[];
+    created_at: string;
+    completed_at: string | null;
+  }>;
 }

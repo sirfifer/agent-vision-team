@@ -101,9 +101,24 @@ function TaskCard({ task }: { task: GovernedTask }) {
   );
 }
 
+type StatusFilter = 'all' | 'pending_review' | 'approved' | 'blocked' | 'completed';
+
+const filterConfig: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'pending_review', label: 'Pending' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'blocked', label: 'Blocked' },
+  { key: 'completed', label: 'Completed' },
+];
+
 export function TaskBoard({ className = '' }: { className?: string }) {
   const { data } = useDashboard();
   const { governedTasks, governanceStats } = data;
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  const filteredTasks = statusFilter === 'all'
+    ? governedTasks
+    : governedTasks.filter(t => t.status === statusFilter);
 
   const pendingCount = governedTasks.filter(t => t.status === 'pending_review').length;
   const blockedCount = governedTasks.filter(t => t.status === 'blocked').length;
@@ -121,6 +136,23 @@ export function TaskBoard({ className = '' }: { className?: string }) {
               {governanceStats.totalGovernedTasks}
             </span>
           )}
+        </div>
+
+        {/* Status filter tabs */}
+        <div className="flex gap-1 mt-2 flex-wrap">
+          {filterConfig.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`text-2xs px-1.5 py-0.5 rounded transition-colors ${
+                statusFilter === f.key
+                  ? 'bg-tier-quality text-white'
+                  : 'bg-vscode-widget-bg text-vscode-muted hover:text-vscode-fg'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
 
         {/* Summary stats */}
@@ -152,12 +184,14 @@ export function TaskBoard({ className = '' }: { className?: string }) {
       </div>
 
       <div className="p-2 space-y-2">
-        {governedTasks.length === 0 ? (
+        {filteredTasks.length === 0 ? (
           <div className="px-3 py-8 text-xs text-vscode-muted text-center italic">
-            No governed tasks yet. Tasks created via <code className="text-2xs">create_governed_task()</code> will appear here.
+            {governedTasks.length === 0
+              ? <>No governed tasks yet. Tasks created via <code className="text-2xs">create_governed_task()</code> will appear here.</>
+              : 'No tasks match the current filter.'}
           </div>
         ) : (
-          governedTasks.map(task => (
+          filteredTasks.map(task => (
             <TaskCard key={task.id} task={task} />
           ))
         )}

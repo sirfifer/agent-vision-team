@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt } from '../types';
+import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, ResearchBriefInfo } from '../types';
 import { useVsCodeApi } from '../hooks/useVsCodeApi';
 
 const defaultData: DashboardData = {
@@ -41,6 +41,9 @@ interface DashboardContextValue {
   showResearchPrompts: boolean;
   setShowResearchPrompts: (show: boolean) => void;
   researchPrompts: ResearchPrompt[];
+  // Research briefs
+  researchBriefs: ResearchBriefInfo[];
+  researchBriefContent: { briefPath: string; content: string; error?: string } | null;
   // Tutorial
   showTutorial: boolean;
   setShowTutorial: (show: boolean) => void;
@@ -83,6 +86,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   // Research prompts state
   const [showResearchPrompts, setShowResearchPrompts] = useState(false);
   const [researchPrompts, setResearchPrompts] = useState<ResearchPrompt[]>([]);
+
+  // Research briefs state
+  const [researchBriefs, setResearchBriefs] = useState<ResearchBriefInfo[]>([]);
+  const [researchBriefContent, setResearchBriefContent] = useState<{ briefPath: string; content: string; error?: string } | null>(null);
 
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
@@ -169,6 +176,29 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
             error: msg.error,
           });
           break;
+        case 'findingsUpdate':
+          setData(prev => ({ ...prev, findings: msg.findings }));
+          break;
+        case 'findingDismissed':
+          if (msg.success) {
+            setData(prev => ({
+              ...prev,
+              findings: (prev.findings ?? []).map(f =>
+                f.id === msg.findingId ? { ...f, status: 'dismissed' as const } : f
+              ),
+            }));
+          }
+          break;
+        case 'researchBriefContent':
+          setResearchBriefContent({
+            briefPath: msg.briefPath,
+            content: msg.content,
+            error: msg.error,
+          });
+          break;
+        case 'researchBriefsList':
+          setResearchBriefs(msg.briefs);
+          break;
         case 'showWizard':
           setShowWizard(true);
           break;
@@ -214,6 +244,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       lastFormatResult,
       showResearchPrompts, setShowResearchPrompts,
       researchPrompts,
+      researchBriefs,
+      researchBriefContent,
       showTutorial, setShowTutorial,
     }}>
       {children}

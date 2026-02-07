@@ -16,6 +16,62 @@ interface DocumentInfo {
   title?: string;
 }
 
+interface GateResult {
+  name: string;
+  passed: boolean;
+  detail?: string;
+}
+
+interface QualityGateResults {
+  build: GateResult;
+  lint: GateResult;
+  tests: GateResult;
+  coverage: GateResult;
+  findings: GateResult;
+  all_passed: boolean;
+  timestamp?: string;
+}
+
+interface DecisionHistoryEntry {
+  id: string;
+  taskId: string;
+  agent: string;
+  category: string;
+  summary: string;
+  confidence: string;
+  verdict: string | null;
+  guidance: string;
+  createdAt: string;
+}
+
+interface TrustFinding {
+  id: string;
+  tool: string;
+  severity: string;
+  component?: string;
+  description: string;
+  createdAt: string;
+  status: 'open' | 'dismissed';
+}
+
+interface HookGovernanceStatus {
+  totalInterceptions: number;
+  lastInterceptionAt?: string;
+  recentInterceptions: Array<{ timestamp: string; subject: string }>;
+}
+
+interface SessionState {
+  phase: string;
+  lastCheckpoint?: string;
+  activeWorktrees?: string[];
+}
+
+interface ResearchBriefInfo {
+  name: string;
+  path: string;
+  modifiedAt: string;
+}
+
 interface DashboardData {
   connectionStatus: 'connected' | 'disconnected' | 'error';
   serverPorts: { kg: number; quality: number; governance: number };
@@ -28,6 +84,16 @@ interface DashboardData {
   // Governed tasks and governance stats
   governedTasks: GovernedTask[];
   governanceStats: GovernanceStats;
+  // Quality gates
+  qualityGateResults?: QualityGateResults;
+  // Decision history
+  decisionHistory?: DecisionHistoryEntry[];
+  // Trust engine findings
+  findings?: TrustFinding[];
+  // Hook governance
+  hookGovernanceStatus?: HookGovernanceStatus;
+  // Session state
+  sessionState?: SessionState;
   // Setup wizard and config
   setupReadiness?: SetupReadiness;
   projectConfig?: ProjectConfig;
@@ -35,6 +101,8 @@ interface DashboardData {
   architectureDocs?: DocumentInfo[];
   // Research prompts
   researchPrompts?: ResearchPrompt[];
+  // Research briefs
+  researchBriefs?: ResearchBriefInfo[];
 }
 
 function getNonce(): string {
@@ -243,6 +311,22 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         case 'formatDocContent':
           this.handleFormatDocContent(message.tier, message.rawContent, message.requestId);
+          break;
+
+        case 'dismissFinding':
+          this.handleDismissFinding(message.findingId, message.justification, message.dismissedBy);
+          break;
+
+        case 'requestFindings':
+          this.postMessage({ type: 'findingsUpdate', findings: this.data.findings ?? [] });
+          break;
+
+        case 'readResearchBrief':
+          this.handleReadResearchBrief(message.briefPath);
+          break;
+
+        case 'listResearchBriefs':
+          this.handleListResearchBriefs();
           break;
       }
     });
@@ -601,6 +685,74 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       // Clean up temp files
       try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
       try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
+    }
+  }
+
+  private async handleDismissFinding(findingId: string, justification: string, dismissedBy: string): Promise<void> {
+    try {
+      // Call quality server's record_dismissal via MCP
+      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!root) return;
+
+      // Use the quality MCP port to call record_dismissal
+      const response = await fetch('http://localhost:3102/tools/call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'record_dismissal',
+          arguments: { finding_id: findingId, justification, dismissed_by: dismissedBy },
+        }),
+      });
+
+      if (response.ok) {
+        this.postMessage({ type: 'findingDismissed', findingId, success: true });
+      } else {
+        this.postMessage({ type: 'findingDismissed', findingId, success: false });
+      }
+    } catch {
+      this.postMessage({ type: 'findingDismissed', findingId, success: false });
+    }
+  }
+
+  private handleReadResearchBrief(briefPath: string): void {
+    try {
+      const content = fs.readFileSync(briefPath, 'utf-8');
+      this.postMessage({ type: 'researchBriefContent', briefPath, content });
+    } catch (err) {
+      this.postMessage({ type: 'researchBriefContent', briefPath, content: '', error: String(err) });
+    }
+  }
+
+  private handleListResearchBriefs(): void {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      this.postMessage({ type: 'researchBriefsList', briefs: [] });
+      return;
+    }
+
+    const briefsDir = path.join(root, '.avt', 'research-briefs');
+    if (!fs.existsSync(briefsDir)) {
+      this.postMessage({ type: 'researchBriefsList', briefs: [] });
+      return;
+    }
+
+    try {
+      const files = fs.readdirSync(briefsDir)
+        .filter(f => f.endsWith('.md'))
+        .map(f => {
+          const fullPath = path.join(briefsDir, f);
+          const stat = fs.statSync(fullPath);
+          return {
+            name: f,
+            path: fullPath,
+            modifiedAt: stat.mtime.toISOString(),
+          };
+        })
+        .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+
+      this.postMessage({ type: 'researchBriefsList', briefs: files });
+    } catch {
+      this.postMessage({ type: 'researchBriefsList', briefs: [] });
     }
   }
 

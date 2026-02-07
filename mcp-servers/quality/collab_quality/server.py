@@ -95,5 +95,39 @@ def record_dismissal(
     return {"recorded": recorded}
 
 
+@mcp.tool()
+def get_all_findings(status: Optional[str] = None) -> dict:
+    """Get all findings, optionally filtered by status ('open' or 'dismissed').
+
+    Returns findings from the trust engine database with their current
+    status and metadata. Use this to populate dashboard finding panels.
+
+    Args:
+        status: Optional filter - 'open' or 'dismissed'. Omit for all findings.
+
+    Returns:
+        {findings: [{id, tool, severity, component, description, created_at, status}]}
+    """
+    findings = trust_engine.get_all_findings(status=status)
+    return {"findings": findings}
+
+
+@mcp.tool()
+def get_dismissal_history(finding_id: str) -> dict:
+    """Get the dismissal audit trail for a finding.
+
+    Returns all dismissal records for a finding, ordered by most recent first.
+    Every dismissal includes who dismissed it and their justification.
+
+    Args:
+        finding_id: The finding ID to get history for.
+
+    Returns:
+        {history: [{dismissed_by, justification, dismissed_at}]}
+    """
+    history = trust_engine.get_dismissal_history(finding_id)
+    return {"history": history}
+
+
 if __name__ == "__main__":
     mcp.run(transport="sse", port=3102)
