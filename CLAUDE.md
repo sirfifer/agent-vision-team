@@ -43,9 +43,34 @@ The system uses Claude Code's Task System with governance-gated execution. Every
 - **Memory integration**: Failed approaches from the past are flagged
 - **Deterministic flow**: Review → Approve/Block → Execute (in that order, always)
 
-### Creating Governed Tasks
+### How Task Governance Works (Hook-Based Enforcement)
 
-**NEVER use TaskCreate directly.** Instead, use the governance MCP server:
+**Use TaskCreate naturally.** A PostToolUse hook automatically intercepts every TaskCreate call and adds governance. You do not need to call a special tool; governance is transparent and deterministic.
+
+When any agent calls TaskCreate, the following happens automatically:
+
+```
+Agent calls TaskCreate("Implement auth service")
+        |
+        v
+Native TaskCreate runs normally (task file created)
+        |
+        v
+PostToolUse hook fires (synchronous, ~50ms)
+        |  1. Creates review task: review-abc123
+        |  2. Adds blockedBy: [review-abc123] to impl task
+        |  3. Records governance state in SQLite
+        |  4. Queues async automated review
+        |
+        v
+Task is governed. Blocked until review completes.
+```
+
+This fires for EVERY TaskCreate call, EVERY agent, EVERY subagent. No exceptions. No opt-out. The enforcement is event-driven, not instruction-driven.
+
+### Explicit Governance (Optional)
+
+For cases where you want explicit control over review type, context, or multi-blocker setup, you can still use the governance MCP server directly:
 
 ```
 create_governed_task(
@@ -56,56 +81,7 @@ create_governed_task(
 )
 ```
 
-This atomically creates:
-1. **Review task**: `[GOVERNANCE] Review: Implement authentication service` (pending)
-2. **Implementation task**: `Implement authentication service` (blocked by review)
-
-### The Flow
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ Orchestrator: create_governed_task("Implement auth service", ...)           │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                    ┌───────────────┴───────────────┐
-                    ▼                               ▼
-        ┌───────────────────┐           ┌───────────────────┐
-        │ review-abc123     │           │ impl-xyz789       │
-        │ [GOVERNANCE]      │  blocks   │ Implement auth    │
-        │ Review: auth      │─────────▶ │ blockedBy:        │
-        │ status: pending   │           │   [review-abc123] │
-        └───────────────────┘           │ ❌ CANNOT RUN     │
-                    │                   └───────────────────┘
-                    ▼
-        ┌───────────────────────────────────────────────────┐
-        │ Governance Review (manual or automated):          │
-        │ • Check vision standards                          │
-        │ • Check memory for failed approaches              │
-        │ • Check architecture patterns                     │
-        └───────────────────────────────────────────────────┘
-                    │
-        ┌───────────┴───────────┬───────────────────┐
-        ▼                       ▼                   ▼
-    APPROVED                BLOCKED             NEEDS_SECURITY
-        │                       │                   │
-        │                       │                   ▼
-        │                       │           add_review_blocker(
-        │                       │               impl-xyz789,
-        │                       │               "security", ...
-        │                       │           )
-        │                       │                   │
-        ▼                       ▼                   ▼
-complete_task_review(       Task stays         impl-xyz789 now
-    review-abc123,          blocked with       blocked by TWO
-    "approved", ...         guidance           reviews
-)                               │
-        │                       │
-        ▼                       │
-impl-xyz789 unblocks           │
-        │                       │
-        ▼                       │
-Worker picks up task            │
-```
+This creates the same governance pair but with richer context. Both paths coexist; the hook handles the common case, and `create_governed_task()` handles cases needing explicit control.
 
 ### Adding Additional Reviews
 
@@ -351,9 +327,13 @@ Workers MUST call `submit_decision` before implementing any key choice:
 
 The tool call blocks until the review completes. The worker then acts on the verdict.
 
-### Safety Net: ExitPlanMode Hook
+### Hook-Based Enforcement Layer
 
-A `PreToolUse` hook on `ExitPlanMode` runs `scripts/hooks/verify-governance-review.sh` as a backup check. If the agent tries to present a plan without having called `submit_plan_for_review`, the hook blocks the action. This is the safety net, not the primary mechanism.
+Two hooks enforce governance deterministically:
+
+1. **PostToolUse on TaskCreate** (`scripts/hooks/governance-task-intercept.py`): The primary enforcement mechanism. Fires after every TaskCreate, creates the governance pair, and queues automated review. This is what makes "blocked from birth" universal and deterministic.
+
+2. **PreToolUse on ExitPlanMode** (`scripts/hooks/verify-governance-review.sh`): Safety net for plan presentation. Blocks agents from presenting plans without governance review. Checks `.avt/governance.db` for plan review records.
 
 ### Internal Review Flow
 

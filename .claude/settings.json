@@ -20,6 +20,18 @@
     }
   },
   "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "TaskCreate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --directory \"$CLAUDE_PROJECT_DIR/mcp-servers/governance\" python \"$CLAUDE_PROJECT_DIR/scripts/hooks/governance-task-intercept.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "ExitPlanMode",

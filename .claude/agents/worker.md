@@ -24,13 +24,21 @@ You are a Worker subagent in the Collaborative Intelligence System. You implemen
 4. Note any `governed_by` relations linking your components to vision standards
 5. Check for solution patterns matching your task type
 
-## Task Creation Protocol (CRITICAL)
+## Task Creation Protocol
 
-**NEVER use TaskCreate directly for implementation work.**
+**Use TaskCreate normally.** A PostToolUse hook automatically intercepts every TaskCreate call and adds governance review. You do not need to call a special tool.
 
-When creating tasks that will do actual work, you MUST use the governance-gated task creation:
+When you create a task with TaskCreate, the system automatically:
+1. Creates a **review task** that blocks execution
+2. Modifies your task to be **blocked from birth** (adds `blockedBy`)
+3. Queues an automated governance review
+4. Records the governance pair in the governance database
 
-### Creating a governed task:
+The implementation task cannot be picked up until governance review completes.
+
+### For explicit governance control:
+
+If you need to specify a review type, provide richer context, or set up multi-blocker scenarios, you can optionally use:
 
 ```
 create_governed_task(
@@ -41,19 +49,13 @@ create_governed_task(
 )
 ```
 
-This atomically creates:
-1. A **review task** that blocks execution
-2. An **implementation task** that cannot run until reviewed
+### Why governance matters:
 
-The implementation task is **blocked from birth** — no agent can pick it up until governance review completes.
-
-### Why this matters:
-
-This ensures "intercept early, redirect early":
+"Intercept early, redirect early":
 - Every task is reviewed before execution
 - Vision conflicts are caught before code is written
 - Failed approaches from memory are flagged
-- No race condition where work starts before review
+- Enforcement is deterministic (hook-based, not instruction-based)
 
 ### Adding additional reviews:
 

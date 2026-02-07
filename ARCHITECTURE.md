@@ -38,7 +38,7 @@ The system runs entirely locally on a developer's machine. There are no cloud se
 | **Quality MCP Server** | Deterministic quality verification with trust engine (port 3102, 8 tools) |
 | **Governance MCP Server** | Transactional review checkpoints and governed task lifecycle (port 3103, 10 tools) |
 | **6 Custom Subagents** | Worker, Quality Reviewer, KG Librarian, Governance Reviewer, Researcher, Project Steward |
-| **Governance Architecture** | Transactional decision review, governed tasks (blocked-from-birth), multi-blocker support, AI-powered review via `claude --print` |
+| **Governance Architecture** | PostToolUse hook on TaskCreate (core enforcement), governed tasks (blocked-from-birth), transactional decision review, multi-blocker support, AI-powered review via `claude --print` |
 | **Three-Tier Protection Hierarchy** | Vision > Architecture > Quality — lower tiers cannot modify higher tiers |
 | **Project Rules System** | Behavioral guidelines (enforce/prefer) injected into agent prompts from `.avt/project-config.json` |
 | **E2E Testing Harness** | 11 scenarios, 172+ structural assertions, parallel execution with full isolation |
@@ -333,30 +333,35 @@ Orchestrator
 
 #### Governance-Gated Pattern
 
-Used for all implementation work. This is the primary workflow:
+Used for all implementation work. This is the primary workflow. Tasks are automatically governed by the PostToolUse hook on `TaskCreate` (Section 3.3):
 
 ```
-1. Orchestrator calls create_governed_task() via Governance MCP
+1. Orchestrator creates a task via TaskCreate or create_governed_task()
    │
-   ├─→ Review Task (review-abc123)       Implementation Task (impl-xyz789)
+   │  If TaskCreate: PostToolUse hook fires automatically
+   │  If create_governed_task(): MCP server handles governance directly
+   │
+   │  Either way, the result is the same:
+   │
+   ├─→ Review Task (review-abc123)       Implementation Task (1.json)
    │   status: pending                    status: pending
-   │   blocks: [impl-xyz789]             blockedBy: [review-abc123]
+   │   blocks: [1]                        blockedBy: [review-abc123]
    │                                      CANNOT EXECUTE
    │
-2. Governance review runs
+2. Governance review runs (async, queued by the hook)
    │  (Governance Server invokes governance-reviewer via claude --print)
    │  Loads vision standards from KG, checks alignment, produces verdict
    │
 3. On approval: complete_task_review(review-abc123, verdict="approved")
-   │  Removes review-abc123 from impl-xyz789.blockedBy
-   │  impl-xyz789 now executable
+   │  Removes review-abc123 from implementation task's blockedBy
+   │  Implementation task now executable
    │
-4. Orchestrator spawns Worker with impl-xyz789
+4. Orchestrator spawns Worker with the task
    │
    Worker lifecycle:
-   │  a. Check get_task_review_status() — confirm unblocked
+   │  a. Check get_task_review_status() -- confirm unblocked
    │  b. Read task brief, query KG for context
-   │  c. For each key decision: submit_decision() → blocks until verdict
+   │  c. For each key decision: submit_decision() -- blocks until verdict
    │     - pattern_choice, component_design, api_design: standard review
    │     - deviation, scope_change: auto-flagged as needs_human_review
    │  d. Implement within scope
@@ -374,49 +379,95 @@ Used for all implementation work. This is the primary workflow:
 If a governance review identifies the need for additional scrutiny:
 
 ```
-add_review_blocker(impl-xyz789, "security", "Auth handling requires security review")
+add_review_blocker(implementation_task_id, "security", "Auth handling requires security review")
    │
    ├─→ New Review Task (review-security-def456)
-   │   blocks: [impl-xyz789]
+   │   blocks: [implementation_task_id]
    │
-   └─→ impl-xyz789.blockedBy: [review-abc123, review-security-def456]
+   └─→ Implementation task blockedBy: [review-abc123, review-security-def456]
        BOTH must complete with "approved" before task can execute
 ```
 
 ### 3.3 Lifecycle Hooks
 
-Hooks are configured in `.claude/settings.json` and execute shell scripts at specific points in the Claude Code lifecycle.
+Hooks are configured in `.claude/settings.json` and execute shell scripts at specific points in the Claude Code lifecycle. Hooks are the **primary enforcement mechanism** for governance in this system, not a secondary safety net.
 
 #### Current Hooks
 
 | Hook Type | Matcher | Script | Purpose |
 |-----------|---------|--------|---------|
+| `PostToolUse` | `TaskCreate` | `scripts/hooks/governance-task-intercept.py` | **Core enforcement**: intercepts every task creation and pairs it with a governance review blocker |
 | `PreToolUse` | `ExitPlanMode` | `scripts/hooks/verify-governance-review.sh` | Safety net: blocks plan presentation if `submit_plan_for_review` was not called |
 
-#### ExitPlanMode Hook Detail
+#### PostToolUse Hook on TaskCreate (Core Enforcement)
 
-This hook is the **safety net**, not the primary governance mechanism. The primary mechanism is the transactional `submit_plan_for_review()` tool call that agents make directly.
+This is the **architectural cornerstone** of the governance system. Every call to `TaskCreate`, by any agent at any level of the hierarchy, is intercepted by this hook. The hook creates a governance review task that blocks the implementation task from execution. This is how the "blocked from birth" invariant is enforced structurally, not by convention or documentation.
+
+**How it works:**
+
+```
+Agent calls TaskCreate("Implement auth service")
+    |
+    v
+Claude Code creates task file (1.json) in ~/.claude/tasks/<list-id>/
+    |
+    v
+PostToolUse hook fires -> governance-task-intercept.py
+    |
+    v
+Hook discovers the new task's ID by scanning the task directory
+    |
+    v
+Hook creates review-{uuid}.json with blocks: ["1"]
+Hook adds blockedBy: ["review-{uuid}"] to 1.json
+Hook stores governance records in .avt/governance.db
+Hook queues async AI review via _run-governance-review.sh
+    |
+    v
+Hook returns additionalContext to Claude:
+    "GOVERNANCE: Task 'Implement auth service' has been automatically
+     paired with governance review review-abc123."
+    |
+    v
+Agent receives the context and continues working
+```
+
+**Why this approach is essential:**
+
+- **100% interception**: The hook fires on every `TaskCreate` call, regardless of which agent made it or whether the agent followed governance instructions. There is no way to create an ungoverned task.
+- **Subagent inheritance**: Subagents spawned via the Task tool inherit PostToolUse hooks from the parent session. This has been empirically verified: a subagent's `TaskCreate` calls fire the same hook as the parent's. Full coverage across the entire agent hierarchy is guaranteed.
+- **No protocol dependency**: Unlike the MCP-based `create_governed_task()` approach (which requires agents to call the right tool), the hook works even if an agent uses native `TaskCreate` directly. Governance is enforced by the platform, not by agent compliance.
+- **Transparent to agents**: Agents use `TaskCreate` normally. They do not need special instructions or awareness of governance. The hook adds governance transparently.
+
+**Key discovery: `TaskCreate` returns an empty `tool_result`**. The hook cannot extract the task ID from the tool's return value. Instead, it discovers the task by scanning the task directory for a subject match immediately after creation (`_discover_task_id()`). This is reliable because the hook fires synchronously after the task file is written.
+
+**Environment requirements** (both must be set):
+
+```bash
+export CLAUDE_CODE_ENABLE_TASKS="true"      # Enables TaskCreate (replaces legacy TodoWrite)
+export CLAUDE_CODE_TASK_LIST_ID="<name>"     # Enables cross-session persistence
+```
+
+Without `CLAUDE_CODE_ENABLE_TASKS="true"`, the native task tools (`TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet`) are not available. Claude Code falls back to the legacy `TodoWrite` tool, which is in-memory only, has no dependency tracking, and cannot be hooked for governance. Setting this variable replaces `TodoWrite` entirely with the native task system.
+
+**Verified in live testing** (2026-02-07):
+- Level 1 (mock review): 12/12 tasks intercepted, 100% rate
+- Level 2 (real AI review): 10/10 tasks intercepted, reviews approved/blocked correctly
+- Level 3 (subagent delegation): 13/13 tasks intercepted (10 main + 3 subagent)
+- E2E: 13 scenarios, 221 assertions, no regression
+
+#### ExitPlanMode Hook (Safety Net)
+
+This hook is the **safety net** for plan review, not the primary governance mechanism. The primary plan review enforcement is the worker protocol itself; this hook catches cases where an agent skips or forgets the governance checkpoint.
 
 ```bash
 # scripts/hooks/verify-governance-review.sh
 # Checks governance SQLite DB for plan review records.
 # Exit 0 = allow (review found or DB unavailable)
 # Exit 2 = block with feedback JSON (no review found)
-
-DB_PATH="${CLAUDE_PROJECT_DIR:-.}/.avt/governance.db"
-PLAN_REVIEWS=$(sqlite3 "$DB_PATH" \
-  "SELECT COUNT(*) FROM reviews WHERE plan_id IS NOT NULL;" 2>/dev/null || echo "0")
-
-if [ "$PLAN_REVIEWS" -gt 0 ]; then
-  exit 0  # Review exists — allow
-else
-  # Output JSON feedback and block
-  echo '{"additionalContext": "GOVERNANCE REVIEW REQUIRED: ..."}'
-  exit 2
-fi
 ```
 
-The hook catches the case where an agent forgets to call `submit_plan_for_review()` — it cannot proceed past `ExitPlanMode` without at least one plan review on record.
+The hook blocks `ExitPlanMode` if no plan review records exist in the governance database. If the database does not exist (server not running), the hook allows the action to avoid blocking development when governance is intentionally disabled.
 
 ### 3.4 Worktree Management
 
@@ -1523,7 +1574,7 @@ tools:
 | | 3. Query KG for vision standards | `get_entities_by_tier("vision")` to load all vision constraints |
 | | 4. Query KG for patterns | `search_nodes("<component>")` to find architectural patterns and past solutions |
 | | 5. Note governed relations | Check `governed_by` relations linking components to vision standards |
-| **Task Creation** | 6. Create governed tasks | Call `create_governed_task()` on Governance server. NEVER use `TaskCreate` directly. |
+| **Task Creation** | 6. Create governed tasks | Use `TaskCreate` or `create_governed_task()`. The PostToolUse hook ensures governance regardless of which is used (Section 3.3). |
 | | 7. Verify task unblocked | Call `get_task_review_status()` to confirm approval before starting work |
 | **During Work** | 8. Submit decisions | Call `submit_decision()` for every key choice (pattern_choice, component_design, api_design, deviation, scope_change). **This call blocks until verdict returns.** |
 | | 9. Act on verdicts | `approved`: proceed. `blocked`: revise and resubmit. `needs_human_review`: include context and wait. |
@@ -1826,7 +1877,7 @@ tools:
 
 Every implementation task is blocked from birth until governance review approves it. This is the central invariant of the governance system. There are no race conditions where work could start before review, no optimistic execution paths, and no fire-and-forget review requests.
 
-The design principle is deterministic ordering: **Review -> Approve/Block -> Execute**. This order is enforced structurally through task dependency graphs, not through convention or documentation.
+The design principle is deterministic ordering: **Review -> Approve/Block -> Execute**. This order is enforced structurally through the PostToolUse hook on `TaskCreate` (Section 3.3), which intercepts every task creation and pairs it with a governance blocker. There is no way for any agent, at any level of the hierarchy, to create an ungoverned task.
 
 Why this matters:
 - **Vision conflicts are caught before code is written**, not during code review
@@ -1836,57 +1887,76 @@ Why this matters:
 
 ### 8.2 Governed Task Lifecycle
 
-The `create_governed_task()` tool atomically creates two tasks in the Claude Code native Task system:
+The "blocked from birth" invariant is enforced by two complementary mechanisms:
 
-1. **Review Task** (status: pending) -- blocks the implementation task
-2. **Implementation Task** (status: pending, blockedBy: [review task]) -- CANNOT execute until review passes
+1. **PostToolUse hook on `TaskCreate`** (primary, automatic): Every `TaskCreate` call triggers the hook at `scripts/hooks/governance-task-intercept.py`, which creates a governance review blocker. This is the **core enforcement mechanism** -- it works regardless of which agent created the task or whether the agent was following governance instructions. See Section 3.3 for the detailed hook flow.
+
+2. **`create_governed_task()` MCP tool** (explicit, protocol-based): Agents can also create governed tasks directly through the Governance MCP server. This provides a richer API (review type selection, structured context) and creates governance DB records in a single atomic call.
+
+Both mechanisms produce the same result: a review task that blocks an implementation task.
 
 ```
-create_governed_task("Implement auth service", review_type="governance")
-    |
-    +-------------------------------------+------------------------------------------+
-    v                                     v                                          |
-+------------------------------+  +--------------------------------------+           |
-| Review Task (review-abc123)  |  | Implementation Task (impl-xyz789)    |           |
-|                              |  |                                      |           |
-| subject: [GOVERNANCE]        |  | subject: Implement auth service      |           |
-|   Review: Implement auth     |  | status: pending                      |           |
-|   service                    |  | blockedBy: [review-abc123]           |           |
-| status: pending              |  |                                      |           |
-| blocks: [impl-xyz789]        |  | XX CANNOT EXECUTE                    |           |
-+------------------------------+  +--------------------------------------+           |
-              |                                                                      |
-              v                                                                      |
-+---------------------------------------------------------------------+              |
-| Governance Review Executes:                                         |              |
-|   - Load vision standards from KG                                   |              |
-|   - Load architecture patterns from KG                              |              |
-|   - Check memory for failed approaches                              |              |
-|   - AI review via governance-reviewer (claude --print)              |              |
-+---------------------------------------------------------------------+              |
-              |                                                                      |
-   +----------+-------------------+                                                  |
-   v          v                   v                                                  |
-APPROVED    BLOCKED          NEEDS_HUMAN_REVIEW                                      |
-   |          |                   |                                                  |
-   |          |                   v                                                  |
-   |          |          Human must resolve.                                          |
-   |          |          Task stays blocked.                                          |
-   |          |                                                                      |
-   |          v                                                                      |
-   |   Task stays blocked                                                            |
-   |   with guidance. Agent                                                          |
-   |   must revise approach.                                                         |
-   |                                                                                 |
-   v                                                                                 |
-complete_task_review(review-abc123, "approved", ...)                                  |
-   |                                                                                 |
-   v                                                                                 |
-review-abc123 blockedBy removed from impl-xyz789                                     |
-   |                                                                                 |
-   v                                                                                 |
-If no remaining blockers -> impl-xyz789 is AVAILABLE for execution ------------------+
+                      TWO PATHS TO THE SAME INVARIANT
+
+Path A (Automatic - PostToolUse Hook):         Path B (Explicit - MCP Tool):
+
+Agent calls TaskCreate("Implement auth")       Agent calls create_governed_task(
+    |                                              subject: "Implement auth",
+    v                                              review_type: "governance")
+Claude Code writes task file (1.json)              |
+    |                                              v
+    v                                          Governance Server creates both tasks
+PostToolUse hook fires automatically               |
+    |                                              |
+    v                                              |
+Hook creates review-{uuid}.json                   |
+Hook adds blockedBy to 1.json                     |
+Hook stores records in governance.db               |
+    |                                              |
+    v                                              v
++------------------------------+  +--------------------------------------+
+| Review Task (review-abc123)  |  | Implementation Task (1 or impl-xyz) |
+|                              |  |                                      |
+| subject: [GOVERNANCE]        |  | subject: Implement auth service      |
+|   Review: Implement auth     |  | status: pending                      |
+|   service                    |  | blockedBy: [review-abc123]           |
+| status: pending              |  |                                      |
+| blocks: [1 or impl-xyz]     |  | XX CANNOT EXECUTE                    |
++------------------------------+  +--------------------------------------+
+              |
+              v
++---------------------------------------------------------------------+
+| Governance Review Executes:                                         |
+|   - Load vision standards from KG                                   |
+|   - Load architecture patterns from KG                              |
+|   - Check memory for failed approaches                              |
+|   - AI review via governance-reviewer (claude --print)              |
++---------------------------------------------------------------------+
+              |
+   +----------+-------------------+
+   v          v                   v
+APPROVED    BLOCKED          NEEDS_HUMAN_REVIEW
+   |          |                   |
+   |          |                   v
+   |          |          Human must resolve.
+   |          |          Task stays blocked.
+   |          |
+   |          v
+   |   Task stays blocked
+   |   with guidance. Agent
+   |   must revise approach.
+   |
+   v
+complete_task_review(review-abc123, "approved", ...)
+   |
+   v
+review-abc123 removed from implementation task's blockedBy
+   |
+   v
+If no remaining blockers -> implementation task is AVAILABLE for execution
 ```
+
+**Why the hook is the primary mechanism**: The `create_governed_task()` MCP tool requires agents to call the right tool. If an agent uses native `TaskCreate` directly (whether by mistake, because it was not instructed, or because it is a subagent without governance MCP access), the MCP tool cannot intercept it. The PostToolUse hook has no such gap: it fires on every `TaskCreate` call at every level of the agent hierarchy, including subagents. In practice, use `create_governed_task()` when you want the richer API and structured context; rely on the hook to guarantee that nothing slips through.
 
 **Stacking Additional Reviews**:
 
@@ -1918,7 +1988,9 @@ impl-xyz789
                   blockedBy: [] -> TASK AVAILABLE
 ```
 
-**Implementation**: The `create_governed_task_pair()` function in `mcp-servers/governance/collab_governance/task_integration.py` handles atomic creation. Review tasks are always written to disk before implementation tasks, ensuring the blocker reference is valid at creation time. File-level locking via `fcntl.flock()` prevents concurrent modification.
+**Implementation**: Two code paths create governed task pairs:
+- **PostToolUse hook** (`scripts/hooks/governance-task-intercept.py`): Discovers the newly created task by subject match (`_discover_task_id()`), creates a `review-{uuid}.json` file, and modifies the implementation task to add `blockedBy`. Stores governance records in `governance.db`.
+- **MCP tool** (`create_governed_task_pair()` in `task_integration.py`): Atomically creates both task files with `blockedBy`/`blocks` relationships. Review tasks are written before implementation tasks, ensuring the blocker reference is valid at creation time. File-level locking via `fcntl.flock()` prevents concurrent modification.
 
 ### 8.3 Transactional Decision Review
 
@@ -2008,7 +2080,7 @@ The Knowledge Graph enforces a protection hierarchy via `protection_tier` metada
 
 ### 8.5 Safety Net: ExitPlanMode Hook
 
-A `PreToolUse` hook on `ExitPlanMode` provides a backup enforcement mechanism. The hook script at `scripts/hooks/verify-governance-review.sh` runs before any agent can present a plan to the human.
+While the PostToolUse hook on `TaskCreate` (Section 3.3, Section 8.2) is the **primary** governance enforcement mechanism, a `PreToolUse` hook on `ExitPlanMode` provides a **secondary safety net** for plan review. The hook script at `scripts/hooks/verify-governance-review.sh` runs before any agent can present a plan to the human.
 
 **How It Works**:
 
@@ -2035,9 +2107,18 @@ Script checks .avt/governance.db for plan review records
 
 ### 8.6 Task List + Governance Layering
 
-The system separates concerns into two distinct layers that compose cleanly:
+The system separates concerns into three distinct layers that compose cleanly:
 
 ```
++---------------------------------------------------------------+
+|                    ENFORCEMENT LAYER                            |
+|                                                                |
+|  PostToolUse hook on TaskCreate (Section 3.3)                  |
+|  Guarantees: every task is governed, no exceptions              |
+|  100% interception, subagent inheritance, transparent           |
+|                                                                |
+|  Script: scripts/hooks/governance-task-intercept.py            |
+|  Config: .claude/settings.json (PostToolUse matcher)           |
 +---------------------------------------------------------------+
 |                      GOVERNANCE LAYER                          |
 |                                                                |
@@ -2064,17 +2145,20 @@ The system separates concerns into two distinct layers that compose cleanly:
 +---------------------------------------------------------------+
 |                     SHARED NAMESPACE                            |
 |                                                                |
+|  CLAUDE_CODE_ENABLE_TASKS="true"                               |
 |  CLAUDE_CODE_TASK_LIST_ID="agent-vision-team"                  |
-|  Ensures tasks persist across sessions and are shared          |
-|  across all agents in the project                              |
+|  Both required: first enables TaskCreate, second ensures       |
+|  cross-session persistence and shared visibility               |
 +---------------------------------------------------------------+
 ```
 
-**Why Two Layers**:
+**Why Three Layers**:
 
 | Concern | Layer | Rationale |
 |---------|-------|-----------|
-| Task persistence | Infrastructure | Claude Code's native Task system already handles JSON file storage, session persistence, and cross-agent visibility |
+| Universal interception | Enforcement | The PostToolUse hook guarantees governance coverage regardless of which tool or agent created the task |
+| Subagent coverage | Enforcement | Hook inheritance means subagents cannot bypass governance, even without MCP access |
+| Task persistence | Infrastructure | Claude Code's native Task system handles JSON file storage, session persistence, and cross-agent visibility |
 | DAG dependencies (blockedBy/blocks) | Infrastructure | The native Task system provides dependency graph semantics out of the box |
 | File locking | Infrastructure | `task_integration.py` uses `fcntl.flock()` for concurrent-safe reads and writes to task files |
 | Review policy | Governance | Whether a task should proceed is a policy question independent of how tasks are stored |
@@ -2084,11 +2168,13 @@ The system separates concerns into two distinct layers that compose cleanly:
 
 **How They Compose**:
 
-1. `create_governed_task()` creates tasks in the **native Task List** (infrastructure) with `blockedBy` relationships pointing to review tasks. Simultaneously, it creates governance records in `governance.db` (policy).
+1. An agent calls `TaskCreate` (directly or via `create_governed_task()`). The **Infrastructure Layer** writes the task file.
 
-2. `complete_task_review()` removes blockers in the **native Task system** (via `release_task()` in `task_integration.py`) when reviews pass. Simultaneously, it updates review records in `governance.db` with verdicts, findings, and guidance.
+2. The **Enforcement Layer** (PostToolUse hook) fires immediately, discovers the new task, creates a review blocker, and stores governance records. This happens automatically on every `TaskCreate`, whether or not the agent used the governance MCP tool.
 
-3. `get_task_review_status()` reads from **both layers**: file-system task state (is the task blocked? how many blockers?) and governance database records (what type of review? what was the verdict?).
+3. `complete_task_review()` removes blockers in the **Infrastructure Layer** (via `release_task()` in `task_integration.py`) when reviews pass. Simultaneously, it updates review records in the **Governance Layer** (`governance.db`) with verdicts, findings, and guidance.
+
+4. `get_task_review_status()` reads from **both the Infrastructure and Governance layers**: file-system task state (is the task blocked? how many blockers?) and governance database records (what type of review? what was the verdict?).
 
 **The `task_integration.py` Bridge**:
 
@@ -2101,7 +2187,7 @@ The `TaskFileManager` class in `mcp-servers/governance/collab_governance/task_in
 | `release_task()` | Complete review task file, remove blocker from impl task file | N/A (called by `complete_task_review` which handles governance DB) |
 | `get_task_governance_status()` | Read task file, enumerate blockers and their statuses | N/A (called by `get_task_review_status` which merges governance DB data) |
 
-**Strategic Value**: This two-layer separation keeps governance independent of the transport mechanism. If Claude Code's Task system changes its file format, only `task_integration.py` needs to adapt. The governance policy logic, standards verification, and review workflows remain unchanged. Conversely, governance rules can evolve (new review types, different verdict logic, additional checks) without touching the task infrastructure.
+**Strategic Value**: This three-layer separation keeps each concern independent. The Enforcement Layer (PostToolUse hook) guarantees coverage without depending on agent behavior. The Governance Layer can evolve its review policies (new review types, different verdict logic, additional checks) without touching task infrastructure. The Infrastructure Layer can adapt to Claude Code Task system changes (file format, storage location) by modifying only `task_integration.py` and the hook's discovery logic. Each layer can be tested, updated, and reasoned about independently.
 
 ## 9. CLAUDE.md Orchestration
 
@@ -2123,7 +2209,9 @@ When given a complex task, the orchestrator:
 
 The system follows an "Intercept Early, Redirect Early" principle. Every implementation task is **blocked from birth** until governance review approves it.
 
-**Key rule**: Never use `TaskCreate` directly. Instead, use the Governance MCP server:
+**Key design**: Agents use `TaskCreate` normally. The PostToolUse hook on `TaskCreate` (Section 3.3) automatically intercepts every task creation and pairs it with a governance review blocker. Governance is enforced by the platform, not by agent compliance.
+
+For richer governance metadata (review type selection, structured context), agents can also use the Governance MCP server's `create_governed_task()` tool:
 
 ```
 create_governed_task(
@@ -2134,18 +2222,18 @@ create_governed_task(
 )
 ```
 
-This atomically creates two linked tasks:
-1. A **review task** (`[GOVERNANCE] Review: ...`) with `status: pending`
-2. An **implementation task** (`Implement ...`) with `blockedBy: [review-task-id]`
+Both paths produce the same result: a review task that blocks the implementation task. The PostToolUse hook guarantees that even a plain `TaskCreate("Implement auth service")` call gets governed.
 
-The flow is strictly sequential:
+The flow is strictly sequential regardless of which path is used:
 
 ```
-create_governed_task() --> Review task (pending) blocks Implementation task
-                       --> Governance review runs
-                       --> complete_task_review(verdict: "approved" | "blocked")
-                       --> If approved and last blocker: Implementation task unblocks
-                       --> Worker picks up task
+TaskCreate or create_governed_task()
+    --> PostToolUse hook creates governance pair (if TaskCreate used directly)
+    --> Review task (pending) blocks Implementation task
+    --> Governance review runs (automated or manual)
+    --> complete_task_review(verdict: "approved" | "blocked")
+    --> If approved and last blocker: Implementation task unblocks
+    --> Worker picks up task
 ```
 
 Additional blockers can be stacked via `add_review_blocker()` (e.g., security review on top of governance review). All blockers must complete before the task becomes available.
@@ -2419,7 +2507,7 @@ agent-vision-team/
 │   │   └── project-overview.md              # Slash command definition
 │   ├── skills/
 │   │   └── e2e.md                           # /e2e skill definition
-│   ├── settings.json                        # Claude Code hooks and config
+│   ├── settings.json                        # Hooks (PostToolUse on TaskCreate, PreToolUse on ExitPlanMode), MCP servers, model routing
 │   └── settings.local.json                  # Permission allowlist (synced by wizard)
 │
 ├── .avt/                                    # Agent Vision Team system config
@@ -2747,44 +2835,51 @@ This section traces end-to-end data paths through the system for key workflows. 
 
 ### 12.1 Task Execution Flow
 
-The governed task lifecycle is the core execution primitive. Every implementation task is "blocked from birth" -- it cannot execute until all governance reviews approve it.
+The governed task lifecycle is the core execution primitive. Every implementation task is "blocked from birth" -- it cannot execute until all governance reviews approve it. Two code paths create governance pairs (see Section 8.2):
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  Orchestrator                                                            │
-│  calls: create_governed_task(subject, description, context, review_type) │
-└──────────────────────────┬───────────────────────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│  Governance Server (server.py → create_governed_task tool)               │
-│                                                                          │
-│  1. GovernanceStore.record_governed_task(task_id, review_type, context)  │
-│     → INSERT into governed_tasks table (SQLite)                          │
-│                                                                          │
-│  2. TaskFileManager.create_governed_task_pair(subject, description, ...) │
-│     → Acquires fcntl.LOCK_EX on .task-lock file                         │
-│     → Writes review task JSON: {id: "review-{uuid}", status: "pending"} │
-│     → Writes impl task JSON:   {id: "impl-{uuid}",                      │
-│     │                            status: "blocked",                      │
-│     │                            blockedBy: ["review-{uuid}"]}           │
-│     → Releases lock                                                      │
-│                                                                          │
-│  3. GovernanceStore.record_task_review(review_id, impl_id, review_type) │
-│     → INSERT into task_reviews table                                     │
-│                                                                          │
-│  Returns: {review_task_id, implementation_task_id}                       │
-└──────────────────────────┬───────────────────────────────────────────────┘
-                           │
-          ┌────────────────┴────────────────┐
-          ▼                                 ▼
-┌──────────────────┐             ┌──────────────────────┐
-│ review-{uuid}    │   blocks    │ impl-{uuid}          │
-│ status: pending  │────────────▶│ status: blocked      │
-│ type: governance │             │ blockedBy:           │
-└────────┬─────────┘             │  ["review-{uuid}"]   │
-         │                       │ CANNOT EXECUTE       │
-         ▼                       └──────────────────────┘
+PATH A: PostToolUse Hook (Primary - Automatic)     PATH B: MCP Tool (Explicit)
+─────────────────────────────────────────────       ────────────────────────────
+
+Agent calls TaskCreate("Implement X")               Agent calls create_governed_task(
+    │                                                    subject, description,
+    ▼                                                    context, review_type)
+Claude Code writes task file (e.g. 1.json)               │
+    │                                                    ▼
+    ▼                                               Governance Server (server.py)
+PostToolUse hook fires →                                 │
+governance-task-intercept.py                             │
+    │                                                    │
+    ├─ _discover_task_id(): scan task dir               ├─ GovernanceStore.record_governed_task()
+    │  for subject match → finds "1"                    │  → INSERT into governed_tasks (SQLite)
+    │                                                    │
+    ├─ Create review-{uuid}.json                        ├─ TaskFileManager.create_governed_task_pair()
+    │  with blocks: ["1"]                               │  → fcntl.LOCK_EX → write review + impl
+    │                                                    │  task files → release lock
+    ├─ Modify 1.json to add                             │
+    │  blockedBy: ["review-{uuid}"]                     ├─ GovernanceStore.record_task_review()
+    │                                                    │  → INSERT into task_reviews
+    ├─ GovernanceStore: INSERT records                   │
+    │                                                    │
+    ├─ Queue async review via                            │
+    │  _run-governance-review.sh                         │
+    │                                                    │
+    └─ Return additionalContext                         └─ Return {review_task_id,
+       to agent                                              implementation_task_id}
+          │                                                    │
+          └──────────────────┬─────────────────────────────────┘
+                             ▼
+          ┌────────────────────────────────────┐
+          │  RESULT (same for both paths):      │
+          │                                     │
+          │  review-{uuid}     blocks    1.json │
+          │  status: pending ──────────▶ status: │
+          │  type: governance            blocked │
+          │                     blockedBy:       │
+          │                      [review-{uuid}] │
+          │                     CANNOT EXECUTE   │
+          └─────────────┬──────────────────────┘
+                        ▼
 ┌──────────────────────────────────────────────────────┐
 │  Governance Reviewer (manual or automated)            │
 │                                                       │
@@ -2806,7 +2901,7 @@ The governed task lifecycle is the core execution primitive. Every implementatio
                            │
                            ▼ (on approval, all blockers cleared)
 ┌──────────────────────────────────────────────────────┐
-│ impl-{uuid}                                           │
+│ Implementation task                                    │
 │ status: pending  (now available for worker pickup)    │
 │ blockedBy: []                                         │
 │ CAN EXECUTE                                          │
@@ -2814,7 +2909,8 @@ The governed task lifecycle is the core execution primitive. Every implementatio
 ```
 
 **Key code paths:**
-- `server.py`: `create_governed_task` tool handler orchestrates store + file manager
+- `governance-task-intercept.py` (PostToolUse hook): `_discover_task_id()` scans task dir, creates review file, modifies impl file, stores DB records, queues async review
+- `server.py`: `create_governed_task` tool handler orchestrates store + file manager (MCP path)
 - `task_integration.py`: `TaskFileManager.create_governed_task_pair()` uses `fcntl.LOCK_EX` for atomicity
 - `task_integration.py`: `TaskFileManager.release_task()` conditionally unblocks
 - `store.py`: `GovernanceStore` persists to SQLite tables `governed_tasks` and `task_reviews`
@@ -3789,11 +3885,12 @@ Claude Code provides the execution environment for the entire system. The follow
 |---------|--------|----------|
 | Custom subagents | **Active** | 6 agents defined in `.claude/agents/`: worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward |
 | MCP servers (SSE) | **Active** | 3 servers registered in `.claude/settings.json`: collab-kg (port 3101), collab-quality (port 3102), collab-governance (port 3103) |
-| PreToolUse hooks | **Active** | `ExitPlanMode` hook runs `scripts/hooks/verify-governance-review.sh` to enforce governance review before plan presentation |
+| PostToolUse hooks | **Active** | `TaskCreate` hook runs `scripts/hooks/governance-task-intercept.py` to enforce "blocked from birth" invariant on every task creation (core enforcement mechanism) |
+| PreToolUse hooks | **Active** | `ExitPlanMode` hook runs `scripts/hooks/verify-governance-review.sh` as safety net for plan review |
 | Model routing | **Active** | Per-agent model assignment in `.claude/settings.json` agents block: Opus for worker/quality-reviewer, Sonnet (default) for kg-librarian/governance-reviewer |
 | Skills | **Active** | `/e2e` skill for E2E test harness execution |
 | Commands | **Active** | `/project-overview` command for project context |
-| Task List (native) | **Active** | `CLAUDE_CODE_TASK_LIST_ID` for cross-session task persistence; governed task system writes to native task files |
+| Task List (native) | **Active** | `CLAUDE_CODE_ENABLE_TASKS=true` + `CLAUDE_CODE_TASK_LIST_ID` for native task system with cross-session persistence; PostToolUse hook writes governance pairs to native task files |
 | Git worktrees | **Active** | Worker isolation via `git worktree add ../project-worker-N -b task/NNN-description` |
 | MCP Tool Search | **Planned (immediate)** | 85% context reduction for MCP tool loading. Config-only change: set `ENABLE_TOOL_SEARCH=auto:5`. Requires Sonnet 4+ or Opus 4+ (not Haiku) |
 | Effort controls | **Planned (immediate)** | Per-agent effort levels: max for worker/quality-reviewer, medium for kg-librarian, low for project-steward. Config change in agent definitions |
@@ -3822,7 +3919,7 @@ This section replaces the v1 "Implementation Phases" checklist, which listed unc
 | Governance Reviewer Agent | **Operational** | AI review called internally by governance server via `claude --print`. Reviews decisions and plans through vision alignment and architectural conformance lenses. Model: Sonnet. 4 tools |
 | Researcher Agent | **Operational** | Dual-mode research: periodic/maintenance (dependency monitoring, breaking change detection) and exploratory/design (technology evaluation, architectural decisions). Model: Opus. 7 tools |
 | Project Steward Agent | **Operational** | Project hygiene: naming conventions, folder organization, documentation completeness, cruft detection. Periodic cadence: weekly/monthly/quarterly. Model: Sonnet. 7 tools |
-| VS Code Extension | **Operational** | Dashboard webview, 9-step setup wizard, 10-step workflow tutorial, 6-step VS Code walkthrough, governance panel, research prompts panel, 3 MCP clients (KG, Quality, Governance), 4 TreeViews, 12 commands |
+| VS Code Extension | **Operational** | Dashboard webview, 9-step setup wizard, 10-step workflow tutorial, 6-step VS Code walkthrough, governance panel, research prompts panel, 3 MCP clients (KG, Quality, Governance), 4 TreeViews, 15 commands (12 user-facing, 3 internal) |
 | E2E Test Harness | **Operational** | 11 scenarios (s01-s10, s12), 172+ structural domain-agnostic assertions, parallel execution with full isolation, random domain generation from 8 templates, mock review mode |
 | CLAUDE.md Orchestration | **Operational** | All protocols documented: task decomposition, governance checkpoints, quality review, memory curation, research, project hygiene, drift detection |
 
@@ -3830,7 +3927,7 @@ This section replaces the v1 "Implementation Phases" checklist, which listed unc
 
 These are known deficiencies in the current implementation. They do not block operation but represent incomplete or inconsistent areas.
 
-**Quality server gate stubs.** The `auto_format`, `run_lint`, `run_tests`, and `check_coverage` tools make real subprocess calls (ruff, prettier, eslint, pytest) and return actual results. However, the **build gate** and **findings gate** within `check_all_gates()` are stubs — the build gate always returns `passed: true` with "Build check not yet implemented" and the findings gate always returns `passed: true` with "No critical findings." These need to be connected to actual build commands and the trust engine's finding store respectively. The trust engine itself (SQLite-backed finding management, dismissal audit trail) is fully functional.
+**Quality server gates fully connected.** All five gates in `check_all_gates()` now make real checks. The **build gate** reads configured build commands from `.avt/project-config.json` (`quality.buildCommands`) and runs them via `subprocess.run()` with a 300-second timeout. The **findings gate** queries the trust engine for unresolved critical/high-severity findings. The `auto_format`, `run_lint`, `run_tests`, and `check_coverage` tools continue to make real subprocess calls (ruff, prettier, eslint, pytest).
 
 **Extension-system state drift.** The extension dashboard was built incrementally as the system evolved. Some UI components may reference patterns or display states that have since changed. The gap analysis (February 2026) identified that the extension's scope has grown far beyond "observability only" but some internal state representations have not kept pace with governance and research system evolution.
 
@@ -3848,7 +3945,7 @@ Items are ordered by priority. Effort and dependency information is included to 
 | **Immediate** | Set effort controls per agent | Config only | — | Add effort levels to agent definitions in `.claude/settings.json` |
 | **Immediate** | Update model references to Opus 4.6 | Trivial | — | Replace Opus 4.5 references in documentation. Code references are model-agnostic |
 | **Immediate** | Add researcher/steward to settings.json agents | Config only | — | Explicitly configure model and tools for researcher (Opus) and project-steward (Sonnet) |
-| **Short-term** | Replace Quality server gate stubs | Medium | — | Connect the build gate and findings gate in `check_all_gates()` to actual build commands and the trust engine's finding store. The tool-level subprocess calls (ruff, prettier, eslint, pytest) are already real |
+| **Done** | ~~Replace Quality server gate stubs~~ | Medium | — | Build gate reads `.avt/project-config.json` build commands, findings gate queries trust engine for unresolved critical/high findings. Completed February 2026 |
 | **Short-term** | Convert common workflows to model-invocable skills | Low | — | Identify orchestrator patterns that repeat across sessions. Candidates: governance review flow, worker spawn-and-review cycle, KG curation trigger |
 | **Short-term** | Add setup hooks (`--init`, `--maintenance`) | Low | — | `--init`: validate project config, seed KG with vision/architecture docs, verify MCP server connectivity. `--maintenance`: run cruft detection, check dependency updates |
 | **Short-term** | Align extension UI with current system state | Medium | Architecture doc v2 | Audit dashboard components against current MCP server APIs. Update state representations, add missing governance/research views, remove stale references |
@@ -3864,9 +3961,9 @@ For historical context, the following summarizes what the v1 "Implementation Pha
 
 | v1 Phase | What Was Planned | What Shipped |
 |----------|-----------------|-------------|
-| **Phase 1: Make MCP Servers Real** | KG: JSONL persistence, delete tools, compaction. Quality: real subprocess calls, SQLite trust engine | KG: fully operational with 11 tools (3 beyond plan), JSONL persistence, tier protection. Quality: 8 tools operational with real subprocess calls, trust engine with SQLite complete. **Gap**: build and findings gates in `check_all_gates()` are still stubs |
-| **Phase 2: Create Subagents + Validate E2E** | 3 agents (worker, quality-reviewer, kg-librarian), CLAUDE.md orchestration, settings.json hooks, end-to-end validation | 6 agents (added governance-reviewer, researcher, project-steward), full CLAUDE.md orchestration with governance/research/hygiene protocols, PreToolUse hooks, end-to-end workflow validated |
-| **Phase 3: Build Extension as Monitoring Layer** | MCP clients, TreeView wiring, file watchers, diagnostics, dashboard, status bar | 3 MCP clients, 4 TreeViews, dashboard webview with React 19, 9-step wizard, 10-step tutorial, VS Code walkthrough, governance panel, research prompts panel, 12 commands. Scope significantly exceeded plan |
+| **Phase 1: Make MCP Servers Real** | KG: JSONL persistence, delete tools, compaction. Quality: real subprocess calls, SQLite trust engine | KG: fully operational with 11 tools (3 beyond plan), JSONL persistence, tier protection. Quality: 8 tools operational with real subprocess calls, trust engine with SQLite complete. All 5 quality gates now fully connected |
+| **Phase 2: Create Subagents + Validate E2E** | 3 agents (worker, quality-reviewer, kg-librarian), CLAUDE.md orchestration, settings.json hooks, end-to-end validation | 6 agents (added governance-reviewer, researcher, project-steward), full CLAUDE.md orchestration with governance/research/hygiene protocols, PostToolUse + PreToolUse hooks, end-to-end workflow validated |
+| **Phase 3: Build Extension as Monitoring Layer** | MCP clients, TreeView wiring, file watchers, diagnostics, dashboard, status bar | 3 MCP clients, 4 TreeViews, dashboard webview with React 19, 9-step wizard, 10-step tutorial, VS Code walkthrough, governance panel, research prompts panel, 15 commands (12 user-facing, 3 internal). Scope significantly exceeded plan |
 | **Phase 4: Expand and Harden** | Event logging, cross-project memory, multi-worker parallelism, FastMCP 3.0 migration, installation script | E2E test harness (11 scenarios, 172+ assertions), full governance system (not in original plan), research system (not in original plan), project hygiene system (not in original plan). Cross-project memory and FastMCP migration remain future items |
 
 ---
@@ -3941,7 +4038,7 @@ The full integration test validates that all components work together in the gov
 **Setup:**
 1. Start all 3 MCP servers (KG on 3101, Quality on 3102, Governance on 3103)
 2. Ensure KG contains vision and architecture entities (via `ingest_documents` or manual `create_entities`)
-3. Set `CLAUDE_CODE_TASK_LIST_ID=agent-vision-team` for cross-session task persistence
+3. Set `CLAUDE_CODE_ENABLE_TASKS=true` and `CLAUDE_CODE_TASK_LIST_ID=agent-vision-team` (both required for task system and cross-session persistence)
 4. Open Claude Code with the project's `.claude/agents/`, `CLAUDE.md`, and `.claude/settings.json`
 
 **Integration flow:**
@@ -3954,11 +4051,11 @@ Step 2: Orchestrator queries KG for context
     search_nodes("UserService") -> discovers patterns and constraints
     get_entities_by_tier("vision") -> loads all vision standards
         |
-Step 3: Orchestrator creates governed task
-    create_governed_task("Add input validation to UserService",
-        review_type="governance")
-    -> Review task created (pending)
-    -> Implementation task created (blocked by review)
+Step 3: Orchestrator creates task (either path works)
+    TaskCreate("Add input validation to UserService")
+    -> PostToolUse hook fires automatically
+    -> Review task created (pending, blocks implementation)
+    -> Implementation task blocked from birth
         |
 Step 4: Governance review executes
     Governance server loads vision standards from KG (JSONL)
