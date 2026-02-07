@@ -387,6 +387,7 @@ export const DEMO_DATA: DashboardData = {
     pending: 2,
     pendingReviews: 2,
     totalGovernedTasks: 6,
+    needsHumanReview: 1,
   },
 
   // ── Quality Gates ───────────────────────────────────────────────────────────
@@ -518,4 +519,7 @@ export const DEMO_DATA: DashboardData = {
     lastCheckpoint: 'checkpoint-003',
     activeWorktrees: ['../voiceflow-worker-1', '../voiceflow-worker-2'],
   },
+
+  // ── Job Summary ────────────────────────────────────────────────────────────
+  jobSummary: { running: 1, queued: 0, total: 3 },
 };

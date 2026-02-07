@@ -58,9 +58,28 @@ function ConnectionBanner() {
 
 function RightPanel({ className }: { className?: string }) {
   const [activeTab, setActiveTab] = useState<RightTab>('tasks');
+  const [editorOpen, setEditorOpen] = useState(false);
 
   return (
     <div className={`flex flex-col ${className ?? ''}`}>
+      {/* Prominent "New Task" button */}
+      <div className="px-3 py-2 border-b border-vscode-border">
+        <button
+          onClick={() => setEditorOpen(!editorOpen)}
+          className="w-full px-4 py-2.5 rounded-md font-semibold text-sm transition-all bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/25"
+          title="Open the task editor to spawn a new agent task"
+        >
+          {editorOpen ? 'Close Editor' : '+ New Task'}
+        </button>
+      </div>
+
+      {/* Collapsible editor panel */}
+      {editorOpen && (
+        <div className="border-b border-vscode-border bg-vscode-widget-bg/50">
+          <JobSubmission onSubmitted={() => setEditorOpen(false)} />
+        </div>
+      )}
+
       {/* Tab bar */}
       <div className="flex border-b border-vscode-border shrink-0">
         <button
@@ -109,12 +128,7 @@ function RightPanel({ className }: { className?: string }) {
         {activeTab === 'tasks' && <TaskBoard />}
         {activeTab === 'decisions' && <DecisionExplorer />}
         {activeTab === 'activity' && <ActivityFeed />}
-        {activeTab === 'jobs' && (
-          <div>
-            <JobSubmission />
-            <JobList />
-          </div>
-        )}
+        {activeTab === 'jobs' && <JobList />}
       </div>
     </div>
   );

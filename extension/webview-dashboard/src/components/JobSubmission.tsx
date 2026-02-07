@@ -16,7 +16,11 @@ const MODELS = [
   { value: 'haiku', label: 'Haiku (fastest)' },
 ];
 
-export function JobSubmission() {
+interface JobSubmissionProps {
+  onSubmitted?: () => void;
+}
+
+export function JobSubmission({ onSubmitted }: JobSubmissionProps) {
   const [prompt, setPrompt] = useState('');
   const [agentType, setAgentType] = useState('');
   const [model, setModel] = useState('opus');
@@ -47,6 +51,7 @@ export function JobSubmission() {
       if (data.job?.id) {
         setLastJobId(data.job.id);
         setPrompt('');
+        onSubmitted?.();
       }
     } catch (err) {
       console.error('Failed to submit job:', err);
@@ -57,7 +62,7 @@ export function JobSubmission() {
 
   return (
     <div className="p-4 space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-vscode-muted">Submit Job</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-vscode-muted">New Task</h3>
 
       <textarea
         value={prompt}
@@ -99,7 +104,7 @@ export function JobSubmission() {
         disabled={!prompt.trim() || submitting}
         className="w-full px-4 py-2 text-sm font-medium rounded bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] hover:bg-[var(--vscode-button-hoverBackground)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
-        {submitting ? 'Submitting...' : 'Submit Job'}
+        {submitting ? 'Submitting...' : 'Submit Task'}
       </button>
 
       {lastJobId && (

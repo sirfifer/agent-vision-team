@@ -30,6 +30,7 @@ async def get_dashboard() -> dict:
         "governanceStats": {
             "totalDecisions": 0, "approved": 0, "blocked": 0,
             "pending": 0, "pendingReviews": 0, "totalGovernedTasks": 0,
+            "needsHumanReview": 0,
         },
         "setupReadiness": pc.get_readiness(),
         "projectConfig": pc.load(),
@@ -67,13 +68,15 @@ async def get_dashboard() -> dict:
             # Governance: stats
             status = await state.mcp.call_tool("governance", "get_governance_status")
             if isinstance(status, dict):
+                task_gov = status.get("task_governance", {})
                 data["governanceStats"] = {
                     "totalDecisions": status.get("total_decisions", 0),
                     "approved": status.get("approved", 0),
                     "blocked": status.get("blocked", 0),
                     "pending": status.get("pending", 0),
-                    "pendingReviews": status.get("pending_reviews", 0),
-                    "totalGovernedTasks": status.get("total_governed_tasks", 0),
+                    "pendingReviews": task_gov.get("pending_reviews", status.get("pending_reviews", 0)),
+                    "totalGovernedTasks": task_gov.get("total_governed_tasks", status.get("total_governed_tasks", 0)),
+                    "needsHumanReview": status.get("needs_human_review", 0),
                 }
         except Exception:
             pass
@@ -109,6 +112,19 @@ async def get_dashboard() -> dict:
                 data["qualityGateResults"] = gates
         except Exception:
             pass
+
+    # Job summary for the status bar
+    try:
+        from ..services.job_runner import get_job_runner
+        runner = get_job_runner()
+        all_jobs = runner.list_jobs()
+        data["jobSummary"] = {
+            "running": sum(1 for j in all_jobs if j.status.value == "running"),
+            "queued": sum(1 for j in all_jobs if j.status.value == "queued"),
+            "total": len(all_jobs),
+        }
+    except Exception:
+        data["jobSummary"] = {"running": 0, "queued": 0, "total": 0}
 
     return data
 

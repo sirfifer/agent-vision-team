@@ -236,6 +236,7 @@ export interface GovernanceStats {
   pending: number;
   pendingReviews: number;
   totalGovernedTasks: number;
+  needsHumanReview: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -419,6 +420,8 @@ export interface DashboardData {
   researchPrompts?: ResearchPrompt[];
   // Research briefs
   researchBriefs?: ResearchBriefInfo[];
+  // Job summary for status bar
+  jobSummary?: { running: number; queued: number; total: number };
 }
 
 // Message types between extension host and webview

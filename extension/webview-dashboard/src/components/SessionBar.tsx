@@ -21,7 +21,11 @@ const statusTooltips: Record<string, string> = {
 
 export function SessionBar() {
   const { data, sendCommand, sendMessage, setShowSettings, setShowWizard, setShowTutorial, setShowResearchPrompts, researchPrompts, demoMode } = useDashboard();
-  const { connectionStatus, sessionPhase, tasks } = data;
+  const { connectionStatus, sessionPhase, governanceStats, governedTasks } = data;
+
+  const needsHumanCount = governedTasks.filter(t =>
+    t.reviews.some(r => r.status === 'needs_human_review')
+  ).length;
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 border-b border-vscode-border bg-vscode-widget-bg text-xs">
@@ -37,10 +41,45 @@ export function SessionBar() {
 
       <div className="w-px h-4 bg-vscode-border" />
 
-      <div className="flex items-center gap-1.5" title={`${tasks.active} active task briefs out of ${tasks.total} total in .avt/task-briefs/`}>
-        <span className="text-vscode-muted uppercase tracking-wider">Tasks</span>
-        <span className="font-semibold">{tasks.active}/{tasks.total}</span>
+      <div className="flex items-center gap-1.5" title="Governance status: governed task breakdown">
+        <span className="text-vscode-muted uppercase tracking-wider">Gov</span>
+        {governanceStats.totalGovernedTasks > 0 ? (
+          <>
+            {governanceStats.blocked > 0 && (
+              <span className="px-1.5 py-0.5 rounded text-2xs font-semibold bg-red-500/20 text-red-400">
+                {governanceStats.blocked} blocked
+              </span>
+            )}
+            {needsHumanCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded text-2xs font-semibold bg-purple-500/20 text-purple-400">
+                {needsHumanCount} needs review
+              </span>
+            )}
+            {governanceStats.pendingReviews > 0 && (
+              <span className="px-1.5 py-0.5 rounded text-2xs font-semibold bg-yellow-500/20 text-yellow-400">
+                {governanceStats.pendingReviews} pending
+              </span>
+            )}
+            <span className="px-1.5 py-0.5 rounded text-2xs font-semibold bg-green-500/20 text-green-400">
+              {governanceStats.approved} approved
+            </span>
+          </>
+        ) : (
+          <span className="text-vscode-muted">no tasks</span>
+        )}
       </div>
+
+      {data.jobSummary && data.jobSummary.running > 0 && (
+        <>
+          <div className="w-px h-4 bg-vscode-border" />
+          <div className="flex items-center gap-1.5" title={`${data.jobSummary.running} job(s) currently running`}>
+            <span className="text-vscode-muted uppercase tracking-wider">Jobs</span>
+            <span className="px-1.5 py-0.5 rounded text-2xs font-semibold bg-blue-500/20 text-blue-400">
+              {data.jobSummary.running} running
+            </span>
+          </div>
+        </>
+      )}
 
       <div className="w-px h-4 bg-vscode-border" />
 

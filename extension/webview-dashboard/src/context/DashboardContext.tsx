@@ -13,7 +13,7 @@ const defaultData: DashboardData = {
   tasks: { active: 0, total: 0 },
   sessionPhase: 'inactive',
   governedTasks: [],
-  governanceStats: { totalDecisions: 0, approved: 0, blocked: 0, pending: 0, pendingReviews: 0, totalGovernedTasks: 0 },
+  governanceStats: { totalDecisions: 0, approved: 0, blocked: 0, pending: 0, pendingReviews: 0, totalGovernedTasks: 0, needsHumanReview: 0 },
 };
 
 interface DashboardContextValue {
