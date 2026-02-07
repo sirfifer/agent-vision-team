@@ -115,15 +115,24 @@ async def get_dashboard() -> dict:
 
 @router.post("/mcp/connect")
 async def connect_mcp() -> dict:
-    """Connect to MCP servers."""
+    """Connect (or reconnect) to MCP servers and return full dashboard data."""
     if state.mcp and state.mcp.is_connected:
-        return {"status": "already_connected"}
+        # Already connected; return fresh dashboard data
+        return await get_dashboard()
+
+    # Disconnect stale client if any
+    if state.mcp:
+        try:
+            await state.mcp.disconnect()
+        except Exception:
+            pass
 
     from ..services.mcp_client import McpClientService
     state.mcp = McpClientService()
     try:
         await state.mcp.connect()
-        return {"status": "connected"}
+        # Return full dashboard data so the UI updates immediately
+        return await get_dashboard()
     except ConnectionError as exc:
         state.mcp = None
         raise HTTPException(status_code=503, detail=str(exc))

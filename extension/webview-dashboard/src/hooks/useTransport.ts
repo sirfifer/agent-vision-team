@@ -57,7 +57,10 @@ function getApiBase(): string {
 }
 
 function getApiKey(): string {
-  return (window as any).__AVT_API_KEY__ || '';
+  // Try injected global first (set by Gateway), then URL query param ?key=xxx
+  return (window as any).__AVT_API_KEY__
+    || new URLSearchParams(window.location.search).get('key')
+    || '';
 }
 
 function createWebTransport(): Transport {
@@ -149,6 +152,10 @@ function createWebTransport(): Transport {
 
       try {
         const resp = await fetch(url, init);
+        if (!resp.ok) {
+          console.error(`API ${type} returned ${resp.status}: ${resp.statusText}`);
+          return;
+        }
         const data = await resp.json();
         // Dispatch response as a window message event
         const responseMsg = mapApiResponse(type, data);

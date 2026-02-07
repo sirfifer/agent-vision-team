@@ -39,12 +39,17 @@ class McpSseConnection:
         if self._response.status_code != 200:
             raise ConnectionError(f"SSE connection failed (status {self._response.status_code})")
 
+        # Create a single async iterator for the response stream.
+        # Both session ID reading and event reading use this same iterator
+        # to avoid the "content already streamed" error.
+        self._stream_iter = self._response.aiter_text()
+
         # Read session ID from the first data line
         session_id = await self._read_session_id()
         self._messages_url = f"{self.base_url}/messages/?session_id={session_id}"
         logger.info("SSE session established: %s", session_id)
 
-        # Start background SSE event reader
+        # Start background SSE event reader (continues from the same iterator)
         self._reader_task = asyncio.create_task(self._event_reader())
 
         # MCP initialize handshake
@@ -96,7 +101,7 @@ class McpSseConnection:
     async def _read_session_id(self) -> str:
         """Read lines from SSE until we find the session ID."""
         buffer = ""
-        async for chunk in self._response.aiter_text():
+        async for chunk in self._stream_iter:
             buffer += chunk
             for line in buffer.split("\n"):
                 if line.startswith("data:"):
@@ -112,10 +117,13 @@ class McpSseConnection:
         raise ConnectionError("SSE stream ended before session ID")
 
     async def _event_reader(self) -> None:
-        """Background task: read SSE events and resolve pending requests."""
+        """Background task: read SSE events and resolve pending requests.
+
+        Continues reading from the same stream iterator that _read_session_id used.
+        """
         current_event_type = ""
         try:
-            async for chunk in self._response.aiter_text():
+            async for chunk in self._stream_iter:
                 for line in chunk.split("\n"):
                     line = line.strip()
                     if line.startswith("event:"):

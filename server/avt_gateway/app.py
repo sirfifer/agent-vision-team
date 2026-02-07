@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .auth import require_auth
 from .config import config
@@ -22,6 +25,18 @@ async def lifespan(app: FastAPI):
     logger.info("AVT Gateway starting on %s:%d", config.host, config.port)
     logger.info("Project directory: %s", config.project_dir)
     logger.info("API key: %s", config.api_key)
+
+    # Auto-connect to MCP servers
+    from .app_state import state
+    from .services.mcp_client import McpClientService
+
+    state.mcp = McpClientService()
+    try:
+        await state.mcp.connect()
+        logger.info("MCP servers connected on startup")
+    except ConnectionError as exc:
+        logger.warning("MCP auto-connect failed: %s (dashboard will start degraded)", exc)
+        state.mcp = None
 
     # Start the WebSocket background poller
     ws_manager.start_poller()
@@ -72,6 +87,30 @@ app.include_router(governance_router)
 app.include_router(quality_router)
 app.include_router(research_router)
 app.include_router(jobs_router)
+
+
+# Serve SPA static files (for local dev without Nginx)
+_static_dir = Path(__file__).parent.parent / "static"
+if _static_dir.is_dir():
+    app.mount("/assets", StaticFiles(directory=_static_dir / "assets"), name="static-assets")
+
+    @app.get("/", include_in_schema=False)
+    async def serve_spa_root():
+        """Serve index.html with injected API key for web transport."""
+        html = (_static_dir / "index.html").read_text()
+        # Inject the API key so the web transport can authenticate
+        inject = f'<script>window.__AVT_API_KEY__="{config.api_key}";</script>'
+        html = html.replace("</head>", f"{inject}</head>", 1)
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(html)
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def serve_spa_fallback(path: str):
+        """SPA fallback: serve index.html for non-API routes."""
+        file = _static_dir / path
+        if file.is_file():
+            return FileResponse(file)
+        return FileResponse(_static_dir / "index.html")
 
 
 @app.websocket("/api/ws")
