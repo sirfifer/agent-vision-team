@@ -5,33 +5,34 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from ..auth import require_auth
-from ..app_state import state
+from ..app_state import ProjectState
+from ..deps import get_project_state
 
-router = APIRouter(prefix="/api", tags=["config"], dependencies=[Depends(require_auth)])
+router = APIRouter(tags=["config"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/config")
-async def get_config() -> dict:
+async def get_config(state: ProjectState = Depends(get_project_state)) -> dict:
     """Get project configuration."""
     return state.project_config.load()
 
 
 @router.put("/config")
-async def save_config(config: dict) -> dict:
+async def save_config(config: dict, state: ProjectState = Depends(get_project_state)) -> dict:
     """Save project configuration."""
     state.project_config.save(config)
     return {"success": True}
 
 
 @router.get("/config/permissions")
-async def get_permissions() -> dict:
+async def get_permissions(state: ProjectState = Depends(get_project_state)) -> dict:
     """Get current permissions."""
     cfg = state.project_config.load()
     return {"permissions": cfg.get("permissions", [])}
 
 
 @router.put("/config/permissions")
-async def save_permissions(body: dict) -> dict:
+async def save_permissions(body: dict, state: ProjectState = Depends(get_project_state)) -> dict:
     """Save permissions and sync to .claude/settings.local.json."""
     permissions = body.get("permissions", [])
     state.project_config.sync_permissions(permissions)
@@ -45,6 +46,6 @@ async def save_permissions(body: dict) -> dict:
 
 
 @router.get("/setup/readiness")
-async def get_readiness() -> dict:
+async def get_readiness(state: ProjectState = Depends(get_project_state)) -> dict:
     """Get setup readiness status."""
     return state.project_config.get_readiness()

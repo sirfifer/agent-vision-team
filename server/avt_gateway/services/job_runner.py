@@ -31,12 +31,13 @@ def get_job_runner() -> JobRunner:
 class JobRunner:
     """Manages a queue of Claude Code CLI invocations."""
 
-    def __init__(self, max_concurrent: int = 1) -> None:
+    def __init__(self, project_dir: Path | None = None, max_concurrent: int = 1) -> None:
         self.max_concurrent = max_concurrent
+        self._project_dir = project_dir or config.project_dir
         self._jobs: dict[str, Job] = {}
         self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._worker_task: asyncio.Task | None = None
-        self._jobs_dir = config.avt_root / "jobs"
+        self._jobs_dir = (self._project_dir / ".avt" / "jobs")
         self._jobs_dir.mkdir(parents=True, exist_ok=True)
 
         # Load persisted jobs
@@ -152,7 +153,7 @@ class JobRunner:
                     stderr=subprocess.PIPE,
                     text=True,
                     timeout=600,  # 10 minute timeout
-                    cwd=str(config.project_dir),
+                    cwd=str(self._project_dir),
                 )
 
             job.exit_code = result.returncode

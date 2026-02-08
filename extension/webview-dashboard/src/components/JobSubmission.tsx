@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useDashboard } from '../context/DashboardContext';
+import { getActiveProjectId } from '../hooks/useTransport';
 
 const AGENT_TYPES = [
   { value: '', label: 'Orchestrator (default)' },
@@ -38,7 +39,9 @@ export function JobSubmission({ onSubmitted }: JobSubmissionProps) {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-      const resp = await fetch(`${apiBase}/api/jobs`, {
+      const projectId = getActiveProjectId();
+      const jobsPath = projectId ? `/api/projects/${projectId}/jobs` : '/api/jobs';
+      const resp = await fetch(`${apiBase}${jobsPath}`, {
         method: 'POST',
         headers,
         body: JSON.stringify({

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { DashboardProvider, useDashboard } from './context/DashboardContext';
+import { ProjectProvider } from './context/ProjectContext';
+import { ProjectTabBar } from './components/ProjectTabBar';
 import { SessionBar } from './components/SessionBar';
 import { SetupBanner } from './components/SetupBanner';
 import { AgentCards } from './components/AgentCards';
@@ -136,23 +138,26 @@ function RightPanel({ className }: { className?: string }) {
 
 export default function App() {
   return (
-    <DashboardProvider>
-      <div className="h-screen flex flex-col bg-vscode-bg text-vscode-fg text-sm">
-        <SessionBar />
-        <SetupBanner />
-        <ConnectionBanner />
-        <AgentCards />
-        <QualityGatesPanel />
-        <div className="flex-1 flex flex-col md:flex-row min-h-0">
-          <GovernancePanel className="w-full md:w-2/5 overflow-y-auto" />
-          <RightPanel className="w-full md:w-3/5" />
+    <ProjectProvider>
+      <DashboardProvider>
+        <div className="h-screen flex flex-col bg-vscode-bg text-vscode-fg text-sm">
+          <ProjectTabBar />
+          <SessionBar />
+          <SetupBanner />
+          <ConnectionBanner />
+          <AgentCards />
+          <QualityGatesPanel />
+          <div className="flex-1 flex flex-col md:flex-row min-h-0">
+            <GovernancePanel className="w-full md:w-2/5 overflow-y-auto" />
+            <RightPanel className="w-full md:w-3/5" />
+          </div>
         </div>
-      </div>
-      {/* Overlays */}
-      <SetupWizard />
-      <SettingsPanel />
-      <ResearchPromptsPanel />
-      <WorkflowTutorial />
-    </DashboardProvider>
+        {/* Overlays */}
+        <SetupWizard />
+        <SettingsPanel />
+        <ResearchPromptsPanel />
+        <WorkflowTutorial />
+      </DashboardProvider>
+    </ProjectProvider>
   );
 }

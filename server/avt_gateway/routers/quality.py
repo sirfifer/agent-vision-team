@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..auth import require_auth
-from ..app_state import state
+from ..app_state import ProjectState
+from ..deps import get_project_state
 
-router = APIRouter(prefix="/api/quality", tags=["quality"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/quality", tags=["quality"], dependencies=[Depends(require_auth)])
 
 
 class DismissRequest(BaseModel):
@@ -17,7 +18,7 @@ class DismissRequest(BaseModel):
 
 
 @router.post("/validate")
-async def validate_all() -> dict:
+async def validate_all(state: ProjectState = Depends(get_project_state)) -> dict:
     """Run full quality validation."""
     if not state.mcp or not state.mcp.is_connected:
         raise HTTPException(status_code=503, detail="MCP servers not connected")
@@ -30,7 +31,7 @@ async def validate_all() -> dict:
 
 
 @router.get("/findings")
-async def get_findings(status: str | None = None) -> dict:
+async def get_findings(status: str | None = None, state: ProjectState = Depends(get_project_state)) -> dict:
     """Get all quality findings, optionally filtered by status."""
     if not state.mcp or not state.mcp.is_connected:
         raise HTTPException(status_code=503, detail="MCP servers not connected")
@@ -48,7 +49,7 @@ async def get_findings(status: str | None = None) -> dict:
 
 
 @router.post("/findings/{finding_id}/dismiss")
-async def dismiss_finding(finding_id: str, body: DismissRequest) -> dict:
+async def dismiss_finding(finding_id: str, body: DismissRequest, state: ProjectState = Depends(get_project_state)) -> dict:
     """Dismiss a quality finding with justification."""
     if not state.mcp or not state.mcp.is_connected:
         raise HTTPException(status_code=503, detail="MCP servers not connected")
@@ -65,7 +66,7 @@ async def dismiss_finding(finding_id: str, body: DismissRequest) -> dict:
 
 
 @router.get("/gates")
-async def get_gate_results() -> dict:
+async def get_gate_results(state: ProjectState = Depends(get_project_state)) -> dict:
     """Get quality gate results."""
     if not state.mcp or not state.mcp.is_connected:
         raise HTTPException(status_code=503, detail="MCP servers not connected")

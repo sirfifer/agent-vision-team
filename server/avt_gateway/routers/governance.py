@@ -5,13 +5,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth import require_auth
-from ..app_state import state
+from ..app_state import ProjectState
+from ..deps import get_project_state
 
-router = APIRouter(prefix="/api/governance", tags=["governance"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/governance", tags=["governance"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/tasks")
-async def get_governed_tasks() -> dict:
+async def get_governed_tasks(state: ProjectState = Depends(get_project_state)) -> dict:
     """Get all governed tasks."""
     if not state.mcp or not state.mcp.is_connected:
         raise HTTPException(status_code=503, detail="MCP servers not connected")
@@ -26,7 +27,7 @@ async def get_governed_tasks() -> dict:
 
 
 @router.get("/status")
-async def get_governance_status() -> dict:
+async def get_governance_status(state: ProjectState = Depends(get_project_state)) -> dict:
     """Get governance dashboard summary."""
     if not state.mcp or not state.mcp.is_connected:
         raise HTTPException(status_code=503, detail="MCP servers not connected")
@@ -39,7 +40,7 @@ async def get_governance_status() -> dict:
 
 
 @router.get("/decisions")
-async def get_decision_history() -> dict:
+async def get_decision_history(state: ProjectState = Depends(get_project_state)) -> dict:
     """Get governance decision history."""
     if not state.mcp or not state.mcp.is_connected:
         raise HTTPException(status_code=503, detail="MCP servers not connected")

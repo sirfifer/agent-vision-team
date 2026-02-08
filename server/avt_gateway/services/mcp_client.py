@@ -202,7 +202,15 @@ class McpSseConnection:
 class McpClientService:
     """Manages connections to all 3 MCP servers."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        kg_url: str | None = None,
+        quality_url: str | None = None,
+        governance_url: str | None = None,
+    ) -> None:
+        self._kg_url = kg_url or config.kg_url
+        self._quality_url = quality_url or config.quality_url
+        self._governance_url = governance_url or config.governance_url
         self._kg: McpSseConnection | None = None
         self._quality: McpSseConnection | None = None
         self._governance: McpSseConnection | None = None
@@ -217,9 +225,9 @@ class McpClientService:
         logger.info("Connecting to MCP servers...")
 
         servers = [
-            ("Knowledge Graph", config.kg_url, "_kg"),
-            ("Quality", config.quality_url, "_quality"),
-            ("Governance", config.governance_url, "_governance"),
+            ("Knowledge Graph", self._kg_url, "_kg"),
+            ("Quality", self._quality_url, "_quality"),
+            ("Governance", self._governance_url, "_governance"),
         ]
 
         failed: list[str] = []

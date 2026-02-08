@@ -1,5 +1,13 @@
 """Governance MCP server — transactional review checkpoints for agent decisions."""
 
+import os
+
+# When run as main module, honor PROJECT_DIR for multi-project data isolation.
+# Must happen before module-level instantiation of GovernanceStore/KGClient
+# (which use relative paths like .avt/governance.db resolved from cwd).
+if __name__ == "__main__" and os.environ.get("PROJECT_DIR"):
+    os.chdir(os.environ["PROJECT_DIR"])
+
 from typing import Optional
 
 from fastmcp import FastMCP
@@ -719,4 +727,4 @@ def _queue_governance_review(review_id: str, impl_task_id: str, context: str) ->
 
 
 if __name__ == "__main__":
-    mcp.run(transport="sse", port=3103)
+    mcp.run(transport="sse", port=int(os.environ.get("PORT", "3103")))

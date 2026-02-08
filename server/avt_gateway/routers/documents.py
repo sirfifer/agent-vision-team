@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..auth import require_auth
-from ..app_state import state
+from ..app_state import ProjectState
+from ..deps import get_project_state
 
-router = APIRouter(prefix="/api/documents", tags=["documents"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/documents", tags=["documents"], dependencies=[Depends(require_auth)])
 
 
 class CreateDocRequest(BaseModel):
@@ -17,7 +18,7 @@ class CreateDocRequest(BaseModel):
 
 
 @router.get("/{tier}")
-async def list_docs(tier: str) -> dict:
+async def list_docs(tier: str, state: ProjectState = Depends(get_project_state)) -> dict:
     """List documents in a tier (vision or architecture)."""
     if tier not in ("vision", "architecture"):
         raise HTTPException(status_code=400, detail="Tier must be 'vision' or 'architecture'")
@@ -26,7 +27,7 @@ async def list_docs(tier: str) -> dict:
 
 
 @router.post("/{tier}")
-async def create_doc(tier: str, body: CreateDocRequest) -> dict:
+async def create_doc(tier: str, body: CreateDocRequest, state: ProjectState = Depends(get_project_state)) -> dict:
     """Create a document in the specified tier."""
     if tier not in ("vision", "architecture"):
         raise HTTPException(status_code=400, detail="Tier must be 'vision' or 'architecture'")
@@ -35,7 +36,7 @@ async def create_doc(tier: str, body: CreateDocRequest) -> dict:
 
 
 @router.post("/{tier}/ingest")
-async def ingest_docs(tier: str) -> dict:
+async def ingest_docs(tier: str, state: ProjectState = Depends(get_project_state)) -> dict:
     """Ingest documents from a tier into the Knowledge Graph."""
     if tier not in ("vision", "architecture"):
         raise HTTPException(status_code=400, detail="Tier must be 'vision' or 'architecture'")
@@ -51,7 +52,7 @@ async def ingest_docs(tier: str) -> dict:
 
 
 @router.post("/{tier}/format")
-async def format_doc(tier: str, body: dict) -> dict:
+async def format_doc(tier: str, body: dict, state: ProjectState = Depends(get_project_state)) -> dict:
     """Format document content using Claude CLI."""
     raw_content = body.get("rawContent", "")
     if len(raw_content) > 100_000:

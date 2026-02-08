@@ -14,7 +14,32 @@ export interface Transport {
   setState(state: unknown): void;
 }
 
-// ── VS Code transport ────────────────────────────────────────────────────
+// -- Active project for web transport path construction --
+
+let activeProjectId: string | undefined;
+
+export function setActiveProject(projectId: string | undefined): void {
+  activeProjectId = projectId;
+  // Reconnect WebSocket with new project if web transport is active
+  if (webWsReconnect) {
+    webWsReconnect();
+  }
+}
+
+export function getActiveProjectId(): string | undefined {
+  return activeProjectId;
+}
+
+/** Prefix an API path with the active project context. */
+function prefixPath(path: string): string {
+  if (activeProjectId && path.startsWith('/api/')) {
+    // /api/foo/bar -> /api/projects/{id}/foo/bar
+    return `/api/projects/${activeProjectId}${path.slice(4)}`;
+  }
+  return path;
+}
+
+// -- VS Code transport --
 
 declare function acquireVsCodeApi(): {
   postMessage(message: unknown): void;
@@ -31,7 +56,10 @@ function createVsCodeTransport(): Transport {
   return vscodeApi;
 }
 
-// ── Web transport ────────────────────────────────────────────────────────
+// -- Web transport --
+
+/** Callback to reconnect WebSocket (set by web transport) */
+let webWsReconnect: (() => void) | null = null;
 
 /** Message type to HTTP endpoint mapping */
 const MESSAGE_ROUTES: Record<string, { method: string; path: string; bodyKey?: string }> = {
@@ -51,13 +79,10 @@ const MESSAGE_ROUTES: Record<string, { method: string; path: string; bodyKey?: s
 };
 
 function getApiBase(): string {
-  // In production, the API is at the same origin (behind nginx)
-  // In dev, use the AVT_API_BASE env var or default to localhost:8080
   return (window as any).__AVT_API_BASE__ || '';
 }
 
 function getApiKey(): string {
-  // Try injected global first (set by Gateway), then URL query param ?key=xxx
   return (window as any).__AVT_API_KEY__
     || new URLSearchParams(window.location.search).get('key')
     || '';
@@ -70,9 +95,16 @@ function createWebTransport(): Transport {
 
   // Connect WebSocket for server-push events
   function connectWs() {
+    if (ws) {
+      try { ws.close(); } catch { /* ignore */ }
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsBase = apiBase ? new URL(apiBase).host : window.location.host;
-    const wsUrl = `${protocol}//${wsBase}/api/ws?token=${apiKey}`;
+    let wsUrl = `${protocol}//${wsBase}/api/ws?token=${apiKey}`;
+    if (activeProjectId) {
+      wsUrl += `&project=${activeProjectId}`;
+    }
 
     ws = new WebSocket(wsUrl);
 
@@ -96,6 +128,11 @@ function createWebTransport(): Transport {
     };
   }
 
+  // Store reconnect callback for project switching
+  webWsReconnect = () => {
+    connectWs();
+  };
+
   // Map WebSocket server events to the ExtensionMessage types the dashboard expects
   function mapWsEvent(msg: { type: string; data: any }): ExtensionMessage | null {
     switch (msg.type) {
@@ -106,7 +143,6 @@ function createWebTransport(): Transport {
       case 'governed_tasks':
         return { type: 'governedTasks', tasks: msg.data.tasks || msg.data };
       case 'job_status':
-        // Jobs are a new feature; broadcast as activity for now
         return { type: 'activityAdd', entry: {
           id: msg.data.id,
           timestamp: msg.data.completed_at || msg.data.started_at || msg.data.submitted_at,
@@ -115,7 +151,6 @@ function createWebTransport(): Transport {
           summary: `Job ${msg.data.id}: ${msg.data.status}`,
         }};
       default:
-        // Pass through as-is for types that match exactly
         return msg as any;
     }
   }
@@ -136,7 +171,7 @@ function createWebTransport(): Transport {
         headers['Authorization'] = `Bearer ${apiKey}`;
       }
 
-      const url = `${apiBase}${route.path}`;
+      const url = `${apiBase}${prefixPath(route.path)}`;
       const init: RequestInit = {
         method: route.method,
         headers,
@@ -212,7 +247,7 @@ function createWebTransport(): Transport {
     const headers: Record<string, string> = {};
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
     try {
-      const resp = await fetch(`${apiBase}${path}`, { headers });
+      const resp = await fetch(`${apiBase}${prefixPath(path)}`, { headers });
       return await resp.json();
     } catch (err) {
       console.error('API GET failed:', path, err);
@@ -223,7 +258,7 @@ function createWebTransport(): Transport {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
     try {
-      const resp = await fetch(`${apiBase}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+      const resp = await fetch(`${apiBase}${prefixPath(path)}`, { method: 'POST', headers, body: JSON.stringify(body) });
       return await resp.json();
     } catch (err) {
       console.error('API POST failed:', path, err);
@@ -234,7 +269,7 @@ function createWebTransport(): Transport {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
     try {
-      const resp = await fetch(`${apiBase}${path}`, { method: 'PUT', headers, body: JSON.stringify(body) });
+      const resp = await fetch(`${apiBase}${prefixPath(path)}`, { method: 'PUT', headers, body: JSON.stringify(body) });
       return await resp.json();
     } catch (err) {
       console.error('API PUT failed:', path, err);
@@ -245,7 +280,7 @@ function createWebTransport(): Transport {
     const headers: Record<string, string> = {};
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
     try {
-      const resp = await fetch(`${apiBase}${path}`, { method: 'DELETE', headers });
+      const resp = await fetch(`${apiBase}${prefixPath(path)}`, { method: 'DELETE', headers });
       return await resp.json();
     } catch (err) {
       console.error('API DELETE failed:', path, err);
@@ -275,7 +310,7 @@ function createWebTransport(): Transport {
       case 'requestFindings':
         return { type: 'findingsUpdate', findings: data.findings || [] };
       case 'validate':
-        return null; // Quality validation results shown via dashboard update
+        return null;
       default:
         return null;
     }
@@ -301,7 +336,7 @@ function createWebTransport(): Transport {
   };
 }
 
-// ── Factory ──────────────────────────────────────────────────────────────
+// -- Factory --
 
 let transport: Transport | undefined;
 

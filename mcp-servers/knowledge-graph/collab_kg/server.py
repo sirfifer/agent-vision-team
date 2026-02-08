@@ -1,5 +1,13 @@
 """Knowledge Graph MCP server."""
 
+import os
+
+# When run as main module, honor PROJECT_DIR for multi-project data isolation.
+# Must happen before module-level instantiation of KnowledgeGraph (which uses
+# relative paths like .avt/knowledge-graph.jsonl resolved from cwd).
+if __name__ == "__main__" and os.environ.get("PROJECT_DIR"):
+    os.chdir(os.environ["PROJECT_DIR"])
+
 from fastmcp import FastMCP
 
 from .graph import KnowledgeGraph
@@ -142,4 +150,4 @@ def validate_tier_access(
 
 
 if __name__ == "__main__":
-    mcp.run(transport="sse", port=3101)
+    mcp.run(transport="sse", port=int(os.environ.get("PORT", "3101")))

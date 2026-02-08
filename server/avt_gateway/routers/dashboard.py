@@ -5,13 +5,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth import require_auth
-from ..app_state import state
+from ..app_state import ProjectState
+from ..deps import get_project_state
 
-router = APIRouter(prefix="/api", tags=["dashboard"], dependencies=[Depends(require_auth)])
+router = APIRouter(tags=["dashboard"], dependencies=[Depends(require_auth)])
 
 
 @router.get("/dashboard")
-async def get_dashboard() -> dict:
+async def get_dashboard(state: ProjectState = Depends(get_project_state)) -> dict:
     """Get full dashboard state (equivalent of the 'update' message in VS Code)."""
     pc = state.project_config
     fs = state.file_service
@@ -19,7 +20,11 @@ async def get_dashboard() -> dict:
     # Base data always available from filesystem
     data: dict = {
         "connectionStatus": "connected" if (state.mcp and state.mcp.is_connected) else "disconnected",
-        "serverPorts": {"kg": 3101, "quality": 3102, "governance": 3103},
+        "serverPorts": {
+            "kg": state.mcp_ports[0],
+            "quality": state.mcp_ports[1],
+            "governance": state.mcp_ports[2],
+        },
         "agents": fs.detect_agents(),
         "visionStandards": [],
         "architecturalElements": [],
@@ -115,8 +120,7 @@ async def get_dashboard() -> dict:
 
     # Job summary for the status bar
     try:
-        from ..services.job_runner import get_job_runner
-        runner = get_job_runner()
+        runner = state.get_job_runner()
         all_jobs = runner.list_jobs()
         data["jobSummary"] = {
             "running": sum(1 for j in all_jobs if j.status.value == "running"),
@@ -130,35 +134,29 @@ async def get_dashboard() -> dict:
 
 
 @router.post("/mcp/connect")
-async def connect_mcp() -> dict:
+async def connect_mcp(state: ProjectState = Depends(get_project_state)) -> dict:
     """Connect (or reconnect) to MCP servers and return full dashboard data."""
     if state.mcp and state.mcp.is_connected:
         # Already connected; return fresh dashboard data
-        return await get_dashboard()
+        return await get_dashboard(state)
 
     # Disconnect stale client if any
-    if state.mcp:
-        try:
-            await state.mcp.disconnect()
-        except Exception:
-            pass
+    await state.disconnect_mcp()
 
-    from ..services.mcp_client import McpClientService
-    state.mcp = McpClientService()
     try:
-        await state.mcp.connect()
+        await state.connect_mcp()
         # Return full dashboard data so the UI updates immediately
-        return await get_dashboard()
+        return await get_dashboard(state)
     except ConnectionError as exc:
         state.mcp = None
         raise HTTPException(status_code=503, detail=str(exc))
 
 
 @router.post("/refresh")
-async def refresh() -> dict:
+async def refresh(state: ProjectState = Depends(get_project_state)) -> dict:
     """Refresh dashboard data from MCP servers."""
     if not state.mcp or not state.mcp.is_connected:
         raise HTTPException(status_code=503, detail="MCP servers not connected")
 
     # Just return fresh dashboard data
-    return await get_dashboard()
+    return await get_dashboard(state)

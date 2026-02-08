@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .auth import require_auth
 from .config import config
 from .ws.manager import ws_manager
 
@@ -26,17 +26,37 @@ async def lifespan(app: FastAPI):
     logger.info("Project directory: %s", config.project_dir)
     logger.info("API key: %s", config.api_key)
 
-    # Auto-connect to MCP servers
-    from .app_state import state
-    from .services.mcp_client import McpClientService
+    from .app_state import registry
+    from .services.project_manager import get_project_manager
 
-    state.mcp = McpClientService()
-    try:
-        await state.mcp.connect()
-        logger.info("MCP servers connected on startup")
-    except ConnectionError as exc:
-        logger.warning("MCP auto-connect failed: %s (dashboard will start degraded)", exc)
-        state.mcp = None
+    mgr = get_project_manager()
+
+    # Auto-register default project from PROJECT_DIR if no projects exist
+    if not mgr.list_projects():
+        try:
+            project = mgr.add_project(str(config.project_dir))
+            logger.info("Auto-registered default project: %s", project.id)
+        except Exception as exc:
+            logger.warning("Failed to auto-register default project: %s", exc)
+
+    # Auto-start all registered projects
+    for project in mgr.list_projects():
+        try:
+            mgr.start_project(project.id)
+            state = registry.register(
+                project.id,
+                Path(project.path),
+                (project.kg_port, project.quality_port, project.governance_port),
+            )
+            # Give MCP servers a moment to start, then try connecting
+            await asyncio.sleep(2)
+            try:
+                await state.connect_mcp()
+                logger.info("MCP connected for project '%s'", project.id)
+            except ConnectionError as exc:
+                logger.warning("MCP auto-connect failed for '%s': %s (will start degraded)", project.id, exc)
+        except Exception as exc:
+            logger.warning("Failed to start project '%s': %s", project.id, exc)
 
     # Start the WebSocket background poller
     ws_manager.start_poller()
@@ -46,9 +66,9 @@ async def lifespan(app: FastAPI):
     # Shutdown
     ws_manager.stop_poller()
 
-    from .app_state import state
-    if state.mcp:
-        await state.mcp.disconnect()
+    # Stop all MCP processes and disconnect clients
+    await registry.disconnect_all()
+    mgr.stop_all()
 
     logger.info("AVT Gateway stopped")
 
@@ -69,8 +89,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register routers
+# -- Global routes (not per-project) --
 from .routers.health import router as health_router
+from .routers.projects import router as projects_router
+
+app.include_router(health_router)
+app.include_router(projects_router)
+
+# -- Per-project routes (mounted under /api/projects/{project_id}) --
 from .routers.dashboard import router as dashboard_router
 from .routers.config_router import router as config_router
 from .routers.documents import router as documents_router
@@ -79,14 +105,15 @@ from .routers.quality import router as quality_router
 from .routers.research import router as research_router
 from .routers.jobs import router as jobs_router
 
-app.include_router(health_router)
-app.include_router(dashboard_router)
-app.include_router(config_router)
-app.include_router(documents_router)
-app.include_router(governance_router)
-app.include_router(quality_router)
-app.include_router(research_router)
-app.include_router(jobs_router)
+project_api = APIRouter(prefix="/api/projects/{project_id}")
+project_api.include_router(dashboard_router)
+project_api.include_router(config_router)
+project_api.include_router(documents_router)
+project_api.include_router(governance_router)
+project_api.include_router(quality_router)
+project_api.include_router(research_router)
+project_api.include_router(jobs_router)
+app.include_router(project_api)
 
 
 # Serve SPA static files (for local dev without Nginx)
@@ -114,16 +141,16 @@ if _static_dir.is_dir():
 
 
 @app.websocket("/api/ws")
-async def websocket_endpoint(ws: WebSocket, token: str | None = None):
+async def websocket_endpoint(ws: WebSocket, token: str | None = None, project: str | None = None):
     """WebSocket endpoint for real-time dashboard updates.
 
-    Authentication via query param: ws://host/api/ws?token=<api-key>
+    Authentication via query param: ws://host/api/ws?token=<api-key>&project=<id>
     """
     if token != config.api_key:
         await ws.close(code=4001, reason="Unauthorized")
         return
 
-    await ws_manager.connect(ws)
+    await ws_manager.connect(ws, project_id=project)
     try:
         while True:
             # Keep connection alive; we don't expect client messages

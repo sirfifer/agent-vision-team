@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 
 from ..auth import require_auth
+from ..app_state import ProjectState
+from ..deps import get_project_state
 from ..models.jobs import JobSubmission
-from ..services.job_runner import get_job_runner
 
-router = APIRouter(prefix="/api/jobs", tags=["jobs"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/jobs", tags=["jobs"], dependencies=[Depends(require_auth)])
 
 
 @router.post("")
-async def submit_job(body: JobSubmission) -> dict:
+async def submit_job(body: JobSubmission, state: ProjectState = Depends(get_project_state)) -> dict:
     """Submit a new job to the Claude CLI queue."""
-    runner = get_job_runner()
+    runner = state.get_job_runner()
     job = await runner.submit(
         prompt=body.prompt,
         agent_type=body.agent_type,
@@ -25,16 +25,16 @@ async def submit_job(body: JobSubmission) -> dict:
 
 
 @router.get("")
-async def list_jobs() -> dict:
+async def list_jobs(state: ProjectState = Depends(get_project_state)) -> dict:
     """List all jobs with status."""
-    runner = get_job_runner()
+    runner = state.get_job_runner()
     return {"jobs": [j.model_dump() for j in runner.list_jobs()]}
 
 
 @router.get("/{job_id}")
-async def get_job(job_id: str) -> dict:
+async def get_job(job_id: str, state: ProjectState = Depends(get_project_state)) -> dict:
     """Get job detail."""
-    runner = get_job_runner()
+    runner = state.get_job_runner()
     job = runner.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
@@ -42,9 +42,9 @@ async def get_job(job_id: str) -> dict:
 
 
 @router.post("/{job_id}/cancel")
-async def cancel_job(job_id: str) -> dict:
+async def cancel_job(job_id: str, state: ProjectState = Depends(get_project_state)) -> dict:
     """Cancel a queued or running job."""
-    runner = get_job_runner()
+    runner = state.get_job_runner()
     cancelled = await runner.cancel_job(job_id)
     if not cancelled:
         raise HTTPException(status_code=400, detail="Job cannot be cancelled (not found or already completed)")
