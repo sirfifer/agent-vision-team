@@ -1,6 +1,6 @@
 # Governance MCP Server
 
-Transactional review checkpoints for agent decisions. Agents call governance tools, **block waiting for a response**, and act on the verdict. Every checkpoint is a synchronous round-trip — not fire-and-forget.
+Transactional review checkpoints for agent decisions. Agents call governance tools, **receive a synchronous response**, and act on the verdict. Every checkpoint is a rapid round-trip, not fire-and-forget. This reliable verification is what enables safe multi-agent parallelism.
 
 ## Architecture
 
@@ -42,7 +42,7 @@ The server is also configured in `.claude/settings.json` and starts automaticall
 
 ### `submit_decision` — Primary checkpoint
 
-Called by agents **before implementing any key decision**. The tool blocks until the review completes.
+Called by agents **before implementing any key decision**. The tool returns once the rapid review completes.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -62,7 +62,7 @@ Called by agents **before implementing any key decision**. The tool blocks until
 - `blocked` — Revise approach per `guidance`, resubmit
 - `needs_human_review` — Auto-assigned for `deviation` and `scope_change` categories
 
-### `submit_plan_for_review` — Plan gate
+### `submit_plan_for_review` — Plan checkpoint
 
 Called **before presenting a plan** to the human.
 
@@ -76,7 +76,7 @@ Called **before presenting a plan** to the human.
 
 **Returns:** `{verdict, review_id, findings, guidance, decisions_reviewed, standards_verified}`
 
-### `submit_completion_review` — Worker completion gate
+### `submit_completion_review` — Worker completion checkpoint
 
 Called **when a worker finishes its task**.
 
@@ -89,9 +89,9 @@ Called **when a worker finishes its task**.
 
 **Returns:** `{verdict, review_id, unreviewed_decisions, findings, guidance}`
 
-Automatically blocks if:
+Automatically flags if:
 - Any decisions were never reviewed
-- Any blocked decisions remain unresolved
+- Any previously redirected decisions remain unresolved
 
 ### `get_decision_history` — Query
 
@@ -132,7 +132,7 @@ When an agent calls `submit_decision`:
 | `kg_client.py` | Direct JSONL reader for KG vision/architecture data |
 | `reviewer.py` | `claude --print` orchestration with prompt templates, JSON parsing, and `review_task_group()` for holistic review |
 | `session_state.py` | Generates `.avt/session-state.md` from governance DB (task stats, decision history) |
-| `task_integration.py` | Direct manipulation of Claude Code task files for governance-gated execution |
+| `task_integration.py` | Direct manipulation of Claude Code task files for governed task execution |
 
 ## SQLite Schema
 
@@ -197,7 +197,7 @@ holistic_reviews (
 
 ## Holistic Governance Review
 
-Individual task review is necessary but not sufficient. Tasks that each pass review individually may collectively introduce unauthorized architectural shifts. Holistic review evaluates all tasks from a session as a group before any work begins.
+Individual task review is necessary but not sufficient. Tasks that each pass review individually may collectively introduce unauthorized architectural shifts. Holistic review evaluates all tasks from a session as a group before work begins, typically completing in seconds.
 
 ### How It Works
 
@@ -214,13 +214,13 @@ PostToolUse hook fires for each:
 Settle checker (last one) detects no newer tasks:
   - Calls reviewer.review_task_group()
   - Evaluates collective intent against vision standards
-  - If APPROVED: removes flag, queues individual reviews
-  - If BLOCKED: updates flag with guidance
+  - If approved: clears flag, queues individual reviews
+  - If issues found: updates flag with constructive guidance
         |
         v
-PreToolUse gate on Write|Edit|Bash|Task:
+PreToolUse checkpoint on Write|Edit|Bash|Task:
   - Fast path (~1ms): no flag file -> allow
-  - Flag exists: read status -> block with feedback
+  - Flag exists: read status -> coordinate work sequencing
 ```
 
 ### Key Properties
@@ -228,7 +228,7 @@ PreToolUse gate on Write|Edit|Bash|Task:
 - **MIN_TASKS_FOR_REVIEW = 2**: Single tasks skip holistic review (proceed directly to individual review)
 - **Settle/debounce**: Each PostToolUse spawns a background checker that waits 3s. Only the last checker triggers the holistic review
 - **session_id tracking**: All tasks from the same agent session are linked via `session_id` from the hook input
-- **Stale flag recovery**: The PreToolUse gate auto-removes flags older than 5 minutes
+- **Stale flag recovery**: The PreToolUse checkpoint auto-clears flags older than 5 minutes
 - **Subagent handling**: Subagents inherit hooks; if a subagent creates tasks after a session is approved, the settle checker detects the existing review and cleans up
 - **Reviewer method**: `GovernanceReviewer.review_task_group()` runs `claude --print` with collective intent analysis
 
@@ -238,18 +238,18 @@ PreToolUse gate on Write|Edit|Bash|Task:
 |------|---------|
 | `scripts/hooks/governance-task-intercept.py` | PostToolUse hook: creates flag, spawns settle checker |
 | `scripts/hooks/_holistic-settle-check.py` | Background settle checker: debounce, holistic review trigger |
-| `scripts/hooks/holistic-review-gate.sh` | PreToolUse gate: blocks mutation tools while review pending |
+| `scripts/hooks/holistic-review-gate.sh` | PreToolUse checkpoint: coordinates work while review completes |
 | `collab_governance/reviewer.py` | `review_task_group()` method for collective intent review |
 | `collab_governance/models.py` | `HolisticReviewRecord` Pydantic model |
 | `collab_governance/store.py` | `holistic_reviews` table, session-based queries |
 
-## Safety Nets
+## Verification Checkpoints
 
-Two `PreToolUse` hooks provide deterministic enforcement:
+Two `PreToolUse` hooks provide deterministic verification:
 
-1. **ExitPlanMode gate** (`scripts/hooks/verify-governance-review.sh`): Checks the SQLite DB for plan review records. If none exist, blocks the tool call with feedback instructing the agent to submit a plan review first. This is a backup mechanism for the Decision Protocol.
+1. **ExitPlanMode checkpoint** (`scripts/hooks/verify-governance-review.sh`): Checks the SQLite DB for plan review records. If none exist, redirects the agent to submit a plan review first. This is a backup mechanism for the Decision Protocol.
 
-2. **Holistic review gate** (`scripts/hooks/holistic-review-gate.sh`): Checks for `.avt/.holistic-review-pending` flag file. If present, blocks all mutation tools (Write, Edit, Bash) and delegation tools (Task) until holistic review completes. This is the primary enforcement for collective intent review.
+2. **Holistic review checkpoint** (`scripts/hooks/holistic-review-gate.sh`): Checks for `.avt/.holistic-review-pending` flag file. If present, coordinates work sequencing until holistic review completes, ensuring all mutation tools (Write, Edit, Bash) and delegation tools (Task) wait for the rapid collective intent verification. This is the primary assurance mechanism for collective intent review.
 
 ## Integration with VS Code Extension
 

@@ -51,9 +51,9 @@ Autonomous end-to-end testing for the Collaborative Intelligence System. Exercis
 The E2E harness validates that the three MCP servers that make up the Collaborative Intelligence System behave correctly when exercised through their Python library APIs. It generates a unique project for every run, ensuring the system is continuously tested against arbitrary data rather than canned fixtures.
 
 **What it tests:**
-- Knowledge Graph tier protection (vision/architecture/quality enforcement)
+- Knowledge Graph tier protection (vision/architecture/quality verification)
 - Governance decision lifecycle (storage, verdicts, history queries)
-- Governed task system (atomic creation, blocking, review release)
+- Governed task system (atomic creation, review pairing, release on approval)
 - Trust engine (finding recording, justified dismissals, audit trail)
 - Cross-server integration (KG + Governance + Quality working together)
 
@@ -235,9 +235,9 @@ uv run python run-e2e.py --workspace /tmp/my-test --seed 42 --verbose
 **What it tests:** The full governed task creation, blocking, and release cycle.
 **Key assertions (~26):**
 - `create_governed_task_pair` creates both review and implementation tasks atomically
-- Implementation task is blocked from birth (non-empty `blockedBy` immediately after creation)
+- Implementation task is governed from creation (non-empty `blockedBy` immediately after creation)
 - Completing a review with "approved" releases the implementation task
-- Completing a review with "blocked" keeps the implementation task blocked
+- Completing a review with "blocked" holds the implementation task with guidance
 - Multi-blocker scenarios: task stays blocked until ALL blockers are released
 
 ### s04 — Vision Violation
@@ -324,7 +324,7 @@ uv run python run-e2e.py --workspace /tmp/my-test --seed 42 --verbose
 **Key assertions (~25):**
 - Hook fires on every TaskCreate call
 - Governance pair (review task + implementation task) created atomically
-- Implementation task is blocked from birth
+- Implementation task is governed from creation
 - Loop prevention skips governance-prefixed tasks
 - Async review queued and completed
 

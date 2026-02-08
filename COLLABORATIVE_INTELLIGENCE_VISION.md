@@ -81,7 +81,7 @@ Claude Code provides the orchestration primitives natively. MCP servers extend t
 | **Agent spawning** | Custom subagents (`.claude/agents/*.md`) | Define worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward as subagent files |
 | **Parallel execution** | Task tool with `run_in_background` | Orchestrator spawns multiple workers simultaneously |
 | **Agent coordination** | Parent-child communication via Task results | Orchestrator delegates work, receives results, chains subagents |
-| **Lifecycle hooks** | `SubagentStart`, `SubagentStop`, `PreToolUse`, `PostToolUse` | Track when subagents begin/end, validate operations, enforce holistic governance review |
+| **Lifecycle hooks** | `SubagentStart`, `SubagentStop`, `PreToolUse`, `PostToolUse` | Track when subagents begin/end, validate operations, coordinate holistic governance review |
 | **Worker isolation** | Git worktrees + parallel sessions | Each worker subagent operates in its own worktree |
 | **Session configuration** | CLAUDE.md + skills injection | Project CLAUDE.md instructs the orchestrator; skills preload domain knowledge |
 | **Model routing** | Per-subagent model selection | Opus 4.6 for judgment, Sonnet 4.5 for routine, Haiku 4.5 for mechanical |
@@ -216,7 +216,7 @@ The three-tier oversight model maps onto Claude Code's native subagent system. S
 - Reviews decisions, plans, and completions against vision standards and institutional memory.
 - Returns structured verdicts (approved, blocked, needs_human_review) with guidance.
 - Operates as the internal reasoning engine for all governance checkpoints.
-- This architectural distinction matters: the governance-reviewer is called synchronously within a tool call, ensuring that review is transactional and blocking, not fire-and-forget.
+- This architectural distinction matters: the governance-reviewer is called synchronously within a tool call, ensuring that review is transactional and completes rapidly, not fire-and-forget.
 
 **Researcher Subagent: Intelligence Gatherer**
 - A custom subagent defined in `.claude/agents/researcher.md`, spawned by the orchestrator for investigative work.
@@ -248,10 +248,10 @@ The system organizes its oversight responsibilities into three tiers, ordered by
 
 ### The Three Tiers
 
-| Tier | Scope | Mutability | Enforcement |
+| Tier | Scope | Mutability | Verification |
 |------|-------|------------|-------------|
-| **T1: Vision** | Project identity, fundamental purpose, design philosophy. What the project IS and who it serves. | **Immutable by agents.** Only the human defines and modifies vision. Agents enforce vision but never propose changes to it. | Quality reviewer subagent checks all work against vision documents and vision-tier knowledge graph entities. Vision conflicts are the highest-severity finding and stop work immediately. |
-| **T2: Architecture** | Established patterns, conventions, performance targets, resiliency standards, resource usage requirements. How the project is built to realize the vision. | **High-friction.** Agents can propose changes through structured proposals. Human must approve before any architectural standard changes. | Quality reviewer consults the knowledge graph for architectural entities before reviewing changes. Blocks deviations that lack an approved change proposal. Monitors for "ad-hoc pattern drift." |
+| **T1: Vision** | Project identity, fundamental purpose, design philosophy. What the project IS and who it serves. | **Immutable by agents.** Only the human defines and modifies vision. Agents verify vision alignment but never propose changes to it. | Quality reviewer subagent checks all work against vision documents and vision-tier knowledge graph entities. Vision conflicts are the highest-severity finding and stop work immediately. |
+| **T2: Architecture** | Established patterns, conventions, performance targets, resiliency standards, resource usage requirements. How the project is built to realize the vision. | **High-friction.** Agents can propose changes through structured proposals. Human must approve before any architectural standard changes. | Quality reviewer consults the knowledge graph for architectural entities before reviewing changes. Redirects deviations that lack an approved change proposal. Monitors for "ad-hoc pattern drift." |
 | **T3: Quality** | Lint, syntax, security scanning, test coverage, formatting. The standards that code must meet. | **Low-friction, automated.** Agents fix deterministic issues autonomously. | Quality MCP server wraps linters, formatters, test runners. Quality reviewer auto-fixes deterministic violations. Goal: code passes all checks on first commit attempt. |
 
 ### Why This Ordering Matters
@@ -566,9 +566,9 @@ The quality reviewer's findings must include rationale tied to this specific cod
 
 ### Circuit Breakers
 
-- **Claude Code PreToolUse hooks**: Block dangerous operations and gate mutation tools during holistic review
-- **Holistic review gate**: PreToolUse on Write|Edit|Bash|Task blocks all work while collective review is pending
-- **Git guards**: Pre-commit hooks enforce quality gates
+- **Claude Code PreToolUse hooks**: Verify operations and coordinate work sequencing during holistic review
+- **Holistic review checkpoint**: PreToolUse on Write|Edit|Bash|Task coordinates work while collective review completes (typically seconds)
+- **Git guards**: Pre-commit hooks verify quality gates
 - **Token budgets**: Natural session limits prevent infinite loops
 - **Drift detection**: Orchestrator monitors for time/loop/scope/quality drift
 - **The human**: Always in the loop at the orchestrator level
@@ -702,7 +702,7 @@ Built the extension as an observability layer:
 
 Added the Governance MCP server and comprehensive end-to-end testing:
 
-**Governance Server (port 3103):** Transactional decision review, governed task lifecycle (create, block, release), holistic collective-intent review with settle/debounce detection, plan and completion verification. Integrates with Claude Code's Task List for persistence. Uses the governance-reviewer subagent internally via `claude --print`. Two-layer enforcement: PostToolUse detection + PreToolUse gate on Write|Edit|Bash|Task.
+**Governance Server (port 3103):** Transactional decision review, governed task lifecycle (create, verify, release), holistic collective-intent review with settle/debounce detection, plan and completion verification. Integrates with Claude Code's Task List for persistence. Uses the governance-reviewer subagent internally via `claude --print`. Two-layer assurance: PostToolUse detection + PreToolUse coordination on Write|Edit|Bash|Task. Reliable verification enables safe multi-agent parallelism.
 
 **E2E Testing Harness:** 14 scenarios with 292+ structural assertions exercising all three MCP servers. Random domain generation, parallel execution with full isolation, domain-agnostic validation.
 
@@ -733,9 +733,9 @@ These answers will inform whether and how to expand the architecture — potenti
 
 ## Vision Summary
 
-This system exists to preserve and serve the project's vision. Everything it does — quality enforcement, institutional memory, multi-agent coordination — serves that purpose.
+This system exists to preserve and serve the project's vision. Everything it does -- quality verification, institutional memory, multi-agent coordination -- serves that purpose.
 
-**Three-tiered oversight** is the organizing principle. Vision standards are immutable by agents and enforced as the highest priority. Architectural standards evolve through structured proposals requiring human approval. Quality standards are automated and low-friction.
+**Three-tiered oversight** is the organizing principle. Vision standards are immutable by agents and verified as the highest priority. Architectural standards evolve through structured proposals requiring human approval. Quality standards are automated and low-friction.
 
 A human developer, working through a primary Claude Code session, orchestrates six specialized subagents: workers implement tasks in isolated worktrees, a quality reviewer evaluates through the three-lens model (vision first, architecture second, quality third), a governance reviewer validates decisions against vision standards, a researcher gathers intelligence before architectural decisions, a librarian curates institutional memory, and a project steward maintains organizational hygiene.
 
@@ -745,7 +745,7 @@ Everything else uses Claude Code's native capabilities: subagent spawning, backg
 
 **The confidence mechanism**: Confidence emerges from deterministic verification first (does it compile? do tests pass?), then from track record (did previous suggestions work?), then from explanation quality (is the rationale project-specific?). Never from self-assessment.
 
-**The team relationship**: Workers and the quality reviewer have each other's back. The quality system provides vision enforcement, architectural guidance, institutional memory, and quality automation that makes workers dramatically more effective. Workers aren't being policed; they're being supported by a teammate that remembers everything, knows the codebase patterns, guards the project's vision, and can bring fresh perspective when things get stuck.
+**The team relationship**: Workers and the quality reviewer have each other's back. The quality system provides vision verification, architectural guidance, institutional memory, and quality automation that makes workers dramatically more effective. Workers aren't being policed; they're being supported by a teammate that remembers everything, knows the codebase patterns, guards the project's vision, and can bring fresh perspective when things get stuck.
 
 **The platform**: Everything runs on Claude Code Max. Custom infrastructure is limited to three MCP servers that provide capabilities the platform genuinely cannot. The architecture leverages native primitives aggressively, building only what it must. The result is a system that is practically powerful, readily extensible, and honest about what it knows and what it's still learning.
 

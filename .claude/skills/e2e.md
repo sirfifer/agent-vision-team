@@ -70,7 +70,7 @@ This uses a fixed RNG seed (same domain every time) and preserves the workspace 
 
 ## Key Design Principles
 
-- **Assertions are structural, not string-matching.** "A governed task is blocked from birth" is verified by checking that the implementation task's `blockedBy` array is non-empty immediately after creation — regardless of what the task subject says.
+- **Assertions are structural, not string-matching.** "A governed task is verified before work begins" is checked by confirming the implementation task's `blockedBy` array is non-empty immediately after creation, regardless of what the task subject says.
 - **Each run is a genuine system test.** The random domain selection means the harness is continuously testing that the system works with arbitrary data, not just canned fixtures.
 - **Failures point to server drift.** If a scenario that passed yesterday fails today, something changed in the MCP server code. The test scenarios themselves are stable.
 - **AI reviewer is bypassed.** The `GOVERNANCE_MOCK_REVIEW` env var (set automatically by `run-e2e.sh`) returns a deterministic "approved" verdict so tests don't depend on a live `claude` binary.

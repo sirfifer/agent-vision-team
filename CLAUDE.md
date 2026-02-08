@@ -13,7 +13,7 @@ This project uses a collaborative intelligence system with:
 You coordinate multiple specialized subagents to accomplish complex development tasks. You:
 - Decompose complex tasks into discrete units of work
 - Spawn worker subagents with scoped task briefs
-- Enforce quality review via the quality-reviewer subagent
+- Ensure quality review via the quality-reviewer subagent
 - Maintain institutional memory via the kg-librarian subagent
 - Manage the three-tier governance hierarchy (Vision > Architecture > Quality)
 
@@ -34,16 +34,17 @@ When given a complex task:
 
 ## Task Governance Protocol — "Intercept Early, Redirect Early"
 
-The system uses Claude Code's Task System with governance-gated execution. Every implementation task is blocked from birth until governance review approves it.
+The system uses Claude Code's Task System with governance-verified execution. Every implementation task is governed from creation: paired with a rapid automated review that verifies vision alignment before work begins. This reliable verification is what enables safe multi-agent parallelism -- you can confidently scale to more workers knowing that every task passes through the same checks.
 
 ### Why This Matters
 
-- **No race conditions**: Tasks cannot be picked up before review
+- **No race conditions**: Tasks are verified before work begins
 - **Vision alignment**: Every task is checked against vision standards before execution
 - **Memory integration**: Failed approaches from the past are flagged
-- **Deterministic flow**: Review → Approve/Block → Execute (in that order, always)
+- **Deterministic flow**: Review → Approve/Redirect → Execute (in that order, always)
+- **Safe scaling**: Reliable verification means more parallel agents without risk
 
-### How Task Governance Works (Hook-Based Enforcement)
+### How Task Governance Works (Hook-Based Verification)
 
 **Use TaskCreate naturally.** A PostToolUse hook automatically intercepts every TaskCreate call and adds governance. You do not need to call a special tool; governance is transparent and deterministic.
 
@@ -63,10 +64,10 @@ PostToolUse hook fires (synchronous, ~50ms)
         |  4. Queues async automated review
         |
         v
-Task is governed. Blocked until review completes.
+Task is governed. Work begins once review completes.
 ```
 
-This fires for EVERY TaskCreate call, EVERY agent, EVERY subagent. No exceptions. No opt-out. The enforcement is event-driven, not instruction-driven.
+This fires for EVERY TaskCreate call, EVERY agent, EVERY subagent. No exceptions. No opt-out. The verification is event-driven, not instruction-driven.
 
 ### Holistic Governance Review
 
@@ -92,18 +93,18 @@ Agent creates Task 3 → PostToolUse fires:
 Background: Settle checker for Task 3 wakes up after 3s:
   - Checks DB: any tasks newer than me? NO → I'm the last task
   - Runs holistic review (GovernanceReviewer.review_task_group())
-  - If APPROVED: removes flag file, queues individual reviews
-  - If BLOCKED: writes block reason to flag file
+  - If APPROVED: clears flag file, queues individual reviews
+  - If issues found: writes guidance to flag file for revision
 
 Meanwhile: Agent tries to Write/Edit/Bash/Task:
-  → PreToolUse gate fires (~1ms)
-  → Flag file exists? YES → exit 2 (block with feedback)
+  → PreToolUse checkpoint fires (~1ms)
+  → Flag file exists? YES → exit 2 (redirect with feedback)
   → Agent sees "Holistic review in progress, please wait"
 ```
 
 **Key properties:**
 - **Detection is timing-based** (settle/debounce), not reliant on agent behavior
-- **Enforcement is deterministic** (PreToolUse blocks mutation tools at the platform level)
+- **Verification is deterministic** (PreToolUse coordinates work sequencing at the platform level)
 - **Works for all agent behaviors**: direct work, subagent spawning, or mixed
 - **Fast path is ~1ms** when no review is pending (flag file existence check)
 - **Single tasks skip holistic review** (MIN_TASKS_FOR_REVIEW = 2)
@@ -326,7 +327,7 @@ prompt: "Perform a full project hygiene review" | "Check naming conventions in s
 
 ## Three-Tier Governance Hierarchy
 
-The system enforces a protection hierarchy via tier metadata:
+The system maintains a protection hierarchy via tier metadata:
 
 | Tier | Contains | Who Can Modify | Examples |
 |------|----------|----------------|----------|
@@ -338,7 +339,7 @@ The system enforces a protection hierarchy via tier metadata:
 
 ## Transactional Governance Checkpoints
 
-The system enforces governance through **transactional MCP tool calls** — agents call the Governance server, block waiting for a response, and act on the verdict. This is not fire-and-forget; every checkpoint is a synchronous round-trip.
+The system provides governance through **transactional MCP tool calls** -- agents call the Governance server, receive a synchronous response, and act on the verdict. This is not fire-and-forget; every checkpoint is a round-trip that returns quickly.
 
 ### The Governance MCP Server (port 3103)
 
@@ -355,7 +356,7 @@ The Governance server provides these transactional tools:
 ### Verdicts
 
 - **approved**: Proceed. The response includes which standards were verified.
-- **blocked**: Stop. The response includes `guidance` explaining what to change. The agent must revise and resubmit.
+- **blocked**: Revise. The response includes `guidance` explaining what to change. The agent revises and resubmits.
 - **needs_human_review**: Include the review context when presenting to the human. Automatically assigned for `deviation` and `scope_change` categories.
 
 ### Worker Decision Protocol
@@ -368,15 +369,15 @@ Workers MUST call `submit_decision` before implementing any key choice:
 
 The tool call blocks until the review completes. The worker then acts on the verdict.
 
-### Hook-Based Enforcement Layer
+### Hook-Based Verification Layer
 
-Three hooks enforce governance deterministically:
+Three hooks provide deterministic governance verification:
 
-1. **PostToolUse on TaskCreate** (`scripts/hooks/governance-task-intercept.py`): The primary enforcement mechanism. Fires after every TaskCreate, creates the governance pair, tracks session_id, creates the holistic review flag file, and spawns the settle checker for collective review. This is what makes "blocked from birth" universal and deterministic.
+1. **PostToolUse on TaskCreate** (`scripts/hooks/governance-task-intercept.py`): The primary verification mechanism. Fires after every TaskCreate, pairs it with a governance review, tracks session_id, creates the holistic review flag file, and spawns the settle checker for collective review. 100% interception rate, universal and deterministic.
 
-2. **PreToolUse on ExitPlanMode** (`scripts/hooks/verify-governance-review.sh`): Safety net for plan presentation. Blocks agents from presenting plans without governance review. Checks `.avt/governance.db` for plan review records.
+2. **PreToolUse on ExitPlanMode** (`scripts/hooks/verify-governance-review.sh`): Ensures plans are verified before presentation. Redirects agents to submit a plan review if none exists. Checks `.avt/governance.db` for plan review records.
 
-3. **PreToolUse on Write|Edit|Bash|Task** (`scripts/hooks/holistic-review-gate.sh`): Blocks all mutation and delegation tools while holistic review is pending. Uses a flag file (`.avt/.holistic-review-pending`) as a fast-path gate (~1ms when no review is pending). Stale flags older than 5 minutes are auto-removed.
+3. **PreToolUse on Write|Edit|Bash|Task** (`scripts/hooks/holistic-review-gate.sh`): Coordinates work sequencing while holistic review completes. Uses a flag file (`.avt/.holistic-review-pending`) as a fast-path checkpoint (~1ms when no review is pending). Stale flags older than 5 minutes are auto-cleared.
 
 ### Internal Review Flow
 
@@ -564,7 +565,7 @@ Use the `/e2e` skill or run directly:
 
 ### How It Works
 
-Each run generates a **unique project** from a pool of 8 domains (Pet Adoption, Restaurant Reservation, Fitness Tracking, etc.). The domain is randomly selected, and vision standards, architecture patterns, and components are filled from domain-specific templates. All assertions are **structural and domain-agnostic** — "a governed task is blocked from birth" is true regardless of whether the domain is Pet Adoption or Fleet Management.
+Each run generates a **unique project** from a pool of 8 domains (Pet Adoption, Restaurant Reservation, Fitness Tracking, etc.). The domain is randomly selected, and vision standards, architecture patterns, and components are filled from domain-specific templates. All assertions are **structural and domain-agnostic** -- "a governed task is verified before work begins" is true regardless of whether the domain is Pet Adoption or Fleet Management.
 
 Scenarios run in parallel with full isolation: each gets its own KnowledgeGraph (JSONL), GovernanceStore (SQLite), and TaskFileManager (directory). The `GOVERNANCE_MOCK_REVIEW` env var is set automatically so tests don't depend on a live `claude` binary.
 

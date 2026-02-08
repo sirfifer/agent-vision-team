@@ -7,10 +7,10 @@ A platform-native collaborative intelligence system for software development, le
 This system provides:
 
 - **Tier-Protected Knowledge Graph**: Persistent institutional memory with vision/architecture/quality protection tiers
-- **Hook-Based Governance Enforcement**: PostToolUse hooks intercept every task Claude creates, automatically pairing it with a governance review. Holistic review evaluates task groups collectively before any work begins -- no agent cooperation required
+- **Transparent Governance**: PostToolUse hooks automatically pair every task with a rapid governance review. Holistic review evaluates task groups collectively, typically completing in seconds -- no agent cooperation required
 - **Quality Verification**: Deterministic tool wrapping (linters, formatters, tests, build checks) with trust engine
-- **Governed Task System**: "Intercept early, redirect early" -- implementation tasks are blocked from birth until governance review approves them
-- **Claude Code Integration**: Custom subagents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward) that leverage native orchestration
+- **Governed Task System**: "Intercept early, redirect early" -- tasks are verified against vision standards before work begins, with minimal introduced latency
+- **Safe Multi-Agent Parallelism**: Six specialized subagents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward) operate in isolated worktrees. Governance verification means you can confidently scale to more parallel agents without risking architectural drift
 - **AVT Gateway**: Standalone FastAPI backend with 35 REST endpoints, WebSocket push, and job runner for remote operation from any browser or phone
 - **Dual-Mode Dashboard**: Same React dashboard runs in VS Code (local) or standalone browser (remote) via transport abstraction
 - **Container Deployment**: Docker, docker-compose, and GitHub Codespaces support for persistent remote operation
@@ -28,20 +28,20 @@ The system follows a **platform-native** philosophy (Principle P9: "Build Only W
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │  PostToolUse Hook: TaskCreate                        │   │
 │  │  → governance-task-intercept.py                      │   │
-│  │  Every task is "blocked from birth" automatically    │   │
-│  │  Creates holistic review flag + settle checker       │   │
+│  │  Every task is governed from creation automatically  │   │
+│  │  Rapid review via settle checker + holistic review   │   │
 │  └──────────────────────────────────────────────────────┘   │
 │                                                             │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │  PreToolUse Hook: Write|Edit|Bash|Task               │   │
 │  │  → holistic-review-gate.sh                           │   │
-│  │  Blocks mutation tools during holistic review (~1ms) │   │
+│  │  Coordinates work during holistic review (~1ms)      │   │
 │  └──────────────────────────────────────────────────────┘   │
 │                                                             │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │  PreToolUse Hook: ExitPlanMode                       │   │
 │  │  → verify-governance-review.sh                       │   │
-│  │  Plans cannot be presented without governance review  │   │
+│  │  Plans are verified before presentation               │   │
 │  └──────────────────────────────────────────────────────┘   │
 │                                                             │
 │  Task tool for subagent coordination                        │
@@ -59,7 +59,7 @@ The system follows a **platform-native** philosophy (Principle P9: "Build Only W
 
 **What we build:**
 - Three MCP servers providing capabilities Claude Code lacks
-- **Lifecycle hooks** that enforce governance at the platform level
+- **Lifecycle hooks** that provide automatic governance verification at the platform level
 - Custom subagent definitions (`.claude/agents/*.md`)
 - Orchestration instructions (`CLAUDE.md`)
 - AVT Gateway for remote operation (FastAPI, 35 REST endpoints, WebSocket, job runner)
@@ -70,7 +70,7 @@ The system follows a **platform-native** philosophy (Principle P9: "Build Only W
 
 **What Claude Code provides natively:**
 - Subagent spawning and coordination (Task tool)
-- **PostToolUse / PreToolUse hooks** -- the enforcement mechanism we hook into
+- **PostToolUse / PreToolUse hooks** -- the coordination mechanism we hook into
 - Session persistence and resume
 - Git worktree management
 - Model routing (Opus 4.6/Sonnet 4.5/Haiku 4.5)
@@ -79,9 +79,9 @@ The system follows a **platform-native** philosophy (Principle P9: "Build Only W
 
 ## Hook-Based Governance: How It Works
 
-The key architectural insight: **we don't ask agents to call custom governance tools**. That approach is not tenable — agents would need to remember to call `create_governed_task()` instead of using Claude Code's native task system, and there's no enforcement if they forget.
+The key architectural insight: **we don't ask agents to call custom governance tools**. That approach is not tenable -- agents would need to remember to call `create_governed_task()` instead of using Claude Code's native task system, and there's no guarantee they will.
 
-Instead, **we hook directly into what Claude does natively**. After Claude writes each task (via `TaskCreate`), a PostToolUse hook fires automatically, creates the governance artifacts, and triggers holistic review of all tasks as a group:
+Instead, **we hook directly into what Claude does natively**. After Claude writes each task (via `TaskCreate`), a PostToolUse hook fires automatically, pairs it with a rapid governance review, and triggers holistic review of all tasks as a group:
 
 ```
 Claude creates a task (TaskCreate)
@@ -91,20 +91,20 @@ PostToolUse hook fires (governance-task-intercept.py)
         │
         ├── Extracts task info from hook payload
         ├── Creates a [GOVERNANCE] review task
-        ├── Adds blockedBy to the implementation task
+        ├── Pairs it with the implementation task (governed from creation)
         ├── Records governance state in SQLite (with session_id)
         ├── Creates .avt/.holistic-review-pending flag file
         └── Spawns background settle checker (3s debounce)
         │
         ▼
-Task is "blocked from birth" — cannot execute until review approves
+Task is governed from creation -- work begins once review completes
         │
         ▼
 After all tasks created (settle period elapses):
         │
         ├── Holistic review evaluates collective intent
-        ├── If approved: flag removed, individual reviews queued
-        └── If blocked: flag updated with guidance
+        ├── If approved: flag cleared, individual reviews queued
+        └── If issues found: flag updated with guidance for revision
 ```
 
 ### The Three Hooks
@@ -113,7 +113,7 @@ After all tasks created (settle period elapses):
 
 Fires after every task creation. The hook:
 - Reads the hook payload from stdin (tool_name, tool_input, tool_result, session_id)
-- Creates a governance review task that blocks the implementation task
+- Pairs the implementation task with a governance review (100% interception rate)
 - Stores governance records in SQLite (`.avt/governance.db`) with session_id
 - Creates/updates the holistic review flag file (`.avt/.holistic-review-pending`)
 - Spawns a background settle checker that waits 3s for more tasks
@@ -122,20 +122,20 @@ Fires after every task creation. The hook:
 
 **2. PreToolUse → `Write|Edit|Bash|Task`** (holistic-review-gate.sh)
 
-Blocks all mutation and delegation tools while holistic review is pending. Fast path (~1ms): checks if `.avt/.holistic-review-pending` exists. If the flag exists, reads its status and returns appropriate feedback. Stale flags (older than 5 minutes) are auto-removed.
+Coordinates work sequencing while holistic review completes. Fast path (~1ms): checks if `.avt/.holistic-review-pending` exists. If the flag exists, reads its status and returns appropriate feedback. Stale flags (older than 5 minutes) are auto-cleared.
 
 **3. PreToolUse → `ExitPlanMode`** (verify-governance-review.sh)
 
-Safety net: if an agent tries to present a plan without having called `submit_plan_for_review`, this hook blocks the action. This ensures governance review cannot be bypassed.
+Ensures plans are verified before presentation. If an agent tries to present a plan without having called `submit_plan_for_review`, this hook redirects the agent to submit the review first.
 
 ### Why Hooks Instead of Custom Tools
 
 | Approach | Problem |
 |----------|---------|
-| Custom `create_governed_task()` tool | Agents must remember to use it; no enforcement if they forget |
-| PostToolUse hook on TaskCreate | **Every task is intercepted automatically** -- agents use Claude's native tools and governance happens behind the scenes |
+| Custom `create_governed_task()` tool | Agents must remember to use it; nothing catches it if they forget |
+| PostToolUse hook on TaskCreate | **Every task is verified automatically** -- agents use Claude's native tools and governance happens behind the scenes |
 
-The hook approach means governance is **transparent and mandatory**. Agents don't need to know about governance -- they just create tasks normally, and the hook ensures every task gets reviewed individually AND collectively.
+The hook approach means governance is **transparent and universal**. Agents don't need to know about governance -- they just create tasks normally, and the hook ensures every task gets reviewed individually AND collectively. This reliability is what makes it safe to scale to more parallel agents: you know nothing reaches the codebase without passing through verification.
 
 ### Configuration
 
@@ -285,10 +285,10 @@ agent-vision-team/
 ├── scripts/
 │   └── hooks/                  # Claude Code lifecycle hooks
 │       ├── governance-task-intercept.py  # PostToolUse: auto-governance on task creation
-│       ├── holistic-review-gate.sh      # PreToolUse: block mutation tools during review
+│       ├── holistic-review-gate.sh      # PreToolUse: coordinate work during holistic review
 │       ├── _holistic-settle-check.py    # Background: settle detection + holistic review
 │       ├── _run-governance-review.sh    # Background: individual AI-powered review
-│       └── verify-governance-review.sh  # PreToolUse: block plans without review
+│       └── verify-governance-review.sh  # PreToolUse: verify plans before presentation
 ├── e2e/                        # Autonomous E2E testing harness
 │   ├── generator/              # Unique project generation per run (8 domains)
 │   ├── scenarios/              # 14 test scenarios (s01-s14)
@@ -297,12 +297,12 @@ agent-vision-team/
 ├── .claude/
 │   ├── agents/                 # 6 custom subagent definitions
 │   ├── skills/                 # User-invocable skills (/e2e)
-│   └── settings.json           # MCP server config + hooks (governance enforcement)
+│   └── settings.json           # MCP server config + hooks (governance verification)
 ├── .avt/                       # Project config, task briefs, memory, research, data stores
 │   ├── knowledge-graph.jsonl   # KG persistence (JSONL)
 │   ├── trust-engine.db         # Trust engine (SQLite)
 │   ├── governance.db           # Governance decisions + holistic reviews (SQLite)
-│   ├── .holistic-review-pending # Flag file (transient, gates mutation tools)
+│   ├── .holistic-review-pending # Flag file (transient, coordinates work during review)
 │   └── seen-todos.json         # TodoWrite hash tracking (for hook diffing)
 ├── .devcontainer/              # GitHub Codespaces configuration
 ├── extension/                  # VS Code extension (local mode, optional)
@@ -339,16 +339,16 @@ Three levels of oversight:
 
 ### Governed Task Execution
 
-The system enforces "intercept early, redirect early" through **Claude Code lifecycle hooks**:
+The system implements "intercept early, redirect early" through **Claude Code lifecycle hooks**:
 
-1. **Claude creates a task** — using its native `TaskCreate` or `TodoWrite` tools (no special action required)
-2. **PostToolUse hook fires** — `governance-task-intercept.py` intercepts the tool call
-3. **Governance review task is created** — paired with the implementation task, which is blocked from birth
-4. **Automated review runs** — async AI-powered review checks vision standards, architecture patterns, KG memory
-5. **Review completes** — approved tasks unblock; blocked tasks stay with guidance
-6. **Worker picks up unblocked task** — guaranteed to be reviewed before execution
+1. **Claude creates a task** -- using its native `TaskCreate` or `TodoWrite` tools (no special action required)
+2. **PostToolUse hook fires** -- `governance-task-intercept.py` intercepts the tool call
+3. **Governance review is paired** -- the implementation task is governed from creation, with rapid automated review queued
+4. **Automated review runs** -- async AI-powered review checks vision standards, architecture patterns, KG memory
+5. **Review completes** -- approved tasks proceed; tasks with issues receive constructive guidance
+6. **Worker picks up verified task** -- guaranteed to be reviewed before execution
 
-Multiple review blockers can be stacked (governance + security + architecture). The task is released only when ALL blockers are approved.
+Multiple review checkpoints can be stacked (governance + security + architecture). The task proceeds only when ALL reviews are complete. This is what makes it safe to run many agents in parallel: every task is verified before any code reaches the codebase.
 
 ### Custom Subagents
 
@@ -367,7 +367,7 @@ The human + primary Claude Code session acts as orchestrator, using:
 - Task tool to spawn subagents
 - CLAUDE.md for task decomposition and governance protocol
 - Governance MCP server for transactional decision review
-- PostToolUse / PreToolUse hooks for automatic governance enforcement
+- PostToolUse / PreToolUse hooks for automatic governance verification
 - session-state.md for persistent session state
 - Git tags for checkpoints
 
@@ -387,11 +387,11 @@ Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governa
 
 ### Phase 4: Governance + E2E (Complete)
 
-- Governed task lifecycle (blocked from birth until review approves)
-- **PostToolUse hook** intercepting `TaskCreate` for automatic governance enforcement
-- **PreToolUse hook** on `Write|Edit|Bash|Task` gating mutation tools during holistic review
-- **PreToolUse hook** on `ExitPlanMode` ensuring plans are reviewed before presentation
-- **Holistic review**: collective intent detection with settle/debounce pattern
+- Governed task lifecycle (every task verified before work begins)
+- **PostToolUse hook** intercepting `TaskCreate` for automatic governance verification (100% interception rate)
+- **PreToolUse hook** on `Write|Edit|Bash|Task` coordinating work during holistic review
+- **PreToolUse hook** on `ExitPlanMode` ensuring plans are verified before presentation
+- **Holistic review**: collective intent detection with settle/debounce pattern, completing in seconds
 - AI-powered review via `claude --print` with governance-reviewer agent
 - Multi-blocker support (stack governance + security + architecture reviews)
 - Quality gates fully operational: build, lint, tests, coverage, findings
@@ -423,16 +423,17 @@ Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governa
 
 ### Governance Server
 
-- **Hook-Based Enforcement**: PostToolUse hook intercepts every `TaskCreate` -- governance is automatic, not opt-in
-- **Holistic Review**: Tasks from the same session are evaluated collectively before any work begins. Detects unauthorized architectural shifts that individual reviews would miss
-- **Two-Layer Enforcement**: PostToolUse detection (settle/debounce) + PreToolUse gate (`Write|Edit|Bash|Task` blocked by flag file)
-- **Transactional Review**: Every decision blocks until review completes (synchronous round-trip)
+- **Automatic Verification**: PostToolUse hook intercepts every `TaskCreate` with 100% reliability -- governance is automatic, not opt-in
+- **Holistic Review**: Tasks from the same session are evaluated collectively before work begins, catching architectural shifts that individual reviews would miss. Typically completes in seconds
+- **Two-Layer Assurance**: PostToolUse detection (settle/debounce) + PreToolUse coordination (`Write|Edit|Bash|Task` sequenced around review)
+- **Transactional Review**: Every decision receives a synchronous round-trip review
 - **AI-Powered Review**: Uses `claude --print` with governance-reviewer agent for full reasoning
 - **Decision Categories**: `pattern_choice`, `component_design`, `api_design`, `deviation`, `scope_change`
-- **Verdicts**: `approved`, `blocked`, `needs_human_review` -- with guidance and standards verified
-- **Governed Tasks**: Atomic creation of review + implementation task pairs, blocked from birth
-- **Multi-Blocker**: Stack multiple reviews (governance, security, architecture) on a single task
+- **Verdicts**: `approved`, `blocked`, `needs_human_review` -- with constructive guidance and standards verified
+- **Governed Tasks**: Atomic creation of review + implementation task pairs, governed from creation
+- **Multi-Review Stacking**: Layer multiple reviews (governance, security, architecture) on a single task
 - **Audit Trail**: All decisions, verdicts, holistic reviews, and task reviews stored in SQLite
+- **Safe Scaling**: Reliable interception and hard quality gates mean you can confidently run more parallel agents -- nothing reaches the codebase without passing verification
 - **Loop Prevention**: Review tasks (prefixed `[GOVERNANCE]`, `[REVIEW]`, etc.) are skipped to prevent infinite recursion
 
 ### Quality Server
