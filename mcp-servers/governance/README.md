@@ -127,10 +127,10 @@ When an agent calls `submit_decision`:
 | Module | Purpose |
 |--------|---------|
 | `server.py` | FastMCP tool definitions and main entry point |
-| `models.py` | Pydantic models: Decision, ReviewVerdict, Finding, Alternative |
-| `store.py` | SQLite persistence: decisions table, reviews table, history/status queries |
+| `models.py` | Pydantic models: Decision, ReviewVerdict, Finding, Alternative, GovernedTaskRecord, HolisticReviewRecord |
+| `store.py` | SQLite persistence: decisions, reviews, governed_tasks, holistic_reviews tables |
 | `kg_client.py` | Direct JSONL reader for KG vision/architecture data |
-| `reviewer.py` | `claude --print` orchestration with prompt templates and JSON parsing |
+| `reviewer.py` | `claude --print` orchestration with prompt templates, JSON parsing, and `review_task_group()` for holistic review |
 | `session_state.py` | Generates `.avt/session-state.md` from governance DB (task stats, decision history) |
 | `task_integration.py` | Direct manipulation of Claude Code task files for governance-gated execution |
 
@@ -162,13 +162,94 @@ reviews (
     reviewer TEXT NOT NULL,
     created_at TEXT NOT NULL
 )
+
+governed_tasks (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    description TEXT,
+    context TEXT,
+    review_type TEXT DEFAULT 'governance',
+    implementation_task_id TEXT,
+    review_task_id TEXT,
+    session_id TEXT,                -- links tasks from the same agent session
+    status TEXT DEFAULT 'pending',
+    verdict TEXT,
+    guidance TEXT,
+    findings TEXT,                  -- JSON array
+    standards_verified TEXT,        -- JSON array
+    created_at TEXT NOT NULL
+)
+
+holistic_reviews (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,       -- links to governed_tasks.session_id
+    task_ids TEXT NOT NULL,         -- JSON array of implementation_task_ids
+    task_subjects TEXT NOT NULL,    -- JSON array of task subjects
+    collective_intent TEXT,
+    verdict TEXT,                   -- approved, blocked, needs_human_review
+    findings TEXT,                  -- JSON array
+    guidance TEXT,
+    standards_verified TEXT,        -- JSON array
+    reviewer TEXT DEFAULT 'governance-reviewer',
+    created_at TEXT NOT NULL
+)
 ```
 
-## Safety Net
+## Holistic Governance Review
 
-A `PreToolUse` hook on `ExitPlanMode` runs `scripts/hooks/verify-governance-review.sh`. This checks the SQLite DB for plan review records. If none exist, it blocks the tool call with feedback instructing the agent to submit a plan review first.
+Individual task review is necessary but not sufficient. Tasks that each pass review individually may collectively introduce unauthorized architectural shifts. Holistic review evaluates all tasks from a session as a group before any work begins.
 
-This is a **backup mechanism** — the primary enforcement is the Decision Protocol in the worker agent instructions.
+### How It Works
+
+```
+Agent creates Task 1, 2, 3 ...
+        |
+        v
+PostToolUse hook fires for each:
+  - Records task with session_id + timestamp
+  - Creates flag file: .avt/.holistic-review-pending
+  - Spawns background settle checker (3s debounce)
+        |
+        v
+Settle checker (last one) detects no newer tasks:
+  - Calls reviewer.review_task_group()
+  - Evaluates collective intent against vision standards
+  - If APPROVED: removes flag, queues individual reviews
+  - If BLOCKED: updates flag with guidance
+        |
+        v
+PreToolUse gate on Write|Edit|Bash|Task:
+  - Fast path (~1ms): no flag file -> allow
+  - Flag exists: read status -> block with feedback
+```
+
+### Key Properties
+
+- **MIN_TASKS_FOR_REVIEW = 2**: Single tasks skip holistic review (proceed directly to individual review)
+- **Settle/debounce**: Each PostToolUse spawns a background checker that waits 3s. Only the last checker triggers the holistic review
+- **session_id tracking**: All tasks from the same agent session are linked via `session_id` from the hook input
+- **Stale flag recovery**: The PreToolUse gate auto-removes flags older than 5 minutes
+- **Subagent handling**: Subagents inherit hooks; if a subagent creates tasks after a session is approved, the settle checker detects the existing review and cleans up
+- **Reviewer method**: `GovernanceReviewer.review_task_group()` runs `claude --print` with collective intent analysis
+
+### Related Files
+
+| File | Purpose |
+|------|---------|
+| `scripts/hooks/governance-task-intercept.py` | PostToolUse hook: creates flag, spawns settle checker |
+| `scripts/hooks/_holistic-settle-check.py` | Background settle checker: debounce, holistic review trigger |
+| `scripts/hooks/holistic-review-gate.sh` | PreToolUse gate: blocks mutation tools while review pending |
+| `collab_governance/reviewer.py` | `review_task_group()` method for collective intent review |
+| `collab_governance/models.py` | `HolisticReviewRecord` Pydantic model |
+| `collab_governance/store.py` | `holistic_reviews` table, session-based queries |
+
+## Safety Nets
+
+Two `PreToolUse` hooks provide deterministic enforcement:
+
+1. **ExitPlanMode gate** (`scripts/hooks/verify-governance-review.sh`): Checks the SQLite DB for plan review records. If none exist, blocks the tool call with feedback instructing the agent to submit a plan review first. This is a backup mechanism for the Decision Protocol.
+
+2. **Holistic review gate** (`scripts/hooks/holistic-review-gate.sh`): Checks for `.avt/.holistic-review-pending` flag file. If present, blocks all mutation tools (Write, Edit, Bash) and delegation tools (Task) until holistic review completes. This is the primary enforcement for collective intent review.
 
 ## Integration with VS Code Extension
 

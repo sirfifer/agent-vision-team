@@ -376,7 +376,10 @@ e2e/
 │   ├── s08_multi_blocker_task.py
 │   ├── s09_scope_change_detection.py
 │   ├── s10_completion_guard.py
-│   └── s12_cross_server_integration.py
+│   ├── s11_hook_based_governance.py
+│   ├── s12_cross_server_integration.py
+│   ├── s13_hook_pipeline_at_scale.py
+│   └── s14_persistence_lifecycle.py
 │
 ├── parallel/                   # Execution engine
 │   ├── __init__.py
@@ -402,7 +405,7 @@ run-e2e.sh
             ├── 1. generate_project(workspace/project, seed=...)
             │       └── Picks random domain, fills templates, writes .avt/ + KG
             │
-            ├── 2. Instantiate all 11 scenario classes
+            ├── 2. Instantiate all 14 scenario classes
             │       └── Each receives the GeneratedProject + workspace path
             │
             ├── 3. ParallelExecutor.run_scenarios(scenarios)
@@ -665,7 +668,10 @@ When a scenario fails, the root cause is in the MCP server code, not the test. U
 | s08 | `mcp-servers/governance/collab_governance/task_integration.py` |
 | s09 | `mcp-servers/governance/collab_governance/store.py` |
 | s10 | `mcp-servers/governance/collab_governance/task_integration.py`, `store.py` |
+| s11 | `scripts/hooks/governance-task-intercept.py`, `collab_governance/task_integration.py` |
 | s12 | All three server packages |
+| s13 | `scripts/hooks/governance-task-intercept.py`, `collab_governance/store.py` |
+| s14 | All three server packages, `collab_kg/graph.py`, `session_state.py` |
 
 ### Common Failure Patterns
 

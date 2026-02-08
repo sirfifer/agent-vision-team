@@ -2,7 +2,7 @@
 
 > A platform-native multi-agent system for software development built on Claude Code, providing tier-protected institutional memory, transactional governance, and deterministic quality verification through three MCP servers, six specialized subagents, and a standalone web gateway for remote operation.
 
-**Last Updated**: 2026-02-07
+**Last Updated**: 2026-02-08
 
 ---
 
@@ -150,9 +150,11 @@ Transactional review checkpoints for agent decisions, implementing the "intercep
 
 **Review process**: When a decision is submitted, the governance server loads vision standards from the KG, runs the governance-reviewer subagent via `claude --print` for AI-powered review, stores the verdict in SQLite, records the decision in the KG for institutional memory, and returns the verdict to the calling agent.
 
-**Governed task lifecycle**: `create_governed_task` atomically creates a review task and an implementation task. The implementation task is blocked from birth — its `blockedBy` array references the review. Multiple review blockers can be stacked (governance, security, architecture). The task is released only when all blockers are approved.
+**Governed task lifecycle**: `create_governed_task` atomically creates a review task and an implementation task. The implementation task is blocked from birth -- its `blockedBy` array references the review. Multiple review blockers can be stacked (governance, security, architecture). The task is released only when all blockers are approved.
 
-**Key files**: `mcp-servers/governance/collab_governance/` — `server.py`, `store.py` (SQLite decision store), `reviewer.py` (AI review logic), `task_integration.py` (Claude Code Task System integration), `kg_client.py` (KG integration)
+**Holistic governance review**: Before any work begins, all tasks from a session are evaluated as a group. A settle/debounce pattern detects when the agent has finished creating tasks, then runs a collective intent review against vision standards. If the collective intent is problematic, all work is blocked. Two-layer enforcement: PostToolUse detection (timing-based) + PreToolUse gate (flag file blocks Write/Edit/Bash/Task with ~1ms fast path).
+
+**Key files**: `mcp-servers/governance/collab_governance/` -- `server.py`, `store.py` (SQLite decision store + holistic reviews), `reviewer.py` (AI review logic + `review_task_group()`), `task_integration.py` (Claude Code Task System integration), `kg_client.py` (KG integration), `models.py` (including `HolisticReviewRecord`)
 
 ---
 
@@ -240,10 +242,16 @@ The reviewer returns structured verdicts with findings, guidance, and a list of 
 ### Governed Task Flow
 
 ```
-create_governed_task()
+create_governed_task() / TaskCreate hook
     ├── Creates review task (pending)
-    └── Creates implementation task (blocked by review)
-         └── Task CANNOT run until review completes
+    ├── Creates implementation task (blocked by review)
+    ├── Creates flag file (.avt/.holistic-review-pending)
+    └── Spawns settle checker (3s debounce)
+
+Settle checker (after all tasks created):
+    ├── Runs holistic review (collective intent vs vision)
+    ├── If APPROVED: removes flag, queues individual reviews
+    └── If BLOCKED: updates flag with guidance
 
 complete_task_review(verdict: "approved")
     └── Releases implementation task → worker picks it up
@@ -415,7 +423,7 @@ This means `DashboardContext.tsx` (the central state manager) required exactly o
 
 ## E2E Testing Harness
 
-An autonomous end-to-end testing system that exercises all three MCP servers across 13 scenarios with 221 structural assertions.
+An autonomous end-to-end testing system that exercises all three MCP servers across 14 scenarios with 292+ structural assertions.
 
 **How it works**: Each run generates a unique project from a pool of 8 domains (Pet Adoption Platform, Restaurant Reservation System, Fitness Tracking App, Online Learning Platform, Smart Home Automation, Inventory Management System, Event Ticketing Platform, Fleet Management System). Vision standards, architecture patterns, and components are filled from domain-specific templates. All assertions are structural and domain-agnostic — behavioral contracts hold regardless of domain.
 
@@ -433,7 +441,10 @@ An autonomous end-to-end testing system that exercises all three MCP servers acr
 | s08 | 3 stacked blockers released one at a time |
 | s09 | scope_change/deviation → needs_human_review verdict |
 | s10 | Unresolved blocks and missing plan reviews caught |
+| s11 | PostToolUse hook interception mechanics for task governance |
 | s12 | KG + Governance + Task system cross-server interplay |
+| s13 | Hook interception under concurrent load (50 rapid + 20 concurrent) |
+| s14 | Full two-phase persistence lifecycle across all 6 stores |
 
 **Usage**:
 ```bash
@@ -443,7 +454,7 @@ An autonomous end-to-end testing system that exercises all three MCP servers acr
 ./e2e/run-e2e.sh --verbose    # debug logging
 ```
 
-**Key files**: `e2e/run-e2e.sh` (entry point), `e2e/run-e2e.py` (Python orchestrator), `e2e/generator/` (project generation + 8 domain templates), `e2e/scenarios/` (14 test scenarios), `e2e/parallel/executor.py` (ThreadPoolExecutor with isolation)
+**Key files**: `e2e/run-e2e.sh` (entry point), `e2e/run-e2e.py` (Python orchestrator), `e2e/generator/` (project generation + 8 domain templates), `e2e/scenarios/` (14 test scenarios, s01-s14), `e2e/parallel/executor.py` (ThreadPoolExecutor with isolation)
 
 ---
 
@@ -455,7 +466,8 @@ An autonomous end-to-end testing system that exercises all three MCP servers acr
 |------|------|------------|
 | `.avt/knowledge-graph.jsonl` | KG entity/relation persistence | KG Server |
 | `.avt/trust-engine.db` | Quality finding audit trails | Quality Server |
-| `.avt/governance.db` | Decision store with verdicts | Governance Server |
+| `.avt/governance.db` | Decision store with verdicts and holistic reviews | Governance Server |
+| `.avt/.holistic-review-pending` | Flag file gating mutation tools during holistic review | PostToolUse hook |
 | `.avt/api-key.txt` | Gateway API authentication key (auto-generated) | AVT Gateway |
 | `.avt/jobs/` | Job submission state and output (JSON files) | AVT Gateway |
 
@@ -490,7 +502,7 @@ The KG Librarian syncs important graph entries to human-readable files:
 | Path | What |
 |------|------|
 | `.claude/agents/*.md` | Six custom subagent definitions (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward) |
-| `.claude/settings.json` | MCP server registration, lifecycle hooks, agent tool permissions |
+| `.claude/settings.json` | MCP server registration, lifecycle hooks (PostToolUse, PreToolUse), holistic review gate, agent tool permissions |
 | `CLAUDE.md` | Orchestrator instructions — task decomposition, governance protocol, quality review, memory protocol, drift detection |
 
 ### Documentation
@@ -610,7 +622,7 @@ cd mcp-servers/knowledge-graph && uv run pytest   # 18 tests, 74% coverage
 cd mcp-servers/quality && uv run pytest            # 26 tests, 48% coverage
 cd extension && npm test                           # 9 unit tests
 
-# E2E (exercises all 3 servers, 13 scenarios, 221 assertions)
+# E2E (exercises all 3 servers, 14 scenarios, 292+ assertions)
 ./e2e/run-e2e.sh
 ```
 
@@ -622,7 +634,7 @@ These principles, drawn from the system's development, govern how it's built and
 
 - **Vision First**: Vision standards are immutable by agents. Only humans define the vision. Agents enforce it but never propose changes to it.
 - **Build Only What the Platform Cannot Do**: Claude Code handles orchestration natively. Custom infrastructure is limited to three MCP servers providing capabilities the platform genuinely lacks.
-- **Intercept Early, Redirect Early**: Implementation tasks are blocked from birth until governance review approves them. No race conditions where work starts before review.
+- **Intercept Early, Redirect Early**: Implementation tasks are blocked from birth until governance review approves them. Holistic review evaluates tasks as a group to catch collective violations that individual review cannot detect. No race conditions where work starts before review.
 - **Deterministic Verification Over AI Judgment**: The most reliable trust signal is a compiler, linter, or test suite — not another LLM's opinion. Quality gates are deterministic.
 - **No Silent Dismissals**: Every dismissed finding requires justification and identity. Audit trails are non-negotiable.
 - **Support, Not Policing**: The quality system's primary purpose is making workers produce better work than they would alone — through pattern memory, architectural guidance, and constructive coaching.
@@ -637,7 +649,7 @@ All five implementation phases are complete:
 - **Phase 1** (MCP Servers): KG with JSONL persistence and tier protection, Quality with trust engine and multi-language tool wrapping, Governance with transactional review and governed tasks
 - **Phase 2** (Subagents + Validation): Six custom subagent definitions, orchestrator CLAUDE.md, settings and hooks
 - **Phase 3** (Extension): VS Code extension with Memory Browser, Findings Panel, Tasks Panel, Dashboard webview, setup wizard
-- **Phase 4** (Governance + E2E): Governance server, governed task system, AI-powered review, E2E harness with 13 scenarios and 221 assertions
+- **Phase 4** (Governance + E2E): Governance server, governed task system, AI-powered review, holistic collective-intent review with two-layer enforcement, E2E harness with 14 scenarios and 292+ assertions
 - **Phase 5** (Remote Operation): AVT Gateway (FastAPI, 35 REST endpoints, WebSocket push, job runner), dual-mode React dashboard, container packaging (Docker, Codespaces), mobile-responsive layout
 
 **Planned**: Cross-project memory, multi-worker parallelism patterns, installation script for target projects.

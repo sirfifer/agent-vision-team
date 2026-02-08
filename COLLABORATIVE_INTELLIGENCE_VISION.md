@@ -81,7 +81,7 @@ Claude Code provides the orchestration primitives natively. MCP servers extend t
 | **Agent spawning** | Custom subagents (`.claude/agents/*.md`) | Define worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward as subagent files |
 | **Parallel execution** | Task tool with `run_in_background` | Orchestrator spawns multiple workers simultaneously |
 | **Agent coordination** | Parent-child communication via Task results | Orchestrator delegates work, receives results, chains subagents |
-| **Lifecycle hooks** | `SubagentStart`, `SubagentStop`, `PreToolUse`, `PostToolUse` | Track when subagents begin/end, validate operations |
+| **Lifecycle hooks** | `SubagentStart`, `SubagentStop`, `PreToolUse`, `PostToolUse` | Track when subagents begin/end, validate operations, enforce holistic governance review |
 | **Worker isolation** | Git worktrees + parallel sessions | Each worker subagent operates in its own worktree |
 | **Session configuration** | CLAUDE.md + skills injection | Project CLAUDE.md instructs the orchestrator; skills preload domain knowledge |
 | **Model routing** | Per-subagent model selection | Opus 4.6 for judgment, Sonnet 4.5 for routine, Haiku 4.5 for mechanical |
@@ -94,7 +94,7 @@ Claude Code provides the orchestration primitives natively. MCP servers extend t
 |---|---|---|
 | **Persistent institutional memory** | Knowledge Graph server | Claude Code sessions are ephemeral. Memory doesn't survive across sessions natively. The KG provides persistent, structured, tier-protected memory that all sessions can query. |
 | **Deterministic quality verification** | Quality server | Claude Code can invoke tools, but doesn't bundle linter/formatter/test runner wrappers. The Quality server provides a unified MCP interface to ruff, eslint, swiftlint, pytest, etc., plus a trust engine for finding management. |
-| **Transactional governance review** | Governance server | Claude Code provides task management but not synchronous governance checkpoints. The Governance server provides transactional decision review, governed task lifecycle management, and plan/completion verification — ensuring every key decision is reviewed against vision standards before implementation proceeds. |
+| **Transactional governance review** | Governance server | Claude Code provides task management but not synchronous governance checkpoints. The Governance server provides transactional decision review, governed task lifecycle management, holistic collective-intent review, and plan/completion verification, ensuring every key decision is reviewed against vision standards before implementation proceeds. |
 
 ### What We Deliberately Don't Build
 
@@ -566,7 +566,8 @@ The quality reviewer's findings must include rationale tied to this specific cod
 
 ### Circuit Breakers
 
-- **Claude Code PreToolUse hooks**: Block dangerous operations
+- **Claude Code PreToolUse hooks**: Block dangerous operations and gate mutation tools during holistic review
+- **Holistic review gate**: PreToolUse on Write|Edit|Bash|Task blocks all work while collective review is pending
 - **Git guards**: Pre-commit hooks enforce quality gates
 - **Token budgets**: Natural session limits prevent infinite loops
 - **Drift detection**: Orchestrator monitors for time/loop/scope/quality drift
@@ -701,7 +702,7 @@ Built the extension as an observability layer:
 
 Added the Governance MCP server and comprehensive end-to-end testing:
 
-**Governance Server (port 3103):** Transactional decision review, governed task lifecycle (create, block, release), plan and completion verification. Integrates with Claude Code's Task List for persistence. Uses the governance-reviewer subagent internally via `claude --print`.
+**Governance Server (port 3103):** Transactional decision review, governed task lifecycle (create, block, release), holistic collective-intent review with settle/debounce detection, plan and completion verification. Integrates with Claude Code's Task List for persistence. Uses the governance-reviewer subagent internally via `claude --print`. Two-layer enforcement: PostToolUse detection + PreToolUse gate on Write|Edit|Bash|Task.
 
 **E2E Testing Harness:** 14 scenarios with 292+ structural assertions exercising all three MCP servers. Random domain generation, parallel execution with full isolation, domain-agnostic validation.
 
@@ -738,7 +739,7 @@ This system exists to preserve and serve the project's vision. Everything it doe
 
 A human developer, working through a primary Claude Code session, orchestrates six specialized subagents: workers implement tasks in isolated worktrees, a quality reviewer evaluates through the three-lens model (vision first, architecture second, quality third), a governance reviewer validates decisions against vision standards, a researcher gathers intelligence before architectural decisions, a librarian curates institutional memory, and a project steward maintains organizational hygiene.
 
-Three custom MCP servers provide what Claude Code cannot: the Knowledge Graph stores persistent, tier-protected institutional memory queryable by all sessions. The Quality server wraps deterministic verification tools behind a unified interface with a trust engine for finding management. The Governance server provides transactional decision review, ensuring every key decision is checked against vision standards before implementation proceeds.
+Three custom MCP servers provide what Claude Code cannot: the Knowledge Graph stores persistent, tier-protected institutional memory queryable by all sessions. The Quality server wraps deterministic verification tools behind a unified interface with a trust engine for finding management. The Governance server provides transactional decision review and holistic collective-intent review, ensuring every key decision is checked against vision standards before implementation proceeds, both individually and as a group.
 
 Everything else uses Claude Code's native capabilities: subagent spawning, background execution, lifecycle hooks, Task List persistence, session resume, model routing, permission control.
 

@@ -38,7 +38,7 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 | **Quality MCP Server** | Deterministic quality verification with trust engine (port 3102, 8 tools) |
 | **Governance MCP Server** | Transactional review checkpoints and governed task lifecycle (port 3103, 10 tools) |
 | **6 Custom Subagents** | Worker, Quality Reviewer, KG Librarian, Governance Reviewer, Researcher, Project Steward |
-| **Governance Architecture** | PostToolUse hook on TaskCreate (core enforcement), governed tasks (blocked-from-birth), transactional decision review, multi-blocker support, AI-powered review via `claude --print` |
+| **Governance Architecture** | PostToolUse hook on TaskCreate (core enforcement), PreToolUse gate on Write/Edit/Bash/Task (holistic review enforcement), governed tasks (blocked-from-birth), holistic review (collective intent detection with settle/debounce), transactional decision review, multi-blocker support, AI-powered review via `claude --print` |
 | **Three-Tier Protection Hierarchy** | Vision > Architecture > Quality — lower tiers cannot modify higher tiers |
 | **Project Rules System** | Behavioral guidelines (enforce/prefer) injected into agent prompts from `.avt/project-config.json` |
 | **E2E Testing Harness** | 14 scenarios, 292+ structural assertions, parallel execution with full isolation |
@@ -85,6 +85,9 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 | **Verdict** | The outcome of a governance review: `approved` (proceed), `blocked` (stop and revise), or `needs_human_review` (escalate). |
 | **Decision Category** | Classification for governance decisions: `pattern_choice`, `component_design`, `api_design`, `deviation`, `scope_change`. |
 | **Checkpoint** | A git tag (`checkpoint-NNN`) marking a recovery point after a meaningful unit of work. |
+| **Holistic Review** | Collective evaluation of all tasks from a session before any work begins. Detects architectural shifts that individual reviews would miss. Stored in `holistic_reviews` table. |
+| **Settle Checker** | Background process (`_holistic-settle-check.py`) that implements debounce detection for task group boundaries. Waits 3 seconds, checks for newer tasks, triggers holistic review if it is the last checker. |
+| **Flag File** | `.avt/.holistic-review-pending` -- transient JSON file that gates mutation tools via the PreToolUse hook during holistic review. Contains status (`pending`, `blocked`, `needs_human_review`) and guidance. |
 
 ---
 
@@ -397,7 +400,8 @@ Hooks are configured in `.claude/settings.json` and execute shell scripts at spe
 
 | Hook Type | Matcher | Script | Purpose |
 |-----------|---------|--------|---------|
-| `PostToolUse` | `TaskCreate` | `scripts/hooks/governance-task-intercept.py` | **Core enforcement**: intercepts every task creation and pairs it with a governance review blocker |
+| `PostToolUse` | `TaskCreate` | `scripts/hooks/governance-task-intercept.py` | **Core enforcement**: intercepts every task creation, pairs it with a governance review blocker, creates holistic review flag, spawns settle checker |
+| `PreToolUse` | `Write\|Edit\|Bash\|Task` | `scripts/hooks/holistic-review-gate.sh` | **Holistic gate**: blocks all mutation/delegation tools while holistic review is pending (~1ms fast path) |
 | `PreToolUse` | `ExitPlanMode` | `scripts/hooks/verify-governance-review.sh` | Safety net: blocks plan presentation if `submit_plan_for_review` was not called |
 
 #### PostToolUse Hook on TaskCreate (Core Enforcement)
@@ -451,11 +455,11 @@ export CLAUDE_CODE_TASK_LIST_ID="<name>"     # Enables cross-session persistence
 
 Without `CLAUDE_CODE_ENABLE_TASKS="true"`, the native task tools (`TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet`) are not available. Claude Code falls back to the legacy `TodoWrite` tool, which is in-memory only, has no dependency tracking, and cannot be hooked for governance. Setting this variable replaces `TodoWrite` entirely with the native task system.
 
-**Verified in live testing** (2026-02-07):
-- Level 1 (mock review): 12/12 tasks intercepted, 100% rate
-- Level 2 (real AI review): 10/10 tasks intercepted, reviews approved/blocked correctly
-- Level 3 (subagent delegation): 13/13 tasks intercepted (10 main + 3 subagent)
-- E2E: 13 scenarios, 221 assertions, no regression
+**Verified in live testing** (2026-02-08):
+- Level 1 (mock review): 11/11 tasks, 12/12 checks PASSED (settle detection, holistic review, flag lifecycle)
+- Level 2 (real AI review): 10/10 tasks, 13/13 checks PASSED (holistic review approved in ~7s, flag removed, individual reviews queued)
+- Level 3 (subagent delegation): 13/13 tasks (10 main + 3 subagent), 13/13 checks PASSED (subagent flag re-creation handled)
+- E2E: 14 scenarios, 292 assertions, no regression
 
 #### ExitPlanMode Hook (Safety Net)
 
@@ -2106,7 +2110,76 @@ Script checks .avt/governance.db for plan review records
 
 **Design Intent**: This hook is the **safety net**, not the primary mechanism. The primary enforcement is the worker protocol itself -- workers are instructed to call `submit_plan_for_review()` before presenting plans. The hook catches cases where an agent skips or forgets the governance checkpoint. If the governance database does not exist (server not running), the hook allows the action to avoid blocking development when governance is intentionally disabled.
 
-### 8.6 Task List + Governance Layering
+### 8.6 Holistic Governance Review
+
+Individual task governance catches vision violations one task at a time. But some violations only become visible when tasks are considered collectively. A task to "Add a models.py file" passes review individually, but together with "Add a migration runner," "Add a schema definition module," and "Add an ORM query builder," they collectively introduce an unauthorized ORM layer.
+
+The holistic review system addresses this with a two-layer enforcement pattern:
+
+**Layer 1: Detection (PostToolUse on TaskCreate)**
+
+When the PostToolUse hook fires for each `TaskCreate`, it:
+1. Records the task with `session_id` in the governance DB
+2. Creates/updates the flag file `.avt/.holistic-review-pending`
+3. Spawns a background settle checker (`scripts/hooks/_holistic-settle-check.py`)
+
+The settle checker implements a debounce pattern: it waits 3 seconds, then checks the DB for newer tasks. If newer tasks exist, it exits silently (a later checker handles it). If it is the last checker, it triggers the holistic review.
+
+**Layer 2: Enforcement (PreToolUse on Write|Edit|Bash|Task)**
+
+The gate hook (`scripts/hooks/holistic-review-gate.sh`) fires before every mutation or delegation tool. Its fast path (~1ms) checks whether `.avt/.holistic-review-pending` exists. If absent, it exits 0 immediately. If present, it reads the flag status and returns exit 2 with feedback:
+
+- `pending`: "Holistic review in progress, please wait"
+- `blocked`: "Holistic review BLOCKED: [guidance]. Please revise your task decomposition."
+- `needs_human_review`: "Tasks held pending human approval"
+
+**Holistic Review Flow:**
+
+```
+Tasks created (session_id links them)
+    |
+    v
+Settle checker wakes after 3s (debounce)
+    |
+    v
+GovernanceReviewer.review_task_group(
+    tasks, transcript_excerpt, vision_standards, architecture
+)
+    |
+    +-- APPROVED: remove flag file, queue individual reviews
+    +-- BLOCKED:  update flag with guidance, work stays blocked
+    +-- NEEDS_HUMAN_REVIEW: update flag, await human
+```
+
+**Key properties:**
+- **MIN_TASKS_FOR_REVIEW = 2**: Single tasks skip holistic review (flag removed immediately)
+- **Stale flag recovery**: Gate auto-removes flags older than 5 minutes
+- **Subagent handling**: If a subagent creates tasks after the session was already approved, the settle checker detects the existing approved review and cleans up the re-created flag
+- **Session tracking**: `session_id` from the hook stdin JSON links all tasks from the same session. The `HolisticReviewRecord` model stores the review result in `governance.db`
+
+**Data model additions:**
+
+```sql
+-- New table
+holistic_reviews (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    task_ids TEXT NOT NULL,       -- JSON array
+    task_subjects TEXT NOT NULL,  -- JSON array
+    collective_intent TEXT,
+    verdict TEXT,
+    findings TEXT,               -- JSON array
+    guidance TEXT,
+    standards_verified TEXT,      -- JSON array
+    reviewer TEXT DEFAULT 'governance-reviewer',
+    created_at TEXT NOT NULL
+)
+
+-- New column on governed_tasks
+session_id TEXT  -- links tasks from the same session
+```
+
+### 8.7 Task List + Governance Layering
 
 The system separates concerns into three distinct layers that compose cleanly:
 

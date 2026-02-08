@@ -68,6 +68,47 @@ Task is governed. Blocked until review completes.
 
 This fires for EVERY TaskCreate call, EVERY agent, EVERY subagent. No exceptions. No opt-out. The enforcement is event-driven, not instruction-driven.
 
+### Holistic Governance Review
+
+Individual task governance catches vision violations one task at a time. But some violations only become visible when tasks are considered collectively. A task to "Add a models.py file" passes review individually, but together with "Add a migration runner," "Add a schema definition module," and "Add an ORM query builder," they collectively introduce an unauthorized ORM layer.
+
+The holistic review system detects this by evaluating all tasks from a session as a group before any work begins.
+
+**How it works:**
+
+```
+Agent creates Task 1 → PostToolUse fires:
+  - Records task with session_id in governance DB
+  - Creates flag file: .avt/.holistic-review-pending
+  - Spawns background settle checker (waits 3s)
+
+Agent creates Task 2 → PostToolUse fires:
+  - Records task, updates flag, spawns new settle checker
+  - Previous checker detects newer task and exits
+
+Agent creates Task 3 → PostToolUse fires:
+  - Same as above
+
+Background: Settle checker for Task 3 wakes up after 3s:
+  - Checks DB: any tasks newer than me? NO → I'm the last task
+  - Runs holistic review (GovernanceReviewer.review_task_group())
+  - If APPROVED: removes flag file, queues individual reviews
+  - If BLOCKED: writes block reason to flag file
+
+Meanwhile: Agent tries to Write/Edit/Bash/Task:
+  → PreToolUse gate fires (~1ms)
+  → Flag file exists? YES → exit 2 (block with feedback)
+  → Agent sees "Holistic review in progress, please wait"
+```
+
+**Key properties:**
+- **Detection is timing-based** (settle/debounce), not reliant on agent behavior
+- **Enforcement is deterministic** (PreToolUse blocks mutation tools at the platform level)
+- **Works for all agent behaviors**: direct work, subagent spawning, or mixed
+- **Fast path is ~1ms** when no review is pending (flag file existence check)
+- **Single tasks skip holistic review** (MIN_TASKS_FOR_REVIEW = 2)
+- **Subagent tasks are handled**: if a subagent creates tasks after the session was already approved, the settle checker cleans up the re-created flag
+
 ### Explicit Governance (Optional)
 
 For cases where you want explicit control over review type, context, or multi-blocker setup, you can still use the governance MCP server directly:
@@ -329,11 +370,13 @@ The tool call blocks until the review completes. The worker then acts on the ver
 
 ### Hook-Based Enforcement Layer
 
-Two hooks enforce governance deterministically:
+Three hooks enforce governance deterministically:
 
-1. **PostToolUse on TaskCreate** (`scripts/hooks/governance-task-intercept.py`): The primary enforcement mechanism. Fires after every TaskCreate, creates the governance pair, and queues automated review. This is what makes "blocked from birth" universal and deterministic.
+1. **PostToolUse on TaskCreate** (`scripts/hooks/governance-task-intercept.py`): The primary enforcement mechanism. Fires after every TaskCreate, creates the governance pair, tracks session_id, creates the holistic review flag file, and spawns the settle checker for collective review. This is what makes "blocked from birth" universal and deterministic.
 
 2. **PreToolUse on ExitPlanMode** (`scripts/hooks/verify-governance-review.sh`): Safety net for plan presentation. Blocks agents from presenting plans without governance review. Checks `.avt/governance.db` for plan review records.
+
+3. **PreToolUse on Write|Edit|Bash|Task** (`scripts/hooks/holistic-review-gate.sh`): Blocks all mutation and delegation tools while holistic review is pending. Uses a flag file (`.avt/.holistic-review-pending`) as a fast-path gate (~1ms when no review is pending). Stale flags older than 5 minutes are auto-removed.
 
 ### Internal Review Flow
 
@@ -456,6 +499,7 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 .avt/                                # Agent Vision Team system config
 ├── task-briefs/                     # Task briefs for workers
 ├── session-state.md                 # Current session progress
+├── .holistic-review-pending         # Flag file: gates mutation tools during holistic review
 ├── memory/                          # Archival memory files (synced by KG Librarian)
 │   ├── architectural-decisions.md   # Significant decisions and rationale
 │   ├── troubleshooting-log.md       # Problems, attempts, solutions

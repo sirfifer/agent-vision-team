@@ -7,14 +7,14 @@ A platform-native collaborative intelligence system for software development, le
 This system provides:
 
 - **Tier-Protected Knowledge Graph**: Persistent institutional memory with vision/architecture/quality protection tiers
-- **Hook-Based Governance Enforcement**: PostToolUse hooks intercept every task Claude creates, automatically pairing it with a governance review -- no agent cooperation required
+- **Hook-Based Governance Enforcement**: PostToolUse hooks intercept every task Claude creates, automatically pairing it with a governance review. Holistic review evaluates task groups collectively before any work begins -- no agent cooperation required
 - **Quality Verification**: Deterministic tool wrapping (linters, formatters, tests, build checks) with trust engine
 - **Governed Task System**: "Intercept early, redirect early" -- implementation tasks are blocked from birth until governance review approves them
 - **Claude Code Integration**: Custom subagents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward) that leverage native orchestration
 - **AVT Gateway**: Standalone FastAPI backend with 35 REST endpoints, WebSocket push, and job runner for remote operation from any browser or phone
 - **Dual-Mode Dashboard**: Same React dashboard runs in VS Code (local) or standalone browser (remote) via transport abstraction
 - **Container Deployment**: Docker, docker-compose, and GitHub Codespaces support for persistent remote operation
-- **E2E Testing Harness**: Autonomous test suite generating unique projects per run across 13 scenarios with 221 structural assertions
+- **E2E Testing Harness**: Autonomous test suite generating unique projects per run across 14 scenarios with 292+ structural assertions
 - **VS Code Extension**: Observability layer for monitoring system state (optional)
 
 ## Architecture
@@ -26,9 +26,16 @@ The system follows a **platform-native** philosophy (Principle P9: "Build Only W
 │          Claude Code (Native Orchestration)                 │
 │                                                             │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  PostToolUse Hook: TaskCreate|TodoWrite              │   │
+│  │  PostToolUse Hook: TaskCreate                        │   │
 │  │  → governance-task-intercept.py                      │   │
 │  │  Every task is "blocked from birth" automatically    │   │
+│  │  Creates holistic review flag + settle checker       │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  PreToolUse Hook: Write|Edit|Bash|Task               │   │
+│  │  → holistic-review-gate.sh                           │   │
+│  │  Blocks mutation tools during holistic review (~1ms) │   │
 │  └──────────────────────────────────────────────────────┘   │
 │                                                             │
 │  ┌──────────────────────────────────────────────────────┐   │
@@ -74,10 +81,10 @@ The system follows a **platform-native** philosophy (Principle P9: "Build Only W
 
 The key architectural insight: **we don't ask agents to call custom governance tools**. That approach is not tenable — agents would need to remember to call `create_governed_task()` instead of using Claude Code's native task system, and there's no enforcement if they forget.
 
-Instead, **we hook directly into what Claude does natively**. After Claude writes each task (via `TaskCreate` or `TodoWrite`), a PostToolUse hook fires automatically and creates the governance artifacts:
+Instead, **we hook directly into what Claude does natively**. After Claude writes each task (via `TaskCreate`), a PostToolUse hook fires automatically, creates the governance artifacts, and triggers holistic review of all tasks as a group:
 
 ```
-Claude creates a task (TaskCreate or TodoWrite)
+Claude creates a task (TaskCreate)
         │
         ▼
 PostToolUse hook fires (governance-task-intercept.py)
@@ -85,27 +92,39 @@ PostToolUse hook fires (governance-task-intercept.py)
         ├── Extracts task info from hook payload
         ├── Creates a [GOVERNANCE] review task
         ├── Adds blockedBy to the implementation task
-        ├── Records governance state in SQLite
-        └── Queues async automated review (background)
+        ├── Records governance state in SQLite (with session_id)
+        ├── Creates .avt/.holistic-review-pending flag file
+        └── Spawns background settle checker (3s debounce)
         │
         ▼
 Task is "blocked from birth" — cannot execute until review approves
+        │
+        ▼
+After all tasks created (settle period elapses):
+        │
+        ├── Holistic review evaluates collective intent
+        ├── If approved: flag removed, individual reviews queued
+        └── If blocked: flag updated with guidance
 ```
 
-### The Two Hooks
+### The Three Hooks
 
-**1. PostToolUse → `TaskCreate|TodoWrite`** (governance-task-intercept.py)
+**1. PostToolUse → `TaskCreate`** (governance-task-intercept.py)
 
 Fires after every task creation. The hook:
-- Reads the hook payload from stdin (tool_name, tool_input, tool_result)
-- For `TodoWrite`: diffs against a seen-todos hash file (`.avt/seen-todos.json`) to detect genuinely new items — since TodoWrite sends the full list each time
+- Reads the hook payload from stdin (tool_name, tool_input, tool_result, session_id)
 - Creates a governance review task that blocks the implementation task
-- Stores governance records in SQLite (`.avt/governance.db`)
-- Queues an async AI-powered review via `claude --print` with the governance-reviewer agent
+- Stores governance records in SQLite (`.avt/governance.db`) with session_id
+- Creates/updates the holistic review flag file (`.avt/.holistic-review-pending`)
+- Spawns a background settle checker that waits 3s for more tasks
 - Returns `additionalContext` to Claude explaining the governance pairing
 - Loop prevention: skips tasks prefixed with `[GOVERNANCE]`, `[REVIEW]`, `[SECURITY]`, `[ARCHITECTURE]`
 
-**2. PreToolUse → `ExitPlanMode`** (verify-governance-review.sh)
+**2. PreToolUse → `Write|Edit|Bash|Task`** (holistic-review-gate.sh)
+
+Blocks all mutation and delegation tools while holistic review is pending. Fast path (~1ms): checks if `.avt/.holistic-review-pending` exists. If the flag exists, reads its status and returns appropriate feedback. Stale flags (older than 5 minutes) are auto-removed.
+
+**3. PreToolUse → `ExitPlanMode`** (verify-governance-review.sh)
 
 Safety net: if an agent tries to present a plan without having called `submit_plan_for_review`, this hook blocks the action. This ensures governance review cannot be bypassed.
 
@@ -114,9 +133,9 @@ Safety net: if an agent tries to present a plan without having called `submit_pl
 | Approach | Problem |
 |----------|---------|
 | Custom `create_governed_task()` tool | Agents must remember to use it; no enforcement if they forget |
-| PostToolUse hook on TaskCreate/TodoWrite | **Every task is intercepted automatically** — agents use Claude's native tools and governance happens behind the scenes |
+| PostToolUse hook on TaskCreate | **Every task is intercepted automatically** -- agents use Claude's native tools and governance happens behind the scenes |
 
-The hook approach means governance is **transparent and mandatory**. Agents don't need to know about governance — they just create tasks normally, and the hook ensures every task gets reviewed.
+The hook approach means governance is **transparent and mandatory**. Agents don't need to know about governance -- they just create tasks normally, and the hook ensures every task gets reviewed individually AND collectively.
 
 ### Configuration
 
@@ -127,7 +146,7 @@ Hooks are configured in `.claude/settings.json`:
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "TaskCreate|TodoWrite",
+        "matcher": "TaskCreate",
         "hooks": [
           {
             "type": "command",
@@ -144,6 +163,16 @@ Hooks are configured in `.claude/settings.json`:
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/verify-governance-review.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|Bash|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/holistic-review-gate.sh",
+            "timeout": 5
           }
         ]
       }
@@ -179,7 +208,7 @@ cd mcp-servers/knowledge-graph && uv run pytest   # 18 tests, 74% coverage
 cd mcp-servers/quality && uv run pytest            # 26 tests, 48% coverage
 cd extension && npm test                           # 9 unit tests
 
-# E2E (exercises all 3 servers, 13 scenarios, 221 assertions)
+# E2E (exercises all 3 servers, 14 scenarios, 292 assertions)
 ./e2e/run-e2e.sh
 ```
 
@@ -256,10 +285,13 @@ agent-vision-team/
 ├── scripts/
 │   └── hooks/                  # Claude Code lifecycle hooks
 │       ├── governance-task-intercept.py  # PostToolUse: auto-governance on task creation
-│       └── verify-governance-review.sh   # PreToolUse: block plans without review
+│       ├── holistic-review-gate.sh      # PreToolUse: block mutation tools during review
+│       ├── _holistic-settle-check.py    # Background: settle detection + holistic review
+│       ├── _run-governance-review.sh    # Background: individual AI-powered review
+│       └── verify-governance-review.sh  # PreToolUse: block plans without review
 ├── e2e/                        # Autonomous E2E testing harness
 │   ├── generator/              # Unique project generation per run (8 domains)
-│   ├── scenarios/              # 13 test scenarios (s01-s13)
+│   ├── scenarios/              # 14 test scenarios (s01-s14)
 │   ├── parallel/               # ThreadPoolExecutor + per-scenario isolation
 │   └── validation/             # Assertion engine + report generator
 ├── .claude/
@@ -269,7 +301,8 @@ agent-vision-team/
 ├── .avt/                       # Project config, task briefs, memory, research, data stores
 │   ├── knowledge-graph.jsonl   # KG persistence (JSONL)
 │   ├── trust-engine.db         # Trust engine (SQLite)
-│   ├── governance.db           # Governance decisions (SQLite)
+│   ├── governance.db           # Governance decisions + holistic reviews (SQLite)
+│   ├── .holistic-review-pending # Flag file (transient, gates mutation tools)
 │   └── seen-todos.json         # TodoWrite hash tracking (for hook diffing)
 ├── .devcontainer/              # GitHub Codespaces configuration
 ├── extension/                  # VS Code extension (local mode, optional)
@@ -346,7 +379,7 @@ The human + primary Claude Code session acts as orchestrator, using:
 
 ### Phase 2: Subagents + Validation (Complete)
 
-6 agents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward). Full CLAUDE.md orchestration. E2E testing harness with 13 scenarios and 221 structural assertions.
+6 agents (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward). Full CLAUDE.md orchestration. E2E testing harness with 14 scenarios and 292 structural assertions.
 
 ### Phase 3: Extension (Complete)
 
@@ -355,8 +388,10 @@ Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governa
 ### Phase 4: Governance + E2E (Complete)
 
 - Governed task lifecycle (blocked from birth until review approves)
-- **PostToolUse hook** intercepting `TaskCreate|TodoWrite` for automatic governance enforcement
+- **PostToolUse hook** intercepting `TaskCreate` for automatic governance enforcement
+- **PreToolUse hook** on `Write|Edit|Bash|Task` gating mutation tools during holistic review
 - **PreToolUse hook** on `ExitPlanMode` ensuring plans are reviewed before presentation
+- **Holistic review**: collective intent detection with settle/debounce pattern
 - AI-powered review via `claude --print` with governance-reviewer agent
 - Multi-blocker support (stack governance + security + architecture reviews)
 - Quality gates fully operational: build, lint, tests, coverage, findings
@@ -388,14 +423,16 @@ Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governa
 
 ### Governance Server
 
-- **Hook-Based Enforcement**: PostToolUse hook intercepts every `TaskCreate`/`TodoWrite` — governance is automatic, not opt-in
+- **Hook-Based Enforcement**: PostToolUse hook intercepts every `TaskCreate` -- governance is automatic, not opt-in
+- **Holistic Review**: Tasks from the same session are evaluated collectively before any work begins. Detects unauthorized architectural shifts that individual reviews would miss
+- **Two-Layer Enforcement**: PostToolUse detection (settle/debounce) + PreToolUse gate (`Write|Edit|Bash|Task` blocked by flag file)
 - **Transactional Review**: Every decision blocks until review completes (synchronous round-trip)
 - **AI-Powered Review**: Uses `claude --print` with governance-reviewer agent for full reasoning
 - **Decision Categories**: `pattern_choice`, `component_design`, `api_design`, `deviation`, `scope_change`
-- **Verdicts**: `approved`, `blocked`, `needs_human_review` — with guidance and standards verified
+- **Verdicts**: `approved`, `blocked`, `needs_human_review` -- with guidance and standards verified
 - **Governed Tasks**: Atomic creation of review + implementation task pairs, blocked from birth
 - **Multi-Blocker**: Stack multiple reviews (governance, security, architecture) on a single task
-- **Audit Trail**: All decisions, verdicts, and task reviews stored in SQLite
+- **Audit Trail**: All decisions, verdicts, holistic reviews, and task reviews stored in SQLite
 - **Loop Prevention**: Review tasks (prefixed `[GOVERNANCE]`, `[REVIEW]`, etc.) are skipped to prevent infinite recursion
 
 ### Quality Server
@@ -420,11 +457,11 @@ Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governa
 
 - **Autonomous Execution**: Single command (`./e2e/run-e2e.sh`) runs the full suite
 - **Domain Randomization**: Each run randomly selects from 8 project domains
-- **Structural Assertions**: 221 domain-agnostic assertions that verify behavioral contracts
+- **Structural Assertions**: 292+ domain-agnostic assertions that verify behavioral contracts
 - **Full Isolation**: Per-scenario KG, SQLite, and task directory -- scenarios never interfere
 - **Parallel Execution**: Library-mode scenarios run concurrently via `ThreadPoolExecutor`
 - **Reproducibility**: `--seed` flag for deterministic domain selection; `--keep` preserves workspace
-- **Comprehensive Coverage**: 13 scenarios spanning KG, Governance, Quality, and cross-server integration
+- **Comprehensive Coverage**: 14 scenarios spanning KG, Governance, Quality, and cross-server integration
 
 See [e2e/README.md](e2e/README.md) for complete documentation.
 
@@ -437,8 +474,8 @@ See [e2e/README.md](e2e/README.md) for complete documentation.
 | Knowledge Graph | 18 | 74% | All passing |
 | Quality Server | 26 | 48% | All passing |
 | Extension (Unit) | 9 | N/A | All passing |
-| E2E Harness | 13 scenarios / 221 assertions | N/A | All passing |
-| **Total** | **53 unit + 13 E2E scenarios** | -- | **All passing** |
+| E2E Harness | 14 scenarios / 292 assertions | N/A | All passing |
+| **Total** | **53 unit + 14 E2E scenarios** | -- | **All passing** |
 
 ### Detailed Coverage
 
