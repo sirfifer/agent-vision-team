@@ -149,6 +149,16 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/verify-governance-review.sh"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|Bash|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/holistic-review-gate.sh",
+            "timeout": 5
+          }
+        ]
       }
     ]
   },

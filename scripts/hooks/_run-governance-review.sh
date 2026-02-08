@@ -65,6 +65,33 @@ print('Review completed (mock)')
     exit 0
 fi
 
+# Query sibling tasks for context
+LIST_ID="${CLAUDE_CODE_TASK_LIST_ID:-default}"
+SIBLING_TASKS=$(cd "$PROJECT_DIR/mcp-servers/governance" && uv run python -c "
+import sys, json
+sys.path.insert(0, '.')
+from collab_governance.store import GovernanceStore
+from pathlib import Path
+
+db_path = Path('${PROJECT_DIR}/.avt/governance.db')
+if not db_path.exists():
+    print('- (no governance DB found)')
+    sys.exit(0)
+store = GovernanceStore(db_path=db_path)
+all_tasks = store.get_all_governed_tasks(limit=20)
+# Construct the namespaced ID for comparison
+my_id = '${LIST_ID}/${IMPL_TASK_ID}'
+siblings = [t for t in all_tasks if t['implementation_task_id'] != my_id]
+if siblings:
+    for t in siblings[:5]:
+        print(f'- {t[\"subject\"]} (status: {t[\"current_status\"]})')
+else:
+    print('- (no sibling tasks)')
+store.close()
+" 2>/dev/null || echo "- (could not query siblings)")
+
+log "Sibling tasks: $SIBLING_TASKS"
+
 # Build the review prompt
 INPUT_FILE=$(mktemp "${TMPDIR:-/tmp}/avt-review-XXXXXX-input.md")
 OUTPUT_FILE=$(mktemp "${TMPDIR:-/tmp}/avt-review-XXXXXX-output.md")
@@ -82,11 +109,16 @@ You are a governance reviewer. A new task has been created and needs governance 
 - **Task ID**: $IMPL_TASK_ID
 - **Review Task ID**: $REVIEW_TASK_ID
 
+## Sibling Tasks (created in the same session)
+Consider whether this task makes sense in context of its siblings:
+$SIBLING_TASKS
+
 ## Instructions
 1. Evaluate whether this task aligns with the project's vision standards and architecture patterns.
 2. Check if the task description is clear and well-scoped.
-3. For simple, well-defined tasks, approve quickly.
-4. For tasks that touch critical systems, require more scrutiny.
+3. Consider whether this task, combined with its siblings, makes sense collectively.
+4. For simple, well-defined tasks, approve quickly.
+5. For tasks that touch critical systems, require more scrutiny.
 
 Respond with ONLY a JSON object (no markdown, no explanation outside the JSON):
 {

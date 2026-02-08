@@ -44,7 +44,9 @@ LIST_ID="hook-live-test-${TIMESTAMP}"
 WORKSPACE=$(mktemp -d /tmp/avt-hook-live-XXXXXX)
 TASK_DIR="${HOME}/.claude/tasks/${LIST_ID}"
 LOG_FILE="${PROJECT_DIR}/.avt/hook-governance.log"
+HOLISTIC_LOG_FILE="${PROJECT_DIR}/.avt/hook-holistic.log"
 DB_FILE="${PROJECT_DIR}/.avt/governance.db"
+FLAG_FILE="${PROJECT_DIR}/.avt/.holistic-review-pending"
 CLAUDE_OUTPUT="${WORKSPACE}/claude-output.txt"
 
 mkdir -p "$WORKSPACE"
@@ -68,9 +70,16 @@ fi
 
 DB_GOVERNED_BEFORE=0
 DB_REVIEWS_BEFORE=0
+DB_HOLISTIC_BEFORE=0
 if [[ -f "$DB_FILE" ]]; then
     DB_GOVERNED_BEFORE=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM governed_tasks;" 2>/dev/null || echo 0)
     DB_REVIEWS_BEFORE=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM task_reviews;" 2>/dev/null || echo 0)
+    DB_HOLISTIC_BEFORE=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM holistic_reviews;" 2>/dev/null || echo 0)
+fi
+
+HOLISTIC_LOG_BEFORE=0
+if [[ -f "$HOLISTIC_LOG_FILE" ]]; then
+    HOLISTIC_LOG_BEFORE=$(wc -l < "$HOLISTIC_LOG_FILE" | tr -d ' ')
 fi
 
 # ── Select prompt ───────────────────────────────────────────────────────────
@@ -98,6 +107,9 @@ echo ""
 
 # ── Ensure .avt directory exists ────────────────────────────────────────────
 mkdir -p "${PROJECT_DIR}/.avt"
+
+# Clean up any stale holistic review flag from previous runs
+rm -f "$FLAG_FILE" 2>/dev/null || true
 
 # ── Run Claude ──────────────────────────────────────────────────────────────
 echo "--- Running Claude Code session ---"
@@ -420,6 +432,168 @@ if [[ "$LEVEL" -ge 3 ]]; then
     echo ""
 fi
 
+# --- 7. Holistic Review Pipeline ---
+echo "-- Holistic Review Pipeline --"
+
+# Determine if session_id was available (holistic path activated)
+HOLISTIC_ACTIVATED="false"
+NEW_HOLISTIC_LINES=0
+
+if [[ -f "$DB_FILE" && "$CLAUDE_TASK_FILES" -gt 0 ]]; then
+    # Check if any governed tasks from this test run have session_id populated
+    WITH_SESSION=$(sqlite3 "$DB_FILE" \
+        "SELECT count(*) FROM governed_tasks
+         WHERE session_id != '' AND session_id IS NOT NULL
+         AND implementation_task_id LIKE '${LIST_ID}/%';" 2>/dev/null || echo 0)
+
+    if [[ "$WITH_SESSION" -gt 0 ]]; then
+        HOLISTIC_ACTIVATED="true"
+        echo "  Session tracking: ACTIVE ($WITH_SESSION tasks with session_id)"
+    else
+        echo "  Session tracking: INACTIVE (no session_id from Claude Code)"
+    fi
+fi
+
+if [[ "$HOLISTIC_ACTIVATED" == "true" ]]; then
+    # 7a. Session ID in governed tasks
+    check_gte "Tasks have session_id populated" "1" "$WITH_SESSION"
+
+    # 7b. Holistic review log (settle checker activity)
+    if [[ -f "$HOLISTIC_LOG_FILE" ]]; then
+        HOLISTIC_LOG_AFTER=$(wc -l < "$HOLISTIC_LOG_FILE" | tr -d ' ')
+        NEW_HOLISTIC_LINES=$((HOLISTIC_LOG_AFTER - HOLISTIC_LOG_BEFORE))
+        echo "  New holistic log entries: $NEW_HOLISTIC_LINES"
+
+        if [[ "$NEW_HOLISTIC_LINES" -gt 0 ]]; then
+            SETTLE_STARTED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Settle checker started" 2>/dev/null || echo 0)
+            SETTLE_DEFERRED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "deferring" 2>/dev/null || echo 0)
+            SETTLE_LATEST=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "I'm the latest" 2>/dev/null || echo 0)
+            REVIEW_COMPLETED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Holistic review complete\|Mock holistic" 2>/dev/null || echo 0)
+            FLAG_REMOVED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Flag.*removed\|Flag file removed" 2>/dev/null || echo 0)
+
+            echo "  Settle checkers started: $SETTLE_STARTED"
+            echo "  Settle checkers deferred (newer tasks existed): $SETTLE_DEFERRED"
+            echo "  Latest checker triggered review: $SETTLE_LATEST"
+            echo "  Holistic review completed: $REVIEW_COMPLETED"
+            echo "  Flag file removed by settle checker: $FLAG_REMOVED"
+
+            check_gte "Settle checkers spawned" "1" "$SETTLE_STARTED"
+            check_gte "Holistic review completed" "1" "$REVIEW_COMPLETED"
+
+            # If holistic review completed, verify individual reviews were queued
+            INDIVIDUAL_QUEUED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Individual review queued\|Individual reviews queued" 2>/dev/null || echo 0)
+            echo "  Individual reviews queued after holistic: $INDIVIDUAL_QUEUED"
+
+            echo ""
+            echo "  --- Recent holistic log ---"
+            tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | head -30
+        else
+            echo "  No new holistic log entries. Settle checker may not have run."
+        fi
+    else
+        echo "  Holistic log not found: $HOLISTIC_LOG_FILE"
+        echo "  (settle checker creates this file)"
+    fi
+
+    echo ""
+
+    # 7c. Flag file lifecycle
+    # After approved holistic review (mock or real), flag should be removed.
+    # After blocked review, flag should exist with status=blocked.
+    # Determine expected state from holistic review DB verdict
+    EXPECTED_FLAG_STATE="removed"  # default expectation
+    if [[ -f "$DB_FILE" ]]; then
+        HR_VERDICT=$(sqlite3 "$DB_FILE" \
+            "SELECT verdict FROM holistic_reviews ORDER BY rowid DESC LIMIT 1;" 2>/dev/null || echo "")
+        if [[ "$HR_VERDICT" == "blocked" || "$HR_VERDICT" == "needs_human_review" ]]; then
+            EXPECTED_FLAG_STATE="present"
+        fi
+    fi
+
+    if [[ -f "$FLAG_FILE" ]]; then
+        FLAG_STATUS=$(python3 -c "
+import json, sys
+try:
+    data = json.load(open('$FLAG_FILE'))
+    print(data.get('status', 'unknown'))
+except:
+    print('unknown')
+" 2>/dev/null || echo "unknown")
+        echo "  Flag file: EXISTS (status=$FLAG_STATUS)"
+        if [[ "$FLAG_STATUS" == "blocked" ]]; then
+            echo "  WARN: Holistic review blocked. Tasks collectively violated standards."
+            FLAG_GUIDANCE=$(python3 -c "
+import json
+data = json.load(open('$FLAG_FILE'))
+print(data.get('guidance', '(no guidance)'))
+" 2>/dev/null || echo "(could not read)")
+            echo "  Guidance: $FLAG_GUIDANCE"
+        fi
+        # If we expected removal (approved), this is a failure
+        if [[ "$EXPECTED_FLAG_STATE" == "removed" ]]; then
+            check "Flag file removed after approved holistic review" "removed" "still_present"
+        else
+            check "Flag file present after $HR_VERDICT holistic review" "present" "present"
+        fi
+    else
+        echo "  Flag file: cleaned up (holistic review approved)"
+        if [[ "$EXPECTED_FLAG_STATE" == "removed" ]]; then
+            check "Flag file removed after approved holistic review" "removed" "removed"
+        else
+            check "Flag file present after $HR_VERDICT holistic review" "present" "removed"
+        fi
+    fi
+
+    # 7d. Holistic review DB record
+    if [[ -f "$DB_FILE" ]]; then
+        DB_HOLISTIC_AFTER=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM holistic_reviews;" 2>/dev/null || echo 0)
+        NEW_HOLISTIC=$((DB_HOLISTIC_AFTER - DB_HOLISTIC_BEFORE))
+        echo "  Holistic review DB records (new): $NEW_HOLISTIC"
+
+        if [[ "$NEW_HOLISTIC" -gt 0 ]]; then
+            HOLISTIC_VERDICT=$(sqlite3 "$DB_FILE" \
+                "SELECT verdict FROM holistic_reviews ORDER BY rowid DESC LIMIT 1;" 2>/dev/null || echo "unknown")
+            HOLISTIC_TASK_COUNT=$(sqlite3 "$DB_FILE" \
+                "SELECT task_ids FROM holistic_reviews ORDER BY rowid DESC LIMIT 1;" 2>/dev/null || echo "[]")
+            HOLISTIC_SESSION=$(sqlite3 "$DB_FILE" \
+                "SELECT session_id FROM holistic_reviews ORDER BY rowid DESC LIMIT 1;" 2>/dev/null || echo "unknown")
+
+            echo "  Latest holistic review verdict: $HOLISTIC_VERDICT"
+            echo "  Session: $HOLISTIC_SESSION"
+            echo "  Tasks reviewed: $HOLISTIC_TASK_COUNT"
+
+            check_gte "Holistic review DB record created" "1" "$NEW_HOLISTIC"
+        else
+            echo "  No holistic review records found."
+            echo "  (This might mean < 2 tasks were created, skipping holistic review)"
+            # Only fail this check if we have enough tasks for holistic review
+            if [[ "$CLAUDE_TASK_FILES" -ge 2 ]]; then
+                check_gte "Holistic review DB record created" "1" "$NEW_HOLISTIC"
+            fi
+        fi
+    fi
+
+    echo ""
+
+    # 7e. Gate feedback in Claude output (informational)
+    GATE_BLOCKS=$(grep -c "HOLISTIC GOVERNANCE REVIEW" "$CLAUDE_OUTPUT" 2>/dev/null || echo 0)
+    GATE_IN_PROGRESS=$(grep -c "HOLISTIC GOVERNANCE REVIEW IN PROGRESS" "$CLAUDE_OUTPUT" 2>/dev/null || echo 0)
+    GATE_BLOCKED=$(grep -c "HOLISTIC GOVERNANCE REVIEW BLOCKED" "$CLAUDE_OUTPUT" 2>/dev/null || echo 0)
+    echo "  Gate block messages in Claude output: $GATE_BLOCKS"
+    echo "    - In progress (waiting): $GATE_IN_PROGRESS"
+    echo "    - Blocked (violation): $GATE_BLOCKED"
+    # Informational only, not a hard assertion
+
+else
+    echo ""
+    echo "  Holistic review path NOT activated."
+    echo "  Possible causes:"
+    echo "    - Claude Code does not provide session_id in PostToolUse hook input"
+    echo "    - No tasks were created"
+    echo "  Holistic review checks skipped. Individual review path was used instead."
+fi
+echo ""
+
 # ── Summary ─────────────────────────────────────────────────────────────────
 echo "============================================================"
 echo "  SUMMARY"
@@ -432,6 +606,8 @@ echo "  Tasks intercepted by hook:  $REVIEW_FILES"
 echo "  Interception rate:          ${INTERCEPTION_RATE}%"
 echo "  DB governed task records:   $NEW_GOVERNED"
 echo "  DB review records:          $NEW_REVIEWS"
+echo "  Holistic review activated:  $HOLISTIC_ACTIVATED"
+echo "  Holistic log entries:       $NEW_HOLISTIC_LINES"
 if [[ "$LEVEL" -eq 1 ]]; then
     echo "  Python module files:        ${PY_MODULE_COUNT:-0}"
     echo "  Python test files:          ${PY_TEST_COUNT:-0}"

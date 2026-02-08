@@ -119,7 +119,7 @@ def _extract_task_info(hook_input: dict) -> dict | None:
 
 # ── Create governance pair ─────────────────────────────────────────────────
 
-def _create_governance_pair(task_info: dict) -> dict:
+def _create_governance_pair(task_info: dict, session_id: str = "") -> dict:
     """Create a review task and link it to the implementation task.
 
     Returns dict with review_task_id, review_record_id, and status info.
@@ -187,8 +187,9 @@ def _create_governance_pair(task_info: dict) -> dict:
             implementation_task_id=db_impl_id,
             subject=subject,
             description=description[:2000],
-            context=f"Auto-intercepted via PostToolUse hook",
+            context="Auto-intercepted via PostToolUse hook",
             current_status="pending_review",
+            session_id=session_id,
         )
         store.store_governed_task(governed_task)
 
@@ -222,11 +223,20 @@ def _discover_task_id(manager: TaskFileManager, subject: str) -> str | None:
     TaskCreate's tool_result is an empty string, so we discover the task ID
     by scanning existing tasks for a subject match. Since the hook fires
     immediately after TaskCreate, the file should already exist.
+
+    When duplicate subjects exist (e.g., main agent and subagent both create
+    a task for the same poem), prefer the task that hasn't been governed yet
+    (no blockedBy), falling back to the first match.
     """
+    first_match = None
     for task in manager.list_tasks():
         if task.subject == subject and not _is_review_task(task.subject, task.id):
-            return task.id
-    return None
+            if not task.blockedBy:
+                # Prefer the unblocked task (hasn't been governed yet)
+                return task.id
+            if first_match is None:
+                first_match = task.id
+    return first_match
 
 
 def _try_find_and_block_task(
@@ -300,6 +310,69 @@ def _log(msg: str) -> None:
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
+def _create_or_update_flag_file(session_id: str) -> None:
+    """Create or update the holistic review flag file.
+
+    This flag gates Write/Edit/Bash/Task tools via the PreToolUse hook
+    (holistic-review-gate.sh). While the flag exists, mutation tools are blocked.
+    """
+    flag_path = Path(PROJECT_DIR) / ".avt" / ".holistic-review-pending"
+    flag_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Count tasks for this session
+    task_count = 0
+    try:
+        store = GovernanceStore(db_path=DB_PATH)
+        tasks = store.get_tasks_for_session(session_id)
+        task_count = len(tasks)
+        store.close()
+    except Exception:
+        pass
+
+    flag_path.write_text(json.dumps({
+        "session_id": session_id,
+        "status": "pending",
+        "task_count": task_count,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }))
+    _log(f"Flag file created/updated: session={session_id} tasks={task_count}")
+
+
+def _spawn_settle_checker(session_id: str, transcript_path: str) -> None:
+    """Spawn a background settle checker for this session.
+
+    The settle checker waits SETTLE_SECONDS, then checks if any newer tasks
+    were created. If not, it triggers the holistic review. If yes, it exits
+    silently (a newer checker will handle it).
+    """
+    settle_script = Path(PROJECT_DIR) / "scripts" / "hooks" / "_holistic-settle-check.py"
+    if not settle_script.exists():
+        _log("NOTE: Settle checker script not found. Falling back to immediate individual review.")
+        return
+
+    my_timestamp = str(time.time())
+    try:
+        env = os.environ.copy()
+        env["CLAUDE_PROJECT_DIR"] = PROJECT_DIR
+        subprocess.Popen(
+            [
+                "uv", "run",
+                "--directory", str(GOVERNANCE_DIR),
+                "python", str(settle_script),
+                session_id,
+                my_timestamp,
+                transcript_path,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            env=env,
+        )
+        _log(f"Settle checker spawned: session={session_id} ts={my_timestamp}")
+    except Exception as e:
+        _log(f"WARNING: Failed to spawn settle checker: {e}")
+
+
 def main() -> None:
     try:
         raw = sys.stdin.read()
@@ -324,25 +397,42 @@ def main() -> None:
 
     _log(f"Intercepting task: {task_info['subject']} (id={task_info['task_id']})")
 
-    # Create the governance pair
-    review_info = _create_governance_pair(task_info)
+    # Extract session context from hook input
+    session_id = hook_input.get("session_id", "")
+    transcript_path = hook_input.get("transcript_path", "")
+
+    # Create the governance pair (passes session_id to the DB record)
+    review_info = _create_governance_pair(task_info, session_id=session_id)
     _log(
         f"Governance pair created: review={review_info['review_task_id']} "
-        f"impl={review_info['implementation_task_id']}"
+        f"impl={review_info['implementation_task_id']} session={session_id}"
     )
 
-    # Queue async review
-    _queue_async_review(review_info)
+    # Create/update flag file to gate work tools
+    if session_id:
+        _create_or_update_flag_file(session_id)
+        # Spawn settle checker (defers individual reviews until holistic review completes)
+        _spawn_settle_checker(session_id, transcript_path)
+    else:
+        # No session_id available; fall back to immediate individual review
+        _log("No session_id; falling back to immediate individual review")
+        _queue_async_review(review_info)
 
     # Return additionalContext to Claude
+    holistic_msg = ""
+    if session_id:
+        holistic_msg = (
+            " A holistic review of all tasks in this session will run automatically "
+            "before individual reviews begin. Mutation tools (Write/Edit/Bash) are "
+            "gated until the holistic review completes."
+        )
     output = {
         "hookSpecificOutput": {
             "hookEventName": "PostToolUse",
             "additionalContext": (
                 f"GOVERNANCE: Task '{task_info['subject']}' has been automatically "
                 f"paired with governance review {review_info['review_task_id']}. "
-                f"The task is blocked until review completes. "
-                f"Review is queued for automated processing. "
+                f"The task is blocked until review completes.{holistic_msg} "
                 f"Use get_task_review_status('{review_info['implementation_task_id']}') "
                 f"to check status."
             ),

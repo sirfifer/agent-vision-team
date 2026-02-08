@@ -128,7 +128,25 @@ class GovernedTaskRecord(BaseModel):
     context: str = ""  # Original context for governance
     reviews: list[str] = Field(default_factory=list)  # List of TaskReviewRecord IDs
     current_status: str = "pending_review"  # pending_review, approved, blocked
+    session_id: str = ""  # Links tasks created in the same session
     created_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
     released_at: Optional[str] = None
+
+
+class HolisticReviewRecord(BaseModel):
+    """Record of a holistic review evaluating multiple tasks collectively."""
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    session_id: str
+    task_ids: list[str] = Field(default_factory=list)
+    task_subjects: list[str] = Field(default_factory=list)
+    collective_intent: str = ""
+    verdict: Optional[Verdict] = None
+    findings: list[Finding] = Field(default_factory=list)
+    guidance: str = ""
+    standards_verified: list[str] = Field(default_factory=list)
+    reviewer: str = "governance-reviewer"
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )

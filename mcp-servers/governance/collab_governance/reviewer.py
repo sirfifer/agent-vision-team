@@ -45,6 +45,34 @@ class GovernanceReviewer:
         raw = self._run_claude(prompt, timeout=120)
         return self._parse_verdict(raw, plan_id=task_id)
 
+    def review_task_group(
+        self,
+        tasks: list[dict],
+        transcript_excerpt: str,
+        vision_standards: list[dict],
+        architecture: list[dict],
+    ) -> ReviewVerdict:
+        """Review a group of tasks holistically for collective vision/architecture compliance.
+
+        Individual tasks may look fine in isolation, but together they might
+        introduce an unauthorized architectural shift (e.g., 5 tasks that
+        collectively build an ORM layer that violates vision standards).
+
+        Args:
+            tasks: List of dicts with 'subject', 'description', 'impl_id'
+            transcript_excerpt: Recent agent reasoning from transcript JSONL
+            vision_standards: Vision-tier entities from the KG
+            architecture: Architecture-tier entities from the KG
+
+        Returns:
+            ReviewVerdict with holistic assessment
+        """
+        prompt = self._build_group_review_prompt(
+            tasks, transcript_excerpt, vision_standards, architecture
+        )
+        raw = self._run_claude(prompt, timeout=120)
+        return self._parse_verdict(raw)
+
     def review_completion(
         self,
         task_id: str,
@@ -368,6 +396,68 @@ Respond with ONLY a JSON object:
   "findings": [...],
   "guidance": "brief guidance",
   "standards_verified": ["list of verified standards"]
+}}"""
+
+    def _build_group_review_prompt(
+        self,
+        tasks: list[dict],
+        transcript_excerpt: str,
+        vision_standards: list[dict],
+        architecture: list[dict],
+    ) -> str:
+        standards_text = self._format_standards(vision_standards)
+        arch_text = self._format_architecture(architecture)
+
+        tasks_text = "\n".join(
+            f"  {i+1}. **{t['subject']}**: {t.get('description', '')[:200]}"
+            for i, t in enumerate(tasks)
+        )
+
+        return f"""You are a governance reviewer performing a HOLISTIC review. You are evaluating multiple tasks as a GROUP, not individually.
+
+## Why This Review Matters
+
+Individual tasks may each look reasonable in isolation. But together, they may represent:
+- An unauthorized architectural shift (e.g., 5 tasks that collectively build an ORM layer)
+- Scope creep beyond the original intent
+- A pattern that conflicts with vision standards when viewed collectively
+- Work that duplicates or contradicts existing architecture
+
+Your job is to identify what these tasks COLLECTIVELY represent and whether that collective intent aligns with project standards.
+
+## Vision Standards
+{standards_text}
+
+## Architecture Patterns
+{arch_text}
+
+## Tasks Under Review (as a group)
+{tasks_text}
+
+## Agent's Recent Reasoning (from transcript)
+{transcript_excerpt}
+
+## Instructions
+
+1. **COLLECTIVE INTENT**: In one sentence, what do these tasks collectively aim to accomplish?
+2. **Vision Check**: Does the collective intent conflict with any vision standard? A single task adding a "model" is fine; five tasks collectively building an ORM layer might violate "No ORM" standards.
+3. **Architecture Check**: Does the collective intent introduce a new architectural pattern not present in the established architecture? Is this an unauthorized architectural shift?
+4. **Scope Check**: Are these tasks proportional to what was discussed, or do they represent scope creep?
+5. **Cross-Task Analysis**: Are any tasks that look fine individually problematic when considered with their siblings?
+
+Respond with ONLY a JSON object (no markdown, no explanation outside the JSON):
+{{
+  "verdict": "approved" | "blocked" | "needs_human_review",
+  "findings": [
+    {{
+      "tier": "vision" | "architecture" | "quality",
+      "severity": "vision_conflict" | "architectural" | "logic",
+      "description": "what was found when evaluating tasks AS A GROUP",
+      "suggestion": "how to fix it"
+    }}
+  ],
+  "guidance": "brief guidance including the identified collective intent",
+  "standards_verified": ["list of standards that were checked and passed"]
 }}"""
 
     def _format_standards(self, standards: list[dict]) -> str:

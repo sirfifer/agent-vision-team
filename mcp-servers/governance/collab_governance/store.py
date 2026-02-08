@@ -12,6 +12,7 @@ from .models import (
     Confidence,
     Finding,
     GovernedTaskRecord,
+    HolisticReviewRecord,
     ReviewType,
     ReviewVerdict,
     TaskReviewRecord,
@@ -107,9 +108,34 @@ class GovernanceStore:
                 ON task_reviews(implementation_task_id);
             CREATE INDEX IF NOT EXISTS idx_task_reviews_review
                 ON task_reviews(review_task_id);
+
+            -- Holistic review table
+            CREATE TABLE IF NOT EXISTS holistic_reviews (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                task_ids TEXT NOT NULL,
+                task_subjects TEXT NOT NULL,
+                collective_intent TEXT,
+                verdict TEXT,
+                findings TEXT,
+                guidance TEXT,
+                standards_verified TEXT,
+                reviewer TEXT NOT NULL DEFAULT 'governance-reviewer',
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_holistic_reviews_session
+                ON holistic_reviews(session_id);
             """
         )
         conn.commit()
+
+        # Idempotent migration: add session_id column to governed_tasks
+        try:
+            conn.execute("ALTER TABLE governed_tasks ADD COLUMN session_id TEXT DEFAULT ''")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
     def next_sequence(self, task_id: str) -> int:
         conn = self._get_conn()
@@ -336,8 +362,8 @@ class GovernanceStore:
         conn.execute(
             """INSERT INTO governed_tasks
                (id, implementation_task_id, subject, description, context,
-                current_status, created_at, released_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                current_status, created_at, released_at, session_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 task.id,
                 task.implementation_task_id,
@@ -347,6 +373,7 @@ class GovernanceStore:
                 task.current_status,
                 task.created_at,
                 task.released_at,
+                task.session_id,
             ),
         )
         conn.commit()
@@ -429,6 +456,7 @@ class GovernanceStore:
             description=row["description"] or "",
             context=row["context"] or "",
             current_status=row["current_status"],
+            session_id=row["session_id"] or "",
             created_at=row["created_at"],
             released_at=row["released_at"],
         )
@@ -537,6 +565,95 @@ class GovernanceStore:
             "blocked": blocked,
             "pending_reviews": pending_reviews,
         }
+
+    # =========================================================================
+    # Holistic Review Methods
+    # =========================================================================
+
+    def store_holistic_review(self, record: HolisticReviewRecord) -> HolisticReviewRecord:
+        """Store a holistic review record."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO holistic_reviews
+               (id, session_id, task_ids, task_subjects, collective_intent,
+                verdict, findings, guidance, standards_verified, reviewer, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                record.id,
+                record.session_id,
+                json.dumps(record.task_ids),
+                json.dumps(record.task_subjects),
+                record.collective_intent,
+                record.verdict.value if record.verdict else None,
+                json.dumps([f.model_dump() for f in record.findings]),
+                record.guidance,
+                json.dumps(record.standards_verified),
+                record.reviewer,
+                record.created_at,
+            ),
+        )
+        conn.commit()
+        return record
+
+    def get_holistic_review_for_session(self, session_id: str) -> Optional[HolisticReviewRecord]:
+        """Get the holistic review for a session, if one exists."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM holistic_reviews WHERE session_id = ? ORDER BY created_at DESC LIMIT 1",
+            (session_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return self._row_to_holistic_review(row)
+
+    def get_tasks_for_session(self, session_id: str) -> list[GovernedTaskRecord]:
+        """Get all governed tasks for a session."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM governed_tasks WHERE session_id = ? ORDER BY created_at",
+            (session_id,),
+        ).fetchall()
+        return [
+            GovernedTaskRecord(
+                id=r["id"],
+                implementation_task_id=r["implementation_task_id"],
+                subject=r["subject"],
+                description=r["description"] or "",
+                context=r["context"] or "",
+                current_status=r["current_status"],
+                session_id=r["session_id"] or "",
+                created_at=r["created_at"],
+                released_at=r["released_at"],
+            )
+            for r in rows
+        ]
+
+    def get_latest_task_timestamp_for_session(self, session_id: str) -> Optional[str]:
+        """Get the created_at of the most recently created task in a session."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT MAX(created_at) as latest FROM governed_tasks WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+        return row["latest"] if row and row["latest"] else None
+
+    def _row_to_holistic_review(self, row: sqlite3.Row) -> HolisticReviewRecord:
+        """Convert a database row to a HolisticReviewRecord."""
+        findings_raw = json.loads(row["findings"] or "[]")
+        verdict = Verdict(row["verdict"]) if row["verdict"] else None
+        return HolisticReviewRecord(
+            id=row["id"],
+            session_id=row["session_id"],
+            task_ids=json.loads(row["task_ids"] or "[]"),
+            task_subjects=json.loads(row["task_subjects"] or "[]"),
+            collective_intent=row["collective_intent"] or "",
+            verdict=verdict,
+            findings=[Finding(**f) for f in findings_raw],
+            guidance=row["guidance"] or "",
+            standards_verified=json.loads(row["standards_verified"] or "[]"),
+            reviewer=row["reviewer"],
+            created_at=row["created_at"],
+        )
 
     def _row_to_task_review(self, row: sqlite3.Row) -> TaskReviewRecord:
         """Convert a database row to a TaskReviewRecord."""
