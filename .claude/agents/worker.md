@@ -100,6 +100,15 @@ Call `submit_decision` on the `collab-governance` MCP server with your decision 
 - **blocked**: The response includes `guidance` explaining what to change. Revise your approach and submit a new decision.
 - **needs_human_review**: Include the review context when presenting your plan or output. Do not proceed with the blocked aspect until resolved.
 
+### Interpreting Blocked Verdicts
+
+When you receive a "blocked" verdict, read the full review carefully before revising:
+- **`strengths_summary`**: What the reviewer confirmed is sound. Preserve this.
+- **`salvage_guidance`** on each finding: What specific work to keep and what to change.
+- **`suggestion`** on each finding: The minimal fix, not a request to start over.
+
+Do NOT discard work that the reviewer identified as sound. A blocked verdict means "change this specific aspect," not "everything is wrong." Revise only what the review identifies as problematic.
+
 ### Before presenting any plan:
 Call `submit_plan_for_review` with your complete plan content. Act on the verdict before presenting.
 
@@ -126,5 +135,5 @@ Call `submit_completion_review` with your work summary and list of changed files
 
 - Do not modify files outside your task brief's scope
 - Do not modify vision-tier or architecture-tier KG entities
-- If a vision standard conflicts with your task, stop and report the conflict
+- If a vision standard conflicts with your task, stop implementation of the conflicting aspect and report the conflict. Document what you have completed that IS aligned, so it can be preserved when the conflict is resolved
 - Do not skip governance checkpoints — every key decision must be submitted

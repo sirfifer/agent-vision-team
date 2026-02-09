@@ -432,7 +432,10 @@ def main() -> None:
             "additionalContext": (
                 f"GOVERNANCE: Task '{task_info['subject']}' has been automatically "
                 f"paired with governance review {review_info['review_task_id']}. "
-                f"The task is blocked until review completes.{holistic_msg} "
+                f"The task is held until review completes. This review will check "
+                f"alignment with vision and architecture standards, and provide "
+                f"constructive feedback including what aspects of your task design "
+                f"are sound.{holistic_msg} "
                 f"Use get_task_review_status('{review_info['implementation_task_id']}') "
                 f"to check status."
             ),

@@ -114,24 +114,31 @@ Consider whether this task makes sense in context of its siblings:
 $SIBLING_TASKS
 
 ## Instructions
-1. Evaluate whether this task aligns with the project's vision standards and architecture patterns.
-2. Check if the task description is clear and well-scoped.
-3. Consider whether this task, combined with its siblings, makes sense collectively.
-4. For simple, well-defined tasks, approve quickly.
-5. For tasks that touch critical systems, require more scrutiny.
+
+Apply PIN (Positive, Innovative, Negative) methodology:
+
+1. **POSITIVE**: What's sound about this task? Is it well-scoped and clear?
+2. **INNOVATIVE**: Does the task show good thinking about the project?
+3. **NEGATIVE**: Evaluate alignment with vision standards and architecture patterns.
+   - For simple, well-defined tasks, approve quickly and note what's good.
+   - For tasks that touch critical systems, require more scrutiny.
+   - If blocking, specify what's salvageable and what needs to change.
 
 Respond with ONLY a JSON object (no markdown, no explanation outside the JSON):
 {
   "verdict": "approved" | "blocked" | "needs_human_review",
+  "strengths_summary": "what the task gets right",
   "findings": [
     {
       "tier": "vision" | "architecture" | "quality",
       "severity": "vision_conflict" | "architectural" | "logic",
       "description": "what was found",
-      "suggestion": "how to fix it"
+      "suggestion": "how to fix it",
+      "strengths": ["what is sound"],
+      "salvage_guidance": "what to preserve"
     }
   ],
-  "guidance": "brief guidance for the agent",
+  "guidance": "acknowledge strengths, then direct changes",
   "standards_verified": ["list of standards checked"]
 }
 PROMPT
@@ -179,8 +186,12 @@ try:
 
     verdict_str = data.get('verdict', 'needs_human_review')
     guidance = data.get('guidance', '')
+    strengths_summary = data.get('strengths_summary', '')
     findings_raw = data.get('findings', [])
     standards = data.get('standards_verified', [])
+    # Prepend strengths to guidance so agents see what's sound
+    if strengths_summary and verdict_str != 'approved':
+        guidance = f'STRENGTHS: {strengths_summary} | GUIDANCE: {guidance}'
 except Exception as e:
     verdict_str = 'needs_human_review'
     guidance = f'Could not parse review output: {e}'

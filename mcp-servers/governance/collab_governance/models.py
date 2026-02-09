@@ -53,6 +53,8 @@ class Finding(BaseModel):
     severity: str
     description: str
     suggestion: str = ""
+    strengths: list[str] = Field(default_factory=list)
+    salvage_guidance: str = ""
 
 
 class ReviewVerdict(BaseModel):
@@ -62,6 +64,7 @@ class ReviewVerdict(BaseModel):
     verdict: Verdict
     findings: list[Finding] = Field(default_factory=list)
     guidance: str = ""
+    strengths_summary: str = ""
     standards_verified: list[str] = Field(default_factory=list)
     reviewer: str = "governance-reviewer"
     created_at: str = Field(
@@ -145,6 +148,7 @@ class HolisticReviewRecord(BaseModel):
     verdict: Optional[Verdict] = None
     findings: list[Finding] = Field(default_factory=list)
     guidance: str = ""
+    strengths_summary: str = ""
     standards_verified: list[str] = Field(default_factory=list)
     reviewer: str = "governance-reviewer"
     created_at: str = Field(

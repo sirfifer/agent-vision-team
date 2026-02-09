@@ -137,6 +137,14 @@ class GovernanceStore:
         except sqlite3.OperationalError:
             pass  # Column already exists
 
+        # Idempotent migration: add strengths_summary column for PIN feedback
+        for table in ("reviews", "holistic_reviews"):
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN strengths_summary TEXT DEFAULT ''")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
     def next_sequence(self, task_id: str) -> int:
         conn = self._get_conn()
         row = conn.execute(
@@ -176,8 +184,8 @@ class GovernanceStore:
         conn.execute(
             """INSERT INTO reviews
                (id, decision_id, plan_id, verdict, findings, guidance,
-                standards_verified, reviewer, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                strengths_summary, standards_verified, reviewer, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 review.id,
                 review.decision_id,
@@ -185,6 +193,7 @@ class GovernanceStore:
                 review.verdict.value,
                 json.dumps([f.model_dump() for f in review.findings]),
                 review.guidance,
+                review.strengths_summary,
                 json.dumps(review.standards_verified),
                 review.reviewer,
                 review.created_at,
@@ -335,6 +344,11 @@ class GovernanceStore:
 
     def _row_to_review(self, row: sqlite3.Row) -> ReviewVerdict:
         findings_raw = json.loads(row["findings"] or "[]")
+        # strengths_summary may not exist in older DBs before migration runs
+        try:
+            strengths_summary = row["strengths_summary"] or ""
+        except (IndexError, KeyError):
+            strengths_summary = ""
         return ReviewVerdict(
             id=row["id"],
             decision_id=row["decision_id"],
@@ -342,6 +356,7 @@ class GovernanceStore:
             verdict=Verdict(row["verdict"]),
             findings=[Finding(**f) for f in findings_raw],
             guidance=row["guidance"] or "",
+            strengths_summary=strengths_summary,
             standards_verified=json.loads(row["standards_verified"] or "[]"),
             reviewer=row["reviewer"],
             created_at=row["created_at"],
@@ -576,8 +591,9 @@ class GovernanceStore:
         conn.execute(
             """INSERT INTO holistic_reviews
                (id, session_id, task_ids, task_subjects, collective_intent,
-                verdict, findings, guidance, standards_verified, reviewer, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                verdict, findings, guidance, strengths_summary,
+                standards_verified, reviewer, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 record.id,
                 record.session_id,
@@ -587,6 +603,7 @@ class GovernanceStore:
                 record.verdict.value if record.verdict else None,
                 json.dumps([f.model_dump() for f in record.findings]),
                 record.guidance,
+                record.strengths_summary,
                 json.dumps(record.standards_verified),
                 record.reviewer,
                 record.created_at,
@@ -641,6 +658,10 @@ class GovernanceStore:
         """Convert a database row to a HolisticReviewRecord."""
         findings_raw = json.loads(row["findings"] or "[]")
         verdict = Verdict(row["verdict"]) if row["verdict"] else None
+        try:
+            strengths_summary = row["strengths_summary"] or ""
+        except (IndexError, KeyError):
+            strengths_summary = ""
         return HolisticReviewRecord(
             id=row["id"],
             session_id=row["session_id"],
@@ -650,6 +671,7 @@ class GovernanceStore:
             verdict=verdict,
             findings=[Finding(**f) for f in findings_raw],
             guidance=row["guidance"] or "",
+            strengths_summary=strengths_summary,
             standards_verified=json.loads(row["standards_verified"] or "[]"),
             reviewer=row["reviewer"],
             created_at=row["created_at"],

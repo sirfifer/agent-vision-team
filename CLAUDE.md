@@ -177,8 +177,8 @@ After any significant code change:
 
 1. **Spawn quality-reviewer** with the diff context
 2. **Review findings by tier** (vision first, then architecture, then quality):
-   - **Vision conflicts**: Stop all related work, address immediately
-   - **Architecture findings**: Route to worker with context, require resolution
+   - **Vision conflicts**: Pause the conflicting work and address the specific conflict. Check the review's `strengths_summary` and `salvage_guidance` to identify what work is sound and can be preserved. The worker should fix only the conflicting aspect, not discard all progress.
+   - **Architecture findings**: Route to worker with the full constructive context (strengths, salvage guidance, suggestion). The worker revises the specific deviation while preserving aligned work.
    - **Quality findings**: Route to worker, auto-fixable issues can be fixed inline
 3. **Verify resolution**: Ensure findings are addressed before proceeding
 
@@ -699,6 +699,15 @@ e2e/
 - **Research before implementing**: For unfamiliar domains or architectural decisions, spawn the researcher first. Workers should implement, not research.
 - **Track external dependencies**: Set up periodic research prompts to monitor APIs, frameworks, and tools the project depends on.
 - **Maintain project hygiene**: Periodically spawn the project-steward for consistency reviews. Clean projects are maintainable projects.
+
+## Constructive Feedback (PIN Methodology)
+
+All reviews in this system follow PIN methodology: Positive, Innovative, Negative.
+
+- **Why**: When a review only says "blocked," agents discard work unnecessarily. If 95% of work is sound and 5% conflicts with vision, the agent should fix the 5%, not start over.
+- **How**: Every review verdict includes `strengths_summary` (what's right overall), and every finding includes `strengths` (what's sound in the related area) and `salvage_guidance` (what to preserve).
+- **For orchestrators**: When routing a blocked finding back to a worker, include the strengths and salvage guidance. The worker should know what to keep.
+- **For reviewers**: A blocked verdict does not mean "everything is wrong." Always specify what's sound, what needs to change, and the minimal path to resolution.
 
 ## Writing Style
 

@@ -66,13 +66,17 @@ case "$STATUS" in
 import json, sys
 try:
     data = json.load(open('$FLAG_FILE'))
-    g = data.get('guidance', 'Review blocked. Check .avt/.holistic-review-pending for details.')
-    # Escape double quotes for JSON safety
-    print(g.replace('\"', '\\\\\\''))
+    parts = []
+    ss = data.get('strengths_summary', '')
+    if ss:
+        parts.append('WHAT IS SOUND: ' + ss)
+    g = data.get('guidance', 'Review blocked.')
+    parts.append('WHAT NEEDS CHANGE: ' + g)
+    print(' '.join(parts).replace('\"', '\\\\\\''))
 except Exception:
     print('Review blocked.')
 " 2>/dev/null || echo "Review blocked.")
-        REASON="HOLISTIC GOVERNANCE REVIEW BLOCKED: Your tasks were reviewed as a group and found to violate project standards collectively. ${GUIDANCE} Please revise your task decomposition."
+        REASON="HOLISTIC GOVERNANCE REVIEW: Your tasks were reviewed as a group and some aspects need revision. ${GUIDANCE} Review the guidance carefully: preserve what is sound and revise only the problematic tasks."
         ;;
     needs_human_review)
         REASON="HOLISTIC REVIEW: Needs human review. Tasks are held pending human approval. Contact the project lead."

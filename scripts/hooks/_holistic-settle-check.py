@@ -124,9 +124,9 @@ def _remove_flag() -> None:
         pass
 
 
-def _update_flag(status: str, guidance: str = "", findings: list = None) -> None:
+def _update_flag(status: str, guidance: str = "", findings: list = None, strengths_summary: str = "") -> None:
     """Update the flag file with a new status and optional details."""
-    data: dict = {"status": status, "guidance": guidance}
+    data: dict = {"status": status, "guidance": guidance, "strengths_summary": strengths_summary}
     if findings:
         data["findings"] = findings
     try:
@@ -272,6 +272,7 @@ def main() -> None:
         verdict=verdict.verdict,
         findings=verdict.findings,
         guidance=verdict.guidance,
+        strengths_summary=verdict.strengths_summary,
         standards_verified=verdict.standards_verified,
     )
     store.store_holistic_review(record)
@@ -296,6 +297,7 @@ def main() -> None:
             "blocked",
             guidance=verdict.guidance,
             findings=[f.model_dump() for f in verdict.findings],
+            strengths_summary=verdict.strengths_summary,
         )
         _log("Work tools remain blocked (holistic review: blocked).")
 

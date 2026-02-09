@@ -135,6 +135,7 @@ def submit_decision(
         "decision_id": decision.id,
         "findings": [f.model_dump() for f in review.findings],
         "guidance": review.guidance,
+        "strengths_summary": review.strengths_summary,
         "standards_verified": review.standards_verified,
     }
 
@@ -199,6 +200,7 @@ def submit_plan_for_review(
         "review_id": review.id,
         "findings": [f.model_dump() for f in review.findings],
         "guidance": review.guidance,
+        "strengths_summary": review.strengths_summary,
         "decisions_reviewed": len(decisions),
         "standards_verified": review.standards_verified,
     }
@@ -291,6 +293,7 @@ def submit_completion_review(
         "unreviewed_decisions": [],
         "findings": [f.model_dump() for f in review.findings],
         "guidance": review.guidance,
+        "strengths_summary": review.strengths_summary,
     }
 
 
@@ -529,6 +532,8 @@ def complete_task_review(
             severity=f.get("severity", "logic"),
             description=f.get("description", ""),
             suggestion=f.get("suggestion", ""),
+            strengths=f.get("strengths", []),
+            salvage_guidance=f.get("salvage_guidance", ""),
         ))
 
     # Update the review record

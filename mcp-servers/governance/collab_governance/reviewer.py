@@ -195,6 +195,8 @@ class GovernanceReviewer:
                         severity=f.get("severity", "logic"),
                         description=f.get("description", ""),
                         suggestion=f.get("suggestion", ""),
+                        strengths=f.get("strengths", []),
+                        salvage_guidance=f.get("salvage_guidance", ""),
                     )
                     for f in data.get("findings", [])
                 ]
@@ -210,6 +212,7 @@ class GovernanceReviewer:
                     verdict=verdict,
                     findings=findings,
                     guidance=data.get("guidance", ""),
+                    strengths_summary=data.get("strengths_summary", ""),
                     standards_verified=data.get("standards_verified", []),
                 )
             except (json.JSONDecodeError, KeyError):
@@ -279,23 +282,41 @@ class GovernanceReviewer:
 - **Confidence**: {decision.confidence.value}
 
 ## Instructions
-1. Check if this decision CONFLICTS with any vision standard. If yes, verdict is "blocked".
-2. Check if this decision deviates from established architecture patterns. If deviation is unjustified, verdict is "blocked".
-3. If the decision is a "deviation" or "scope_change" category, verdict should be "needs_human_review".
-4. If the decision aligns with standards, verdict is "approved".
+
+Apply PIN (Positive, Innovative, Negative) methodology in your review:
+
+### 1. POSITIVE: Identify Strengths
+- What aspects of this decision are sound and well-reasoned?
+- Which standards does the decision naturally align with?
+- What should be preserved regardless of the verdict?
+
+### 2. INNOVATIVE: Acknowledge Good Thinking
+- What creative or thoughtful aspects does this decision show?
+- Are there elements that demonstrate understanding of the project's patterns?
+
+### 3. NEGATIVE: Assess Concerns (if any)
+- Does this decision CONFLICT with any vision standard? If yes, verdict is "blocked".
+- Does it deviate unjustifiably from architecture patterns? If yes, verdict is "blocked".
+- If the category is "deviation" or "scope_change", verdict should be "needs_human_review".
+- If the decision aligns with standards, verdict is "approved".
+
+For EVERY finding, include what related work can be preserved and what is specifically problematic.
 
 Respond with ONLY a JSON object (no markdown, no explanation outside the JSON):
 {{
   "verdict": "approved" | "blocked" | "needs_human_review",
+  "strengths_summary": "1-2 sentences on what the decision gets right overall",
   "findings": [
     {{
       "tier": "vision" | "architecture" | "quality",
       "severity": "vision_conflict" | "architectural" | "logic",
-      "description": "what was found",
-      "suggestion": "how to fix it"
+      "description": "what specifically is problematic",
+      "suggestion": "concrete fix that preserves the good parts",
+      "strengths": ["what is sound about the related work"],
+      "salvage_guidance": "what can be preserved and how to pivot the problematic part"
     }}
   ],
-  "guidance": "brief guidance for the agent",
+  "guidance": "acknowledge strengths, then direct specific changes",
   "standards_verified": ["list of standards that were checked and passed"]
 }}"""
 
@@ -341,16 +362,41 @@ Respond with ONLY a JSON object (no markdown, no explanation outside the JSON):
 {plan_content}
 
 ## Instructions
+
+Apply PIN (Positive, Innovative, Negative) methodology:
+
+### 1. POSITIVE: What's Right About This Plan
+- Which parts align with vision standards?
+- What structural decisions are sound?
+- What would be lost if the agent started over completely?
+
+### 2. INNOVATIVE: Creative Elements
+- What aspects show good understanding of the project?
+- Any novel but valid approaches worth preserving?
+
+### 3. NEGATIVE: Concerns (if any)
 1. Verify the plan aligns with ALL applicable vision standards.
 2. Verify the plan follows established architecture patterns.
 3. Check that prior decision reviews have been respected (no blocked decisions reimplemented).
 4. Identify any gaps, risks, or concerns.
 
+For blocked verdicts: your guidance MUST specify which parts of the plan are sound and should be preserved, and which specific parts need revision.
+
 Respond with ONLY a JSON object:
 {{
   "verdict": "approved" | "blocked" | "needs_human_review",
-  "findings": [...],
-  "guidance": "brief guidance",
+  "strengths_summary": "what the plan gets right, so the agent knows what to preserve",
+  "findings": [
+    {{
+      "tier": "vision" | "architecture" | "quality",
+      "severity": "vision_conflict" | "architectural" | "logic",
+      "description": "what specifically is problematic",
+      "suggestion": "minimal change to fix while preserving good work",
+      "strengths": ["what is sound in the related area"],
+      "salvage_guidance": "what to keep, what to change"
+    }}
+  ],
+  "guidance": "acknowledge strengths, then direct specific changes",
   "standards_verified": ["list of verified standards"]
 }}"""
 
@@ -386,15 +432,29 @@ Respond with ONLY a JSON object:
 **Files changed**: {', '.join(files_changed)}
 
 ## Instructions
-1. Check that all decisions were reviewed (no unreviewed decisions).
-2. Check that no blocked decisions were implemented anyway.
-3. Verify the completed work aligns with vision standards.
+
+Apply PIN methodology to your final review:
+
+### Assessment
+1. **Strengths**: What did this work accomplish well? Acknowledge completed standards alignment.
+2. **Concerns**: Check that all decisions were reviewed. Check that no blocked decisions were implemented anyway. Verify alignment with vision standards.
+3. **Guidance**: If blocking, specify exactly what needs to change and what is already correct.
 
 Respond with ONLY a JSON object:
 {{
   "verdict": "approved" | "blocked" | "needs_human_review",
-  "findings": [...],
-  "guidance": "brief guidance",
+  "strengths_summary": "what the completed work achieves well",
+  "findings": [
+    {{
+      "tier": "vision" | "architecture" | "quality",
+      "severity": "vision_conflict" | "architectural" | "logic",
+      "description": "what specifically is problematic",
+      "suggestion": "concrete fix",
+      "strengths": ["what is sound about the related work"],
+      "salvage_guidance": "what to preserve"
+    }}
+  ],
+  "guidance": "acknowledge completed work strengths before directing any needed changes",
   "standards_verified": ["list of verified standards"]
 }}"""
 
@@ -439,24 +499,41 @@ Your job is to identify what these tasks COLLECTIVELY represent and whether that
 
 ## Instructions
 
+Apply PIN (Positive, Innovative, Negative) methodology to your holistic assessment:
+
+### 1. POSITIVE: What's Sound
+- Which individual tasks are well-scoped and aligned?
+- What does the task decomposition get right?
+- Are there tasks that should proceed unchanged?
+
+### 2. INNOVATIVE: Good Collective Thinking
+- Does the task group show thoughtful decomposition?
+- Are there smart dependency orderings or logical groupings?
+
+### 3. NEGATIVE: Collective Concerns
 1. **COLLECTIVE INTENT**: In one sentence, what do these tasks collectively aim to accomplish?
 2. **Vision Check**: Does the collective intent conflict with any vision standard? A single task adding a "model" is fine; five tasks collectively building an ORM layer might violate "No ORM" standards.
-3. **Architecture Check**: Does the collective intent introduce a new architectural pattern not present in the established architecture? Is this an unauthorized architectural shift?
-4. **Scope Check**: Are these tasks proportional to what was discussed, or do they represent scope creep?
-5. **Cross-Task Analysis**: Are any tasks that look fine individually problematic when considered with their siblings?
+3. **Architecture Check**: Does the collective intent introduce unauthorized architectural patterns?
+4. **Scope Check**: Are these tasks proportional, or do they represent scope creep?
+5. **Cross-Task Analysis**: Are any tasks problematic only when considered with their siblings?
+
+For blocked verdicts: your guidance MUST list which specific tasks are problematic and which are sound. The agent should know which tasks to keep, which to revise, and which to remove.
 
 Respond with ONLY a JSON object (no markdown, no explanation outside the JSON):
 {{
   "verdict": "approved" | "blocked" | "needs_human_review",
+  "strengths_summary": "which tasks and aspects of the decomposition are sound",
   "findings": [
     {{
       "tier": "vision" | "architecture" | "quality",
       "severity": "vision_conflict" | "architectural" | "logic",
       "description": "what was found when evaluating tasks AS A GROUP",
-      "suggestion": "how to fix it"
+      "suggestion": "how to fix it while preserving the sound tasks",
+      "strengths": ["which related tasks/aspects are fine"],
+      "salvage_guidance": "which tasks to keep, which to revise, which to remove"
     }}
   ],
-  "guidance": "brief guidance including the identified collective intent",
+  "guidance": "acknowledge sound tasks and good decomposition, then direct specific changes needed",
   "standards_verified": ["list of standards that were checked and passed"]
 }}"""
 

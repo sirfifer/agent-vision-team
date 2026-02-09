@@ -82,12 +82,13 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 | **Governance Server** | MCP server (port 3103, 10 tools) providing transactional decision review, plan review, completion review, and governed task lifecycle management. |
 | **Quality Gate** | A deterministic check that must pass before work is accepted: build, lint, test, coverage, findings. Run via `check_all_gates()` on the Quality server. |
 | **Trust Engine** | Classification system within the Quality server that assigns findings a trust level (BLOCK, INVESTIGATE, TRACK) and maintains an audit trail for dismissals. |
-| **Verdict** | The outcome of a governance review: `approved` (proceed), `blocked` (stop and revise), or `needs_human_review` (escalate). |
+| **Verdict** | The outcome of a governance review: `approved` (proceed), `blocked` (revise the specific issue while preserving sound work; includes `strengths_summary` and `salvage_guidance`), or `needs_human_review` (escalate). |
+| **PIN Methodology** | Positive, Innovative, Negative: the constructive feedback methodology applied to all reviews. Every verdict includes what's sound (`strengths_summary`), every finding includes what to preserve (`salvage_guidance`). Blocked does not mean "start over"; it means "change this specific aspect." |
 | **Decision Category** | Classification for governance decisions: `pattern_choice`, `component_design`, `api_design`, `deviation`, `scope_change`. |
 | **Checkpoint** | A git tag (`checkpoint-NNN`) marking a recovery point after a meaningful unit of work. |
 | **Holistic Review** | Collective evaluation of all tasks from a session before any work begins. Detects architectural shifts that individual reviews would miss. Stored in `holistic_reviews` table. |
 | **Settle Checker** | Background process (`_holistic-settle-check.py`) that implements debounce detection for task group boundaries. Waits 3 seconds, checks for newer tasks, triggers holistic review if it is the last checker. |
-| **Flag File** | `.avt/.holistic-review-pending` -- transient JSON file that coordinates work sequencing via the PreToolUse hook during holistic review. Contains status (`pending`, `blocked`, `needs_human_review`) and guidance. |
+| **Flag File** | `.avt/.holistic-review-pending` -- transient JSON file that coordinates work sequencing via the PreToolUse hook during holistic review. Contains status (`pending`, `blocked`, `needs_human_review`), guidance, and `strengths_summary` (for constructive feedback on blocks). |
 
 ---
 
@@ -1145,10 +1146,12 @@ get_pending_reviews() -> {
 
 ### 6.3 Verdicts
 
+All verdicts follow PIN (Positive, Innovative, Negative) methodology. Every review, including blocks, communicates what is sound and should be preserved alongside what needs to change. This is an efficiency optimization: agents that know 95% of their work is fine will fix the 5%, not start over.
+
 | Verdict | Meaning | Effect |
 |---------|---------|--------|
-| `approved` | Decision/plan aligns with standards | Agent proceeds; review blocker removed |
-| `blocked` | Decision conflicts with standards | Agent must revise and resubmit; blocker remains |
+| `approved` | Decision/plan aligns with standards | Agent proceeds; review blocker removed. `strengths_summary` confirms what was verified. |
+| `blocked` | Decision conflicts with a specific standard | Agent revises only the conflicting aspect while preserving sound work. `strengths_summary` identifies what's right; findings include `salvage_guidance` for what to keep. |
 | `needs_human_review` | Requires human judgment | Include review context when presenting to human; auto-assigned for `deviation` and `scope_change` |
 
 ### 6.4 Data Models
@@ -1208,6 +1211,8 @@ class Finding(BaseModel):
     severity: str                    # "vision_conflict" | "architectural" | "logic"
     description: str
     suggestion: str
+    strengths: list[str]             # What is sound about the related work (PIN: Positive)
+    salvage_guidance: str            # What can be preserved despite this finding (PIN: guidance)
 
 class ReviewVerdict(BaseModel):
     id: str                          # Auto-generated 12-char hex
@@ -1216,6 +1221,7 @@ class ReviewVerdict(BaseModel):
     verdict: Verdict
     findings: list[Finding]
     guidance: str
+    strengths_summary: str           # Overall positive assessment of what's working (PIN)
     standards_verified: list[str]
     reviewer: str                    # Default: "governance-reviewer"
     created_at: str
@@ -1249,15 +1255,16 @@ class TaskReviewRecord(BaseModel):
 
 ### 6.5 AI Review Pipeline
 
-The `GovernanceReviewer` class (`reviewer.py`) powers the AI review process. It constructs structured prompts, invokes `claude --print` via subprocess with temp file I/O, and parses JSON verdicts from the response.
+The `GovernanceReviewer` class (`reviewer.py`) powers the AI review process. It constructs structured prompts, invokes `claude --print` via subprocess with temp file I/O, and parses JSON verdicts from the response. All prompts apply PIN (Positive, Innovative, Negative) methodology, requiring the reviewer to identify strengths and salvageable work alongside any concerns.
 
-**Three review modes**:
+**Four review modes**:
 
 | Mode | Method | Timeout | Prompt Context |
 |------|--------|---------|----------------|
 | Decision review | `review_decision()` | 60s | Decision + vision standards + architecture entities |
 | Plan review | `review_plan()` | 120s | Plan + all prior decisions + all prior reviews + vision + architecture |
 | Completion review | `review_completion()` | 90s | Summary of work + files changed + all decisions + all reviews + vision |
+| Group/holistic review | `review_task_group()` | 120s | All session tasks + transcript excerpt + vision + architecture |
 
 **Execution flow** (for each review):
 
@@ -1470,6 +1477,7 @@ CREATE TABLE reviews (
     verdict TEXT NOT NULL,           -- "approved" | "blocked" | "needs_human_review"
     findings TEXT,                   -- JSON array of Finding objects
     guidance TEXT,
+    strengths_summary TEXT DEFAULT '',-- PIN: overall positive assessment of what's working
     standards_verified TEXT,         -- JSON array of standard names
     reviewer TEXT NOT NULL,          -- Default: "governance-reviewer"
     created_at TEXT NOT NULL
@@ -1582,7 +1590,7 @@ tools:
 | **Task Creation** | 6. Create governed tasks | Use `TaskCreate` or `create_governed_task()`. The PostToolUse hook ensures governance regardless of which is used (Section 3.3). |
 | | 7. Verify task unblocked | Call `get_task_review_status()` to confirm approval before starting work |
 | **During Work** | 8. Submit decisions | Call `submit_decision()` for every key choice (pattern_choice, component_design, api_design, deviation, scope_change). **This call blocks until verdict returns.** |
-| | 9. Act on verdicts | `approved`: proceed. `blocked`: revise and resubmit. `needs_human_review`: include context and wait. |
+| | 9. Act on verdicts | `approved`: proceed. `blocked`: read `strengths_summary` to identify sound work to preserve; read `salvage_guidance` on each finding for what to keep; revise only the problematic aspect and resubmit. `needs_human_review`: include context and wait. |
 | | 10. Submit plans | Call `submit_plan_for_review()` before presenting any plan |
 | | 11. Stay in scope | Follow patterns from KG, do not modify files outside task brief |
 | **Completion** | 12. Submit completion review | Call `submit_completion_review()` with work summary and changed files |
@@ -1592,7 +1600,7 @@ tools:
 **Constraints**:
 - Do not modify files outside the task brief's scope
 - Do not modify vision-tier or architecture-tier KG entities
-- If a vision standard conflicts with the task, stop and report the conflict
+- If a vision standard conflicts with the task, stop implementation of the conflicting aspect and report the conflict. Document what IS aligned so it can be preserved.
 - Do not skip governance checkpoints -- every key decision must be submitted
 - Pass `callerRole: "worker"` in all KG operations
 
@@ -1623,7 +1631,7 @@ tools:
 
 | Lens | Priority | KG Query | What It Checks | Severity |
 |------|----------|----------|----------------|----------|
-| **1. Vision** | Highest | `get_entities_by_tier("vision")` | Alignment with every applicable vision standard. A vision conflict is the ONLY finding reported -- it overrides everything else. | `vision_conflict` |
+| **1. Vision** | Highest | `get_entities_by_tier("vision")` | Alignment with every applicable vision standard. A vision conflict is the PRIMARY finding and the verdict is blocked. However, the reviewer MUST also report what is sound via `strengths` and `salvage_guidance`, so the agent knows what to preserve. | `vision_conflict` |
 | **2. Architecture** | Medium | `search_nodes("<affected components>")` | Adherence to established patterns (`follows_pattern` relations). Detection of ad-hoc pattern drift: new code that reinvents something an existing pattern handles. | `architectural` |
 | **3. Quality** | Standard | `check_all_gates()`, `run_lint()`, `check_coverage()` | Quality gate results, lint violations, test coverage. Compliance with project rules injected in context. | `logic`, `style`, `formatting` |
 
@@ -1631,6 +1639,8 @@ tools:
 - Project-specific rationale (not generic advice)
 - Concrete suggestion for remediation
 - Reference to the KG entity or standard being violated
+- `strengths`: what is sound about the related work (PIN: Positive)
+- `salvage_guidance`: what can be preserved despite this finding (PIN: guidance)
 
 **Constraints**:
 - Read-focused: review code, do not write production code
@@ -1713,7 +1723,7 @@ tools:
 
 | Check | Priority | Action on Failure |
 |-------|----------|-------------------|
-| **1. Vision Alignment** | Highest | Load standards via `get_entities_by_tier("vision")`. Any vision conflict produces a `blocked` verdict immediately -- overrides everything else. |
+| **1. Vision Alignment** | Highest | Load standards via `get_entities_by_tier("vision")`. Any vision conflict produces a `blocked` verdict. However, per PIN methodology, the reviewer also identifies what is sound and salvageable. |
 | **2. Architectural Conformance** | Medium | Search KG for patterns and components. Detect ad-hoc pattern drift. Unjustified deviation produces a `blocked` verdict. |
 | **3. Consistency Check** | Standard | For plan reviews: verify blocked decisions were not reimplemented. For completion reviews: verify all decisions were reviewed. Inconsistencies produce a `blocked` verdict. |
 
@@ -1722,22 +1732,25 @@ tools:
 ```json
 {
   "verdict": "approved | blocked | needs_human_review",
+  "strengths_summary": "what the work gets right overall (PIN: Positive)",
   "findings": [
     {
       "tier": "vision | architecture | quality",
       "severity": "vision_conflict | architectural | logic",
       "description": "specific finding with project context",
-      "suggestion": "concrete fix"
+      "suggestion": "concrete fix that preserves the good parts",
+      "strengths": ["what is sound in the related area"],
+      "salvage_guidance": "what to keep, what to change"
     }
   ],
-  "guidance": "brief guidance for the agent",
+  "guidance": "acknowledge strengths, then direct specific changes",
   "standards_verified": ["list of standards checked and passed"]
 }
 ```
 
 **Verdict Rules**:
-- **approved**: Decision aligns with all applicable standards. Includes which standards were verified.
-- **blocked**: Decision conflicts with vision or architecture. Includes specific findings with suggestions.
+- **approved**: Decision aligns with all applicable standards. Includes which standards were verified and `strengths_summary` confirming what's sound.
+- **blocked**: Decision conflicts with vision or architecture. Includes specific findings with suggestions, `strengths_summary` identifying what to preserve, and `salvage_guidance` per finding for targeted revision.
 - **needs_human_review**: Decision involves deviation, scope change, or ambiguous interpretation. Includes context for the human.
 
 **Constraints**:
@@ -2130,7 +2143,7 @@ The settle checker implements a debounce pattern: it waits 3 seconds, then check
 The checkpoint hook (`scripts/hooks/holistic-review-gate.sh`) fires before every mutation or delegation tool. Its fast path (~1ms) checks whether `.avt/.holistic-review-pending` exists. If absent, it exits 0 immediately. If present, it reads the flag status and returns exit 2 with feedback:
 
 - `pending`: "Holistic review in progress, please wait"
-- `blocked`: "Holistic review BLOCKED: [guidance]. Please revise your task decomposition."
+- `blocked`: "WHAT IS SOUND: [strengths_summary]. WHAT NEEDS CHANGE: [guidance]. Preserve sound tasks, revise only problematic ones."
 - `needs_human_review`: "Tasks held pending human approval"
 
 **Holistic Review Flow:**
@@ -2147,7 +2160,7 @@ GovernanceReviewer.review_task_group(
 )
     |
     +-- APPROVED: remove flag file, queue individual reviews
-    +-- BLOCKED:  update flag with guidance, work held for revision
+    +-- BLOCKED:  update flag with guidance + strengths_summary, work held for targeted revision
     +-- NEEDS_HUMAN_REVIEW: update flag, await human
 ```
 
@@ -2170,6 +2183,7 @@ holistic_reviews (
     verdict TEXT,
     findings TEXT,               -- JSON array
     guidance TEXT,
+    strengths_summary TEXT DEFAULT '',  -- PIN: what the task group gets right (added for constructive feedback)
     standards_verified TEXT,      -- JSON array
     reviewer TEXT DEFAULT 'governance-reviewer',
     created_at TEXT NOT NULL
@@ -2318,8 +2332,8 @@ After any significant code change:
 
 1. Spawn the **quality-reviewer** subagent with the diff context
 2. Review findings **by tier** (vision first, then architecture, then quality):
-   - **Vision conflicts**: Stop all related work and address immediately
-   - **Architecture findings**: Route to worker with context, require resolution
+   - **Vision conflicts**: Pause the conflicting work and address the specific conflict. Check the review's `strengths_summary` and `salvage_guidance` to identify what is sound and can be preserved. The worker fixes only the conflicting aspect, not discards all progress.
+   - **Architecture findings**: Route to worker with the full constructive context (strengths, salvage guidance, suggestion). The worker revises the specific deviation while preserving aligned work.
    - **Quality findings**: Route to worker; auto-fixable issues can be fixed inline
 3. Verify resolution before proceeding
 
@@ -3106,7 +3120,8 @@ When a worker's action conflicts with a vision-tier standard, the system blocks 
 │     KGClient.record_decision(decision, verdict)                        │
 │     → Creates entity in knowledge-graph.jsonl                           │
 │                                                                         │
-│  Returns: ReviewVerdict {verdict, findings, guidance, standards_verified}│
+│  Returns: ReviewVerdict {verdict, findings, guidance,                    │
+│           strengths_summary, standards_verified}                         │
 └──────────────────────────┬──────────────────────────────────────────────┘
                            │
               ┌────────────┼────────────────┐
@@ -3114,10 +3129,14 @@ When a worker's action conflicts with a vision-tier standard, the system blocks 
          "approved"   "blocked"    "needs_human_review"
               │            │                │
               ▼            ▼                ▼
-         Worker        Worker MUST      Worker includes
-         proceeds      revise and       context when
-         with impl     resubmit         presenting to
-                                        human
+         Worker        Worker reads      Worker includes
+         proceeds      strengths_       context when
+         with impl     summary and      presenting to
+                       salvage_         human
+                       guidance,
+                       revises only
+                       the problematic
+                       aspect
 ```
 
 **Key code paths:**
