@@ -189,7 +189,7 @@ export const DEMO_DATA: DashboardData = {
       timestamp: ago(8),
       agent: 'governance-reviewer',
       type: 'review',
-      summary: 'Governance: 7 approved, 1 blocked, 2 pending',
+      summary: 'Governance: 7 approved, 1 needs revision, 2 pending',
       tier: 'architecture',
     },
     {
@@ -304,7 +304,7 @@ export const DEMO_DATA: DashboardData = {
           reviewType: 'governance',
           status: 'blocked',
           verdict: 'blocked',
-          guidance: 'Blocked: multi-language support requires updating the Latency Budget vision standard. Current 500ms budget may be insufficient for translation pipeline. Needs human review.',
+          guidance: 'Needs revision: multi-language support requires updating the Latency Budget vision standard. Current 500ms budget may be insufficient for translation pipeline. Needs human review.',
           createdAt: ago(30),
           completedAt: ago(28),
         },

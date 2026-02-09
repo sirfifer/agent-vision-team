@@ -287,7 +287,7 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
       <div className="p-3 rounded bg-amber-500/10 border border-amber-500/30 text-sm">
         <strong>Balance matters.</strong> Too many rules reduce agent effectiveness — agents focus on
         compliance instead of problem-solving. We recommend 8-12 high-impact rules.
-        Deterministic checks (linting, formatting, build) are enforced by quality gates, not rules.
+        Deterministic checks (linting, formatting, build) are handled by quality gates, not rules.
         Rules are for behavioral guidance that tools can't check.
       </div>
 

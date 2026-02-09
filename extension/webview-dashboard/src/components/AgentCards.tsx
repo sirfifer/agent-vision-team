@@ -12,7 +12,7 @@ const roleDisplayNames: Record<string, string> = {
 };
 
 const roleDescriptions: Record<string, string> = {
-  orchestrator: 'Orchestrator: coordinates subagents, decomposes tasks, enforces the three-tier governance hierarchy',
+  orchestrator: 'Orchestrator: coordinates subagents, decomposes tasks, maintains the three-tier governance hierarchy',
   worker: 'Worker: implements scoped task briefs, follows established patterns, submits decisions to governance',
   'quality-reviewer': 'Quality Reviewer: evaluates work through vision alignment, architectural conformance, and quality compliance',
   'kg-librarian': 'KG Librarian: curates institutional memory, consolidates observations, promotes solution patterns',
@@ -32,14 +32,14 @@ const statusDotClass: Record<string, string> = {
 const statusDescriptions: Record<string, string> = {
   active: 'Agent is actively working on a task',
   idle: 'Agent is idle, waiting for assignment',
-  blocked: 'Agent is blocked by pending governance review',
+  blocked: 'Agent is awaiting governance review completion',
   reviewing: 'Agent is performing a governance or quality review',
   'not-configured': 'Agent definition not found in .claude/agents/',
 };
 
 function statusLabel(status: string): string | null {
   switch (status) {
-    case 'blocked': return 'Blocked';
+    case 'blocked': return 'Awaiting';
     case 'reviewing': return 'Reviewing';
     case 'active': return 'Active';
     default: return null;
@@ -65,7 +65,7 @@ function AgentCard({ agent, isSelected, onSelect }: {
   const statusDesc = statusDescriptions[agent.status] ?? agent.status;
   const filterHint = isSelected ? 'Click to clear activity filter' : 'Click to filter Activity Feed to this agent';
   const blockedByHint = agent.blockedBy?.length
-    ? `\nBlocked by: ${agent.blockedBy.join(', ')}`
+    ? `\nAwaiting: ${agent.blockedBy.join(', ')}`
     : '';
   const label = statusLabel(agent.status);
   const displayName = roleDisplayNames[agent.role] ?? agent.name;

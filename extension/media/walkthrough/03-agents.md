@@ -2,11 +2,11 @@
 
 | Agent | Role | What It Does |
 |-------|------|-------------|
-| **Orchestrator** | Coordinator | Decomposes complex tasks, spawns workers, enforces quality review, manages the governance hierarchy |
+| **Orchestrator** | Coordinator | Decomposes complex tasks, spawns workers, coordinates quality review, manages the governance hierarchy |
 | **Worker** | Implementer | Executes scoped task briefs, submits decisions to governance before implementing key choices |
 | **Quality Reviewer** | Reviewer | Evaluates diffs through vision alignment, architectural conformance, and quality compliance |
 | **KG Librarian** | Curator | Consolidates observations, promotes recurring solutions to patterns, removes stale entries |
-| **Governance Reviewer** | Gatekeeper | AI-powered review of decisions and plans against vision and architecture standards |
+| **Governance Reviewer** | Reviewer | AI-powered review of decisions and plans against vision and architecture standards |
 | **Researcher** | Investigator | Gathers intelligence for architectural decisions, monitors external dependencies for changes |
 | **Project Steward** | Maintainer | Ensures naming conventions, folder organization, documentation completeness, and project hygiene |
 

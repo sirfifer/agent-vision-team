@@ -33,6 +33,6 @@
 ```
 
 The extension connects to three MCP servers that provide
-institutional memory, quality enforcement, and governance
+institutional memory, quality verification, and governance
 review. Agents coordinate through the orchestrator to
 implement work governed by your project's standards.

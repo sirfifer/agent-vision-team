@@ -12,8 +12,8 @@ const tierBadgeClass: Record<string, string> = {
 };
 
 const typeDescriptions: Record<string, string> = {
-  vision_standard: 'Vision Standard: a core principle or invariant. Human-only modifiable. Violations block all related work.',
-  architectural_standard: 'Architectural Standard: a design rule enforced across the codebase. Modifiable with human approval.',
+  vision_standard: 'Vision Standard: a core principle or invariant. Human-only modifiable. Violations are caught before any code is written.',
+  architectural_standard: 'Architectural Standard: a design rule verified across the codebase. Modifiable with human approval.',
   pattern: 'Pattern: an established implementation pattern that agents should follow. Deviations require governance review.',
   component: 'Component: a tracked system component with observations about its state and behavior.',
   problem: 'Problem: a tracked issue or concern that needs attention.',

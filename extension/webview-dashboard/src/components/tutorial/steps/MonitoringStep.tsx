@@ -8,7 +8,7 @@ const PANELS = [
   {
     name: 'Agent Cards',
     location: 'Below session bar',
-    desc: 'One card per agent (Orchestrator, Worker, Quality Reviewer, KG Librarian, Governance Reviewer, Researcher, Steward). Color-coded status: green = active, gray = idle, red = blocked, amber = reviewing.',
+    desc: 'One card per agent (Orchestrator, Worker, Quality Reviewer, KG Librarian, Governance Reviewer, Researcher, Steward). Color-coded status: green = active, gray = idle, red = awaiting review, amber = reviewing.',
     color: 'border-green-500/30',
   },
   {
@@ -20,7 +20,7 @@ const PANELS = [
   {
     name: 'Governed Tasks',
     location: 'Right side, Tasks tab',
-    desc: 'Shows all tasks created with create_governed_task(). Each displays its review status: Pending Review, Approved, Blocked, In Progress, or Completed.',
+    desc: 'Shows all tasks created with create_governed_task(). Each displays its review status: Pending Review, Approved, Needs Revision, In Progress, or Completed.',
     color: 'border-purple-500/30',
   },
   {

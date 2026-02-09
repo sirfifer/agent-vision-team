@@ -12,16 +12,16 @@
   └────────┬────────┘
            │
   ┌────────▼────────┐
-  │ Create Governed │  Each task gets a governance
-  │ Task            │  review blocker — BLOCKED
-  └────────┬────────┘  FROM BIRTH
+  │ Create Governed │  Each task is paired with a
+  │ Task            │  governance review — GOVERNED
+  └────────┬────────┘  FROM CREATION
            │
   ┌────────▼────────┐
   │  Governance     │  Reviews against vision
   │  Review         │  standards and architecture
   └────┬───────┬────┘
        │       │
-   Approved  Blocked
+   Approved  Needs Revision
        │       │
        │   ┌───▼──────────┐
        │   │ Revise and   │
@@ -44,5 +44,5 @@
   └─────────────────┘
 ```
 
-**No race conditions.** Tasks cannot be picked up before
-review. Every decision is checked before execution.
+**Rapid, reliable verification.** Every task is reviewed
+before work begins. Every decision is checked before execution.

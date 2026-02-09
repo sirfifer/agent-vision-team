@@ -41,8 +41,8 @@ export function StartingWorkStep() {
         <div className="flex gap-3 items-start">
           <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-900/30 text-amber-300 text-xs font-bold flex-shrink-0">2</span>
           <div>
-            <p className="text-sm font-medium">Each task gets a governance review blocker</p>
-            <p className="text-xs text-vscode-muted">Tasks are <strong>blocked from birth</strong> until governance review approves them</p>
+            <p className="text-sm font-medium">Each task is paired with a governance review</p>
+            <p className="text-xs text-vscode-muted">Tasks are <strong>governed from creation</strong> with rapid automated review before work begins</p>
           </div>
         </div>
         <div className="flex gap-3 items-start">

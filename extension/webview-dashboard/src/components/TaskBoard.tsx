@@ -2,10 +2,16 @@ import { useState } from 'react';
 import { useDashboard } from '../context/DashboardContext';
 import type { GovernedTask, TaskReviewInfo, GovernedTaskStatus } from '../types';
 
+const verdictDisplayLabels: Record<string, string> = {
+  approved: 'approved',
+  blocked: 'needs revision',
+  needs_human_review: 'needs human review',
+};
+
 const statusConfig: Record<GovernedTaskStatus, { label: string; color: string; bgColor: string }> = {
   pending_review: { label: 'Pending Review', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20' },
   approved: { label: 'Approved', color: 'text-green-400', bgColor: 'bg-green-500/20' },
-  blocked: { label: 'Blocked', color: 'text-red-400', bgColor: 'bg-red-500/20' },
+  blocked: { label: 'Needs Revision', color: 'text-red-400', bgColor: 'bg-red-500/20' },
   in_progress: { label: 'In Progress', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
   completed: { label: 'Completed', color: 'text-vscode-muted', bgColor: 'bg-vscode-widget-bg' },
 };
@@ -83,7 +89,7 @@ function TaskCard({ task }: { task: GovernedTask }) {
                 <span className="text-vscode-muted">({r.status})</span>
               </div>
               {r.verdict && (
-                <div className="text-vscode-muted">Verdict: {r.verdict}</div>
+                <div className="text-vscode-muted">Verdict: {verdictDisplayLabels[r.verdict] ?? r.verdict}</div>
               )}
               {r.guidance && (
                 <div className="mt-1">{r.guidance}</div>
@@ -107,7 +113,7 @@ const filterConfig: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'pending_review', label: 'Pending' },
   { key: 'approved', label: 'Approved' },
-  { key: 'blocked', label: 'Blocked' },
+  { key: 'blocked', label: 'Needs Revision' },
   { key: 'completed', label: 'Completed' },
 ];
 
@@ -173,7 +179,7 @@ export function TaskBoard({ className = '' }: { className?: string }) {
             {blockedCount > 0 && (
               <span className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                {blockedCount} blocked
+                {blockedCount} needs revision
               </span>
             )}
             {governanceStats.totalDecisions > 0 && (

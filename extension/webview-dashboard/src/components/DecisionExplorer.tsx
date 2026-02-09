@@ -24,6 +24,12 @@ const verdictColors: Record<string, string> = {
   needs_human_review: 'bg-purple-500/20 text-purple-400',
 };
 
+const verdictLabels: Record<string, string> = {
+  approved: 'Approved',
+  blocked: 'Needs Revision',
+  needs_human_review: 'Needs Human Review',
+};
+
 function formatRelativeTime(isoString: string): string {
   const now = Date.now();
   const then = new Date(isoString).getTime();
@@ -55,7 +61,7 @@ function DecisionCard({ decision }: { decision: DecisionHistoryEntry }) {
           <span className="text-xs font-medium flex-1 truncate">{decision.summary}</span>
           {decision.verdict && (
             <span className={`text-2xs px-1.5 py-0.5 rounded font-medium ${verdictColors[decision.verdict] ?? 'bg-vscode-widget-bg text-vscode-muted'}`}>
-              {decision.verdict.replace('_', ' ')}
+              {verdictLabels[decision.verdict] ?? decision.verdict.replace('_', ' ')}
             </span>
           )}
           {!decision.verdict && (
@@ -164,7 +170,7 @@ export function DecisionExplorer({ className = '' }: { className?: string }) {
                 verdictFilter === v ? 'bg-tier-quality text-white' : 'bg-vscode-widget-bg text-vscode-muted hover:text-vscode-fg'
               }`}
             >
-              {v.replace('_', ' ')}
+              {verdictLabels[v] ?? v.replace('_', ' ')}
             </button>
           ))}
           <button

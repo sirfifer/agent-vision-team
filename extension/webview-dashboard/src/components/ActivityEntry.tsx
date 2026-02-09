@@ -36,7 +36,7 @@ const agentColors: Record<string, string> = {
 };
 
 const agentDescriptions: Record<string, string> = {
-  orchestrator: 'Orchestrator: coordinates workers, enforces governance, manages session lifecycle',
+  orchestrator: 'Orchestrator: coordinates workers, maintains governance, manages session lifecycle',
   worker: 'Worker: implements scoped task briefs under governance checkpoints',
   'quality-reviewer': 'Quality Reviewer: runs deterministic quality gates (build, lint, tests, coverage)',
   'kg-librarian': 'KG Librarian: curates Knowledge Graph entities and observations',

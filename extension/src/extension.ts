@@ -104,7 +104,7 @@ function enrichAgentStatus(
             return {
               ...agent,
               status: 'blocked',
-              currentTask: `${taskStats.blocked} task(s) blocked`,
+              currentTask: `${taskStats.blocked} task(s) awaiting review`,
             };
           }
           if (taskStats.approved > 0) {
@@ -537,7 +537,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (govStatus && govStatus.total_decisions > 0) {
           dashboardProvider.addActivity(
             makeActivity('governance-reviewer', 'review',
-              `Governance: ${govStatus.approved} approved, ${govStatus.blocked} blocked, ${govStatus.pending} pending`,
+              `Governance: ${govStatus.approved} approved, ${govStatus.blocked} needs revision, ${govStatus.pending} pending`,
               { tier: 'architecture' })
           );
         }

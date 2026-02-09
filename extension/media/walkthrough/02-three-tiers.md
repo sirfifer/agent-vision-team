@@ -38,4 +38,4 @@
 ```
 
 **Key rule:** Lower tiers cannot modify or contradict
-higher tiers. Vision conflicts stop all related work.
+higher tiers. Vision conflicts are caught before any code is written.
