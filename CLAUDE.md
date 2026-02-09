@@ -526,6 +526,18 @@ e2e/                                     # Autonomous E2E testing harness
 ├── scenarios/                           # 14 test scenarios (s01–s14)
 ├── parallel/                            # ThreadPoolExecutor + isolation
 └── validation/                          # Assertion engine + report generator
+
+server/                                  # AVT Gateway (headless web mode)
+├── avt_gateway/                         # FastAPI application
+│   ├── app.py                           # HTTP/WebSocket API + SPA serving
+│   ├── config.py                        # Environment config + API key management
+│   ├── services/project_manager.py      # Multi-project lifecycle + port allocation
+│   ├── routers/                         # Per-project and global API routes
+│   └── ws/manager.py                    # WebSocket real-time event push
+├── static/                              # Compiled web dashboard SPA
+├── Dockerfile                           # Containerized deployment
+├── entrypoint.sh                        # Container startup sequence
+└── nginx.conf                           # TLS reverse proxy + WebSocket upgrade
 ```
 
 ## Starting MCP Servers
@@ -547,6 +559,22 @@ uv run python -m collab_governance.server
 ```
 
 All servers will be available to all Claude Code sessions and subagents.
+
+### Headless Web Mode (AVT Gateway)
+
+For operating without VS Code, the AVT Gateway serves the dashboard as a standalone web application and manages MCP servers automatically:
+
+```bash
+# Local development
+cd server
+uv run uvicorn avt_gateway.app:app --host 0.0.0.0 --port 8080
+
+# Docker deployment (includes Nginx + TLS)
+docker build -t avt-gateway -f server/Dockerfile .
+docker run -p 443:443 -v /path/to/project:/project avt-gateway
+```
+
+The Gateway supports multi-project management: register multiple project directories, each with isolated MCP server instances on dynamically allocated ports. Access the dashboard at `https://localhost` (Docker) or `http://localhost:8080` (local dev).
 
 ## E2E Testing
 

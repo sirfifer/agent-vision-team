@@ -1,8 +1,8 @@
 # ARCHITECTURE.md v2 — Agent Vision Team
 
-This document is the authoritative architecture reference for the Agent Vision Team Collaborative Intelligence System. It describes the system as built: a Claude Code-based orchestration platform coordinating 6 custom subagents across 3 MCP servers, with transactional governance review, persistent institutional memory, deterministic quality verification, and a VS Code extension providing setup, monitoring, and management capabilities.
+This document is the authoritative architecture reference for the Agent Vision Team Collaborative Intelligence System. It describes the system as built: a Claude Code-based orchestration platform coordinating 6 custom subagents across 3 MCP servers, with transactional governance review, persistent institutional memory, deterministic quality verification, a VS Code extension providing setup, monitoring, and management capabilities, and a headless web mode with multi-project management via the AVT Gateway.
 
-The system's orchestration infrastructure runs on the developer's machine: MCP servers communicate over stdio transport (spawned by Claude Code as child processes), and all persistent state (Knowledge Graph, governance database, trust engine) lives in the project directory. AI inference is cloud-based, handled by Anthropic's Claude models via Claude Code. Claude Code Max provides model access through a subscription (no API keys to manage), but an internet connection is required for all agent operations.
+The system operates in two modes. In its **embedded mode**, the dashboard runs as a VS Code webview panel with MCP servers spawned as extension-managed child processes. In its **headless web mode**, an AVT Gateway (FastAPI on port 8080) serves the same React dashboard as a standalone web application, manages per-project MCP server instances with isolated port allocations, and pushes real-time updates over WebSocket. A transport abstraction layer makes dashboard code mode-agnostic. Both modes share the same persistent state (Knowledge Graph, governance database, trust engine) in the project directory. AI inference is cloud-based, handled by Anthropic's Claude models via Claude Code. Claude Code Max provides model access through a subscription (no API keys to manage), but an internet connection is required for all agent operations.
 
 
 ## Table of Contents
@@ -17,14 +17,15 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 8. [Governance Architecture](#8-governance-architecture)
 9. [CLAUDE.md Orchestration](#9-claudemd-orchestration)
 10. [VS Code Extension](#10-vs-code-extension)
-11. [File System Layout](#11-file-system-layout)
-12. [Data Flow Architecture](#12-data-flow-architecture)
-13. [E2E Testing Architecture](#13-e2e-testing-architecture)
-14. [Research System](#14-research-system)
-15. [Project Rules System](#15-project-rules-system)
-16. [Technology Stack](#16-technology-stack)
-17. [Current Status and Evolution Path](#17-current-status-and-evolution-path)
-18. [Verification](#18-verification)
+11. [AVT Gateway and Web Mode](#11-avt-gateway-and-web-mode)
+12. [File System Layout](#12-file-system-layout)
+13. [Data Flow Architecture](#13-data-flow-architecture)
+14. [E2E Testing Architecture](#14-e2e-testing-architecture)
+15. [Research System](#15-research-system)
+16. [Project Rules System](#16-project-rules-system)
+17. [Technology Stack](#17-technology-stack)
+18. [Current Status and Evolution Path](#18-current-status-and-evolution-path)
+19. [Verification](#19-verification)
 
 ---
 
@@ -43,6 +44,9 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 | **Project Rules System** | Behavioral guidelines (enforce/prefer) injected into agent prompts from `.avt/project-config.json` |
 | **E2E Testing Harness** | 14 scenarios, 292+ structural assertions, parallel execution with full isolation |
 | **VS Code Extension** | Setup wizard (9 steps), workflow tutorial (10 steps), governance panel, document editor, research prompts panel, 3 MCP clients |
+| **AVT Gateway (Web Mode)** | FastAPI HTTP/WebSocket gateway serving the dashboard as a standalone web application, with dual-mode transport abstraction, API-key authentication, and real-time event push |
+| **Multi-Project Management** | Per-project MCP server isolation with dynamic port allocation, global project registry (`~/.avt/projects.json`), project lifecycle management (add/start/stop/remove) |
+| **Docker Deployment** | Containerized stack: Python 3.12, Node.js 22, Claude Code CLI, Nginx reverse proxy with TLS, auto-start MCP servers and Gateway |
 | **CLAUDE.md Orchestration Protocol** | Orchestrator instructions defining task decomposition, governance checkpoints, quality review, memory curation |
 | **Research System** | Research prompts, researcher agent (dual-mode), research briefs |
 | **Session Management** | Checkpoints via git tags, session state in `.avt/session-state.md`, worktree isolation |
@@ -54,9 +58,8 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 | External CI/CD pipelines | All quality gates run locally via MCP servers |
 | External cloud services (beyond Claude) | AI inference uses Anthropic's cloud via Claude Code Max; no additional cloud services |
 | API key management | No API keys required (Claude Code Max subscription model) |
-| External authentication | No multi-user system; single developer workflow |
-| External frameworks or runtimes | MCP servers use Python/uv; extension uses Node/TypeScript — no additional frameworks |
-| Production deployment | This is a development-time system, not a deployed service |
+| External authentication | Single-developer workflow; Gateway uses auto-generated API key, not external auth providers |
+| Multi-user collaboration | Gateway serves one developer at a time per project; no concurrent multi-user sessions |
 
 ### 1.3 Glossary
 
@@ -85,6 +88,10 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
 | **Verdict** | The outcome of a governance review: `approved` (proceed), `blocked` (revise the specific issue while preserving sound work; includes `strengths_summary` and `salvage_guidance`), or `needs_human_review` (escalate). |
 | **PIN Methodology** | Positive, Innovative, Negative: the constructive feedback methodology applied to all reviews. Every verdict includes what's sound (`strengths_summary`), every finding includes what to preserve (`salvage_guidance`). Blocked does not mean "start over"; it means "change this specific aspect." |
 | **Decision Category** | Classification for governance decisions: `pattern_choice`, `component_design`, `api_design`, `deviation`, `scope_change`. |
+| **AVT Gateway** | FastAPI application (port 8080) providing HTTP REST and WebSocket APIs for headless/web-mode operation. Serves the dashboard as a standalone SPA, manages per-project MCP server processes, and pushes real-time updates over WebSocket. |
+| **Dual-Mode Transport** | The `useTransport.ts` abstraction that auto-detects the runtime: VS Code webview (`postMessage`) or standalone browser (HTTP + WebSocket). Dashboard code is transport-agnostic. |
+| **Multi-Project Management** | Capability to register, start, stop, and remove multiple project directories, each with isolated MCP server instances on dynamically allocated ports (base 3101, +3 per slot). Registry persisted at `~/.avt/projects.json`. |
+| **Project Registry** | Global JSON file (`~/.avt/projects.json`) tracking registered projects with their IDs, paths, port slots, and status. Managed by `ProjectManager`. |
 | **Checkpoint** | A git tag (`checkpoint-NNN`) marking a recovery point after a meaningful unit of work. |
 | **Holistic Review** | Collective evaluation of all tasks from a session before any work begins. Detects architectural shifts that individual reviews would miss. Stored in `holistic_reviews` table. |
 | **Settle Checker** | Background process (`_holistic-settle-check.py`) that implements debounce detection for task group boundaries. Waits 3 seconds, checks for newer tasks, triggers holistic review if it is the last checker. |
@@ -176,12 +183,31 @@ The system's orchestration infrastructure runs on the developer's machine: MCP s
                     └──────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      VS CODE EXTENSION                                   │
+│                      VS CODE EXTENSION (Embedded Mode)                   │
 │                                                                         │
 │  Setup Wizard (9 steps)  │ Workflow Tutorial (10 steps)                 │
 │  Governance Panel        │ Research Prompts Panel                       │
 │  Document Editor         │ VS Code Walkthrough (6 steps)               │
 │  Agent Cards / Activity  │ Settings Panel                              │
+│                                                                         │
+│  Transport: acquireVsCodeApi().postMessage                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+               ─── OR (same React dashboard, different transport) ───
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                  AVT GATEWAY + WEB MODE (Headless Mode)                  │
+│                                                                         │
+│  ┌───────────────┐ ┌──────────────┐ ┌─────────────────────────────────┐ │
+│  │ Nginx (TLS)   │ │ FastAPI      │ │ WebSocket Manager               │ │
+│  │ :443 reverse  │→│ :8080 REST   │ │ Real-time event push            │ │
+│  │ proxy + SPA   │ │ API + SPA    │ │ /api/ws?token=&project=         │ │
+│  └───────────────┘ └──────────────┘ └─────────────────────────────────┘ │
+│                                                                         │
+│  Multi-Project Manager: per-project MCP server isolation                │
+│  Port allocation: base 3101 + (slot * 3)                                │
+│  Registry: ~/.avt/projects.json                                         │
+│  Transport: HTTP fetch + WebSocket                                      │
 │                                                                         │
 │  3 MCP Clients: KnowledgeGraphClient, QualityClient, GovernanceClient  │
 │  4 Tree Providers + Actions view: Memory, Findings, Tasks, Actions     │
@@ -2484,7 +2510,8 @@ The dashboard is a React + Tailwind CSS application built with Vite, rendered in
 |------|---------|
 | `App.tsx` | Root layout: `SessionBar` + `SetupBanner` + `ConnectionBanner` + `AgentCards` + split pane (`GovernancePanel` left 2/5, tabbed `TaskBoard`/`ActivityFeed` right 3/5) + overlay modals (`SetupWizard`, `SettingsPanel`, `ResearchPromptsPanel`, `WorkflowTutorial`) |
 | `context/DashboardContext.tsx` | React context providing dashboard state, VS Code API bridge, wizard/settings/tutorial visibility toggles, document format results, research prompt state |
-| `hooks/useVsCodeApi.ts` | Hook wrapping the `acquireVsCodeApi()` bridge for message posting |
+| `hooks/useTransport.ts` | Dual-mode transport abstraction: auto-detects VS Code (`acquireVsCodeApi().postMessage`) or browser (HTTP + WebSocket). Makes dashboard code transport-agnostic. Handles per-project API path prefixing and WebSocket reconnection on project switch |
+| `hooks/useVsCodeApi.ts` | Hook wrapping the `acquireVsCodeApi()` bridge for message posting (VS Code mode only) |
 | `hooks/useDocEditor.ts` | State machine hook for document authoring: `idle` -> `drafting` -> `formatting` -> `reviewing` -> `saving`, with error recovery |
 | `types.ts` | Shared type definitions mirroring extension backend models |
 
@@ -2575,9 +2602,206 @@ The extension connects to the same 3 MCP servers as Claude Code, using the same 
 
 ---
 
-## 11. File System Layout
+## 11. AVT Gateway and Web Mode
 
-### Product Repository
+The system supports headless operation via the AVT Gateway, a FastAPI application that serves the same React dashboard as a standalone web application. This enables monitoring and management without VS Code, supports multi-project management from a single interface, and provides a containerized deployment option.
+
+### 11.1 Dual-Mode Transport Architecture
+
+The dashboard uses a transport abstraction (`useTransport.ts`) that auto-detects the runtime environment:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    React Dashboard (shared)                       │
+│                                                                  │
+│  SessionBar, AgentCards, GovernancePanel, TaskBoard,             │
+│  ActivityFeed, SetupWizard, WorkflowTutorial, ...               │
+└──────────────────────────┬───────────────────────────────────────┘
+                           │ useTransport()
+                           │
+              ┌────────────┼────────────────┐
+              │            │                │
+              ▼            │                ▼
+┌─────────────────────┐    │    ┌─────────────────────────────────┐
+│ VS Code Transport   │    │    │ Web Transport                    │
+│                     │    │    │                                  │
+│ acquireVsCodeApi()  │    │    │ HTTP fetch → REST API            │
+│   .postMessage()    │    │    │ WebSocket  ← server-push events  │
+│   .getState()       │    │    │ localStorage for state           │
+│   .setState()       │    │    │                                  │
+└─────────────────────┘    │    └─────────────────────────────────┘
+                           │
+              Detection: try acquireVsCodeApi()
+              Catch → fall back to web transport
+```
+
+**Key design properties:**
+
+- **Zero code duplication**: The same React components, context, hooks, and state management work in both modes. No forked codebases.
+- **Message routing**: The web transport maps each `postMessage` type to an HTTP endpoint via a route table (`MESSAGE_ROUTES`). Responses are dispatched as `window.MessageEvent`s, matching VS Code's event model.
+- **Real-time updates**: In VS Code mode, the extension host pushes updates via `postMessage`. In web mode, a WebSocket connection (`/api/ws`) receives server-push events that are mapped to the same `ExtensionMessage` types.
+- **Per-project API paths**: When a project is selected, all API paths are prefixed: `/api/foo` becomes `/api/projects/{projectId}/foo`.
+
+### 11.2 AVT Gateway
+
+The Gateway is a FastAPI application providing the HTTP and WebSocket APIs that the web transport consumes.
+
+**Core modules:**
+
+| File | Purpose |
+|------|---------|
+| `server/avt_gateway/app.py` | FastAPI application with lifespan management, CORS, SPA static serving, WebSocket endpoint |
+| `server/avt_gateway/config.py` | Environment-based configuration: ports, project directory, API key (auto-generated and persisted at `.avt/api-key.txt`) |
+| `server/avt_gateway/ws/manager.py` | WebSocket connection manager with background polling and per-project event filtering |
+| `server/avt_gateway/app_state.py` | Per-project state registry holding MCP client connections |
+
+**API routers** (mounted under `/api/projects/{project_id}`):
+
+| Router | Endpoints |
+|--------|-----------|
+| `routers/dashboard.py` | `POST /api/refresh`, `POST /api/mcp/connect` |
+| `routers/config_router.py` | `GET/PUT /api/config`, `GET /api/setup/readiness`, `PUT /api/config/permissions` |
+| `routers/documents.py` | Vision and architecture document CRUD, ingestion, AI-assisted formatting |
+| `routers/governance.py` | Governed tasks, decision history, governance statistics |
+| `routers/quality.py` | Quality validation, findings, finding dismissal |
+| `routers/research.py` | Research prompts CRUD, research briefs listing, prompt execution |
+| `routers/jobs.py` | Job status and management |
+
+**Global routers** (not project-scoped):
+
+| Router | Endpoints |
+|--------|-----------|
+| `routers/health.py` | `GET /api/health` |
+| `routers/projects.py` | `GET/POST /api/projects`, `GET/DELETE /api/projects/{id}`, `POST /api/projects/{id}/start\|stop` |
+
+**Authentication**: All API requests require a Bearer token matching the auto-generated API key. WebSocket connections authenticate via query parameter (`?token=<key>`). The key is generated on first run and persisted at `.avt/api-key.txt`.
+
+**SPA serving**: The Gateway serves the compiled dashboard SPA directly (for development without Nginx). The API key is injected into `index.html` via a `<script>` tag so the web transport can authenticate without manual configuration.
+
+### 11.3 Multi-Project Management
+
+The `ProjectManager` (`server/avt_gateway/services/project_manager.py`) manages multiple project directories, each with isolated MCP server instances.
+
+**Project lifecycle:**
+
+```
+add_project("/path/to/project")
+    → Validates directory exists
+    → Assigns port slot (0, 1, 2, ...)
+    → Computes ports: KG=3101+(slot*3), Quality=3102+(slot*3), Governance=3103+(slot*3)
+    → Saves to ~/.avt/projects.json
+    → Returns ProjectInfo
+
+start_project("project-id")
+    → Spawns 3 MCP server processes (uv run python -m ...)
+    → Sets PROJECT_DIR env var for data isolation
+    → Each server reads/writes its own project's .avt/ directory
+
+stop_project("project-id")
+    → Terminates MCP server processes (SIGTERM, then SIGKILL after 5s)
+    → Updates status to STOPPED
+```
+
+**Port allocation scheme:**
+
+| Slot | KG Port | Quality Port | Governance Port |
+|------|---------|-------------|----------------|
+| 0 | 3101 | 3102 | 3103 |
+| 1 | 3104 | 3105 | 3106 |
+| 2 | 3107 | 3108 | 3109 |
+| N | 3101+(N*3) | 3102+(N*3) | 3103+(N*3) |
+
+**Data isolation**: Each project's MCP servers receive their project path via the `PROJECT_DIR` environment variable. All persistent state (KG JSONL, governance SQLite, trust engine SQLite) is stored within the project's own `.avt/` directory. No data leaks between projects.
+
+**Project data model** (`server/avt_gateway/models/project.py`):
+
+```python
+class ProjectInfo(BaseModel):
+    id: str              # URL-safe slug (e.g., "agent-vision-team")
+    name: str            # Display name
+    path: str            # Absolute path to project root
+    status: ProjectStatus  # stopped | starting | running | error
+    slot: int            # Port allocation slot
+    mcp_base_port: int   # Base port = 3101 + (slot * 3)
+```
+
+### 11.4 Docker Deployment
+
+The system is containerized for headless deployment via a single Docker image.
+
+**Container stack:**
+
+| Component | Role |
+|-----------|------|
+| Python 3.12 | MCP servers, AVT Gateway |
+| Node.js 22 | Claude Code CLI (for `claude --print` governance review) |
+| uv | Python package management |
+| Nginx | Reverse proxy with TLS termination, SPA routing |
+| AVT Gateway | FastAPI on port 8080 (internal) |
+
+**Build process** (`server/Dockerfile`):
+
+1. Install system dependencies (Python, Node.js, Git, SQLite, Nginx)
+2. Install uv, Claude Code CLI (`@anthropic-ai/claude-code`)
+3. Install Python dependencies for all MCP servers and Gateway via `uv sync`
+4. Build web dashboard: `npm ci && npm run build -- --mode web`
+5. Configure Nginx with the bundled config
+6. Set entrypoint to `server/entrypoint.sh`
+
+**Startup sequence** (`server/entrypoint.sh`):
+
+1. Optionally clone a repository if `GIT_REPO_URL` is set
+2. Generate a self-signed TLS certificate if none exists
+3. Start all 3 MCP servers as background processes
+4. Wait for servers to be ready (port polling, up to 30 attempts)
+5. Start AVT Gateway (uvicorn on port 8080)
+6. Start Nginx in foreground (keeps container alive)
+
+**Nginx configuration** (`server/nginx.conf`):
+
+- Listens on ports 80 and 443 (TLS)
+- `/api/*` proxied to Gateway (port 8080), 300s read timeout
+- `/api/ws` proxied with WebSocket upgrade headers, 24h timeout
+- All other routes serve the SPA with `try_files` fallback to `index.html`
+
+**Exposed ports**: 443 (HTTPS via Nginx), 8080 (direct Gateway access)
+
+**Usage:**
+```bash
+docker build -t avt-gateway -f server/Dockerfile .
+docker run -p 443:443 -v /path/to/project:/project avt-gateway
+# Access: https://localhost
+```
+
+To clone a repository at startup:
+```bash
+docker run -p 443:443 -e GIT_REPO_URL=https://github.com/org/repo.git avt-gateway
+```
+
+### 11.5 WebSocket Real-Time Updates
+
+The Gateway maintains WebSocket connections for real-time dashboard updates:
+
+- **Endpoint**: `/api/ws?token=<api-key>&project=<project-id>`
+- **Authentication**: Token validated against Gateway API key
+- **Project filtering**: Events are filtered by the connected project ID
+- **Auto-reconnect**: Web transport reconnects after 3 seconds on disconnect
+- **Project switching**: Changing the active project tears down and reconnects the WebSocket with the new project ID
+
+**Event types pushed to clients:**
+
+| Event | Mapped To | Content |
+|-------|-----------|---------|
+| `dashboard_update` | `update` | Full dashboard state refresh |
+| `governance_stats` | `governanceStats` | Governance counters and status |
+| `governed_tasks` | `governedTasks` | Task list with review status |
+| `job_status` | `activityAdd` | Job lifecycle events |
+
+---
+
+## 12. File System Layout
+
+### 12.1 Product Repository
 
 The following layout is verified against the actual filesystem:
 
@@ -2664,6 +2888,7 @@ agent-vision-team/
 │   │   │   ├── context/
 │   │   │   │   └── DashboardContext.tsx
 │   │   │   ├── hooks/
+│   │   │   │   ├── useTransport.ts                # Dual-mode transport abstraction (VS Code / web)
 │   │   │   │   ├── useVsCodeApi.ts
 │   │   │   │   └── useDocEditor.ts
 │   │   │   └── components/
@@ -2729,6 +2954,36 @@ agent-vision-team/
 │   ├── tsconfig.json
 │   ├── esbuild.config.js
 │   └── README.md
+│
+├── server/                                 # AVT Gateway (headless web mode)
+│   ├── avt_gateway/
+│   │   ├── __init__.py
+│   │   ├── app.py                         # FastAPI application with lifespan, CORS, SPA serving
+│   │   ├── app_state.py                   # Per-project state registry (MCP client connections)
+│   │   ├── config.py                      # Environment-based config (ports, API key, CORS)
+│   │   ├── models/
+│   │   │   └── project.py                 # ProjectInfo, ProjectStatus
+│   │   ├── routers/
+│   │   │   ├── dashboard.py               # /api/refresh, /api/mcp/connect
+│   │   │   ├── config_router.py           # /api/config, /api/setup/readiness
+│   │   │   ├── documents.py               # Vision/architecture document CRUD
+│   │   │   ├── governance.py              # Governed tasks, decisions, stats
+│   │   │   ├── health.py                  # /api/health
+│   │   │   ├── jobs.py                    # Job status and management
+│   │   │   ├── projects.py               # Multi-project CRUD and lifecycle
+│   │   │   ├── quality.py                 # Quality validation, findings
+│   │   │   └── research.py               # Research prompts and briefs
+│   │   ├── services/
+│   │   │   └── project_manager.py         # Multi-project lifecycle, port allocation, process management
+│   │   └── ws/
+│   │       └── manager.py                 # WebSocket connection manager with background poller
+│   ├── static/                            # Compiled web dashboard SPA
+│   │   ├── index.html
+│   │   └── assets/
+│   ├── Dockerfile                         # Containerized deployment
+│   ├── entrypoint.sh                      # Container startup (MCP servers + Gateway + Nginx)
+│   ├── nginx.conf                         # Reverse proxy with TLS, WebSocket upgrade, SPA fallback
+│   └── pyproject.toml
 │
 ├── mcp-servers/
 │   ├── knowledge-graph/
@@ -2918,13 +3173,13 @@ target-project/
 
 **Key differences from the product repository layout**: The target project does not contain the `extension/`, `mcp-servers/`, `e2e/`, `scripts/`, `templates/`, `prompts/`, or `work/` directories. It contains only the runtime artifacts needed for the collaborative intelligence system to operate: agent definitions, persistent data stores, system configuration, and documentation.
 
-## 12. Data Flow Architecture
+## 13. Data Flow Architecture
 
 This section traces end-to-end data paths through the system for key workflows. Each flow is grounded in actual code paths across the three MCP servers, the agent definitions, and the E2E harness.
 
 ---
 
-### 12.1 Task Execution Flow
+### 13.1 Task Execution Flow
 
 The governed task lifecycle is the core execution primitive. Every implementation task is governed from creation -- it cannot execute until all governance reviews approve it. Two code paths create governance pairs (see Section 8.2):
 
@@ -3008,7 +3263,7 @@ governance-task-intercept.py                             │
 
 ---
 
-### 12.2 Memory Flow
+### 13.2 Memory Flow
 
 The Knowledge Graph serves as institutional memory. Data flows through JSONL persistence with in-memory indexing for reads.
 
@@ -3076,7 +3331,7 @@ Tier Protection Check (on every write):
 
 ---
 
-### 12.3 Vision Conflict Flow
+### 13.3 Vision Conflict Flow
 
 When a worker's action conflicts with a vision-tier standard, the system blocks execution at the earliest possible point.
 
@@ -3148,7 +3403,7 @@ When a worker's action conflicts with a vision-tier standard, the system blocks 
 
 ---
 
-### 12.4 Governance Decision Flow
+### 13.4 Governance Decision Flow
 
 This flow details the internal mechanics of a single governance review, from prompt construction through AI evaluation to verdict storage.
 
@@ -3229,7 +3484,7 @@ This flow details the internal mechanics of a single governance review, from pro
 
 ---
 
-### 12.5 Research Flow
+### 13.5 Research Flow
 
 The researcher subagent gathers intelligence to inform development decisions. It operates in two modes: periodic maintenance and exploratory design research.
 
@@ -3293,7 +3548,7 @@ The researcher subagent gathers intelligence to inform development decisions. It
 
 ---
 
-### 12.6 Project Hygiene Flow
+### 13.6 Project Hygiene Flow
 
 The project-steward subagent maintains project organization, naming conventions, and completeness.
 
@@ -3342,13 +3597,13 @@ The project-steward subagent maintains project organization, naming conventions,
 
 ---
 
-## 13. E2E Testing Architecture
+## 14. E2E Testing Architecture
 
 The project includes an autonomous end-to-end testing harness that exercises all three MCP servers across 14 scenarios with 292+ structural assertions. Every run generates a unique project from a pool of 8 domains, ensuring tests validate structural properties rather than domain-specific content.
 
 ---
 
-### 13.1 Design Philosophy
+### 14.1 Design Philosophy
 
 The E2E harness is built on three principles:
 
@@ -3360,7 +3615,7 @@ The E2E harness is built on three principles:
 
 ---
 
-### 13.2 Unique Project Generation
+### 14.2 Unique Project Generation
 
 The project generator creates a complete workspace from domain-specific templates.
 
@@ -3426,7 +3681,7 @@ Each domain provides:
 
 ---
 
-### 13.3 Scenario Inventory
+### 14.3 Scenario Inventory
 
 All 14 scenarios inherit from `BaseScenario` (in `e2e/scenarios/base.py`) which provides assertion helpers and timing/error-handling wrappers.
 
@@ -3460,7 +3715,7 @@ All 14 scenarios inherit from `BaseScenario` (in `e2e/scenarios/base.py`) which 
 
 ---
 
-### 13.4 Execution Model
+### 14.4 Execution Model
 
 Scenarios run in parallel with full isolation. The `ParallelExecutor` provides each scenario with its own KG, governance store, and task directory.
 
@@ -3528,7 +3783,7 @@ Scenarios run in parallel with full isolation. The `ParallelExecutor` provides e
 
 ---
 
-### 13.5 Assertion Engine
+### 14.5 Assertion Engine
 
 The assertion engine (`e2e/validation/assertion_engine.py`) provides domain-agnostic assertion helpers that return `(bool, str)` tuples for structured reporting.
 
@@ -3588,7 +3843,7 @@ The assertion engine (`e2e/validation/assertion_engine.py`) provides domain-agno
 
 ---
 
-### 13.6 When to Run
+### 14.6 When to Run
 
 | Trigger | Reason |
 |---------|--------|
@@ -3612,13 +3867,13 @@ The assertion engine (`e2e/validation/assertion_engine.py`) provides domain-agno
 
 ---
 
-## 14. Research System
+## 15. Research System
 
 The research system provides structured intelligence gathering through the researcher subagent, operating in two distinct modes with governance integration.
 
 ---
 
-### 14.1 Dual-Mode Operation
+### 15.1 Dual-Mode Operation
 
 The researcher subagent (`.claude/agents/researcher.md`) operates in two modes, each with different characteristics:
 
@@ -3662,7 +3917,7 @@ The researcher subagent (`.claude/agents/researcher.md`) operates in two modes, 
 
 ---
 
-### 14.2 Research Workflow
+### 15.2 Research Workflow
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -3727,7 +3982,7 @@ The researcher subagent (`.claude/agents/researcher.md`) operates in two modes, 
 
 ---
 
-### 14.3 Governance Integration
+### 15.3 Governance Integration
 
 The researcher integrates with the governance system when findings have architectural or vision implications:
 
@@ -3737,7 +3992,7 @@ The researcher integrates with the governance system when findings have architec
 
 ---
 
-### 14.4 Research Prompt Registry
+### 15.4 Research Prompt Registry
 
 Research prompts are managed in two locations:
 
@@ -3753,7 +4008,7 @@ The registry tracks:
 
 ---
 
-### 14.5 Consumer Integration
+### 15.5 Consumer Integration
 
 Research outputs feed into the broader system:
 
@@ -3783,13 +4038,13 @@ Research outputs feed into the broader system:
 
 ---
 
-## 15. Project Rules System
+## 16. Project Rules System
 
 Project rules are concise behavioral guidelines that complement vision standards and architectural patterns. They cover behavioral guidance that tier-protected entities and quality gates cannot check.
 
 ---
 
-### 15.1 Rule Structure
+### 16.1 Rule Structure
 
 Rules live in `.avt/project-config.json` and are distinct from vision standards (KG tier-protected) and quality gates (deterministic checks).
 
@@ -3824,7 +4079,7 @@ Rules live in `.avt/project-config.json` and are distinct from vision standards 
 
 ---
 
-### 15.2 Rule Injection Protocol
+### 16.2 Rule Injection Protocol
 
 When the orchestrator spawns a subagent, it compiles applicable rules into a compact preamble prepended to the task prompt:
 
@@ -3866,7 +4121,7 @@ The worker startup protocol explicitly includes:
 
 ---
 
-### 15.3 Relationship to Other Systems
+### 16.3 Relationship to Other Systems
 
 Project rules complement but do not replace the other governance mechanisms:
 
@@ -3907,7 +4162,7 @@ Project rules complement but do not replace the other governance mechanisms:
 
 ---
 
-### 15.4 KG Integration for Rule Rationale
+### 16.4 KG Integration for Rule Rationale
 
 Rule rationale is intentionally not injected into the agent prompt (to keep the preamble compact). Instead, rationale is stored in the KG:
 
@@ -3942,9 +4197,9 @@ This separation ensures:
 - **Deep context available**: Agents that need to understand "why" can query the KG
 - **Rationale is curated**: The KG librarian maintains and updates rationale alongside other institutional memory
 
-## 16. Technology Stack
+## 17. Technology Stack
 
-### 16.1 Core Technologies
+### 17.1 Core Technologies
 
 | Component | Technology | Version | Rationale |
 |-----------|-----------|---------|-----------|
@@ -3959,13 +4214,16 @@ This separation ensures:
 | **Dashboard Webview** | React + TypeScript | React >=19.0.0 | Rich reactive UI for dashboard, wizard, tutorial, governance panel |
 | **Webview Build** | Vite | >=6.0.0 | Fast dev server + production build |
 | **Webview Styling** | Tailwind CSS | >=3.4.0 | Utility-first CSS with PostCSS + Autoprefixer |
+| **AVT Gateway** | FastAPI + uvicorn | FastAPI >=0.115.0 | HTTP REST + WebSocket API for headless web mode |
+| **Reverse Proxy** | Nginx | — | TLS termination, SPA routing, WebSocket upgrade |
+| **Containerization** | Docker | — | Single-image deployment with Python, Node.js, MCP servers, Gateway, Nginx |
 | **E2E Testing** | Python + ThreadPoolExecutor + Pydantic | Python >=3.12, Pydantic >=2.0.0 | Parallel scenario execution with isolation and typed assertions |
 | **Build System** | Hatchling | Latest | Python package builds for all MCP servers and E2E harness |
 | **Version Control** | Git + worktrees | — | Code state management, worker isolation via branches |
-| **Package Management** | npm (extension + webview), uv (Python servers + E2E) | — | Standard per ecosystem |
+| **Package Management** | npm (extension + webview), uv (Python servers + E2E + Gateway) | — | Standard per ecosystem |
 | **OS** | macOS (Darwin) | — | Primary developer platform |
 
-### 16.2 Version Pinning Notes
+### 17.2 Version Pinning Notes
 
 All three MCP servers (`collab-kg`, `collab-quality`, `collab-governance`) share the same dependency floor: `fastmcp>=2.0.0`, `pydantic>=2.0.0`, Python `>=3.12`. The E2E harness (`avt-e2e`) depends on `pydantic>=2.0.0` and Python `>=3.12`. All use Hatchling as the build backend.
 
@@ -3973,7 +4231,7 @@ The extension backend pins `typescript>=5.7.0` and `esbuild>=0.24.0`. The webvie
 
 All packages are at version `0.1.0` (pre-release).
 
-### 16.3 Platform Features
+### 17.3 Platform Features
 
 Claude Code provides the execution environment for the entire system. The following table catalogs which platform features the system actively uses, which are available but not yet configured, and which are planned for adoption.
 
@@ -3998,9 +4256,9 @@ Claude Code provides the execution environment for the entire system. The follow
 
 ---
 
-## 17. Current Status and Evolution Path
+## 18. Current Status and Evolution Path
 
-### 17.1 Current Status
+### 18.1 Current Status
 
 This section replaces the v1 "Implementation Phases" checklist, which listed unchecked items that are now substantially complete. The following table reflects the actual state of each component as of February 2026.
 
@@ -4018,8 +4276,9 @@ This section replaces the v1 "Implementation Phases" checklist, which listed unc
 | VS Code Extension | **Operational** | Dashboard webview, 9-step setup wizard, 10-step workflow tutorial, 6-step VS Code walkthrough, governance panel, research prompts panel, 3 MCP clients (KG, Quality, Governance), 4 TreeViews, 15 commands (12 user-facing, 3 internal) |
 | E2E Test Harness | **Operational** | 14 scenarios (s01-s14), 292+ structural domain-agnostic assertions, parallel execution with full isolation, random domain generation from 8 templates, mock review mode |
 | CLAUDE.md Orchestration | **Operational** | All protocols documented: task decomposition, governance checkpoints, quality review, memory curation, research, project hygiene, drift detection |
+| AVT Gateway (Web Mode) | **Operational** | FastAPI HTTP/WebSocket gateway, dual-mode transport abstraction, multi-project management with per-project MCP isolation, API-key authentication, Docker containerization with Nginx TLS proxy |
 
-### 17.2 Known Gaps
+### 18.2 Known Gaps
 
 These are known deficiencies in the current implementation. They do not block operation but represent incomplete or inconsistent areas.
 
@@ -4031,7 +4290,7 @@ These are known deficiencies in the current implementation. They do not block op
 
 **v1 scaffolding remnants.** Code from the v1 architecture (Communication Hub server scaffolding, extension session management) is preserved in the codebase and in `docs/v1-full-architecture/`. This is intentional (available for reactivation) but adds cognitive load for new contributors.
 
-### 17.3 Evolution Path
+### 18.3 Evolution Path
 
 Items are ordered by priority. Effort and dependency information is included to support planning.
 
@@ -4051,7 +4310,7 @@ Items are ordered by priority. Effort and dependency information is included to 
 | **Future** | Multi-team coordination | High | Agent Teams stabilization | Multiple teams with different specializations (implementation team, review team, research team) coordinating on the same project |
 | **Future** | Plugin distribution | Medium | Plugin packaging | Publish to Claude Code plugin marketplace. Requires stable APIs, documentation, versioning strategy |
 
-### 17.4 What Was Completed Since v1
+### 18.4 What Was Completed Since v1
 
 For historical context, the following summarizes what the v1 "Implementation Phases" planned and what actually shipped. All four phases are substantially complete, with the Quality server gate stubs (build and findings gates in `check_all_gates()`) being the primary remaining item from Phase 1.
 
@@ -4060,13 +4319,13 @@ For historical context, the following summarizes what the v1 "Implementation Pha
 | **Phase 1: Make MCP Servers Real** | KG: JSONL persistence, delete tools, compaction. Quality: real subprocess calls, SQLite trust engine | KG: fully operational with 11 tools (3 beyond plan), JSONL persistence, tier protection. Quality: 8 tools operational with real subprocess calls, trust engine with SQLite complete. All 5 quality gates now fully connected |
 | **Phase 2: Create Subagents + Validate E2E** | 3 agents (worker, quality-reviewer, kg-librarian), CLAUDE.md orchestration, settings.json hooks, end-to-end validation | 6 agents (added governance-reviewer, researcher, project-steward), full CLAUDE.md orchestration with governance/research/hygiene protocols, PostToolUse + PreToolUse hooks, end-to-end workflow validated |
 | **Phase 3: Build Extension as Monitoring Layer** | MCP clients, TreeView wiring, file watchers, diagnostics, dashboard, status bar | 3 MCP clients, 4 TreeViews, dashboard webview with React 19, 9-step wizard, 10-step tutorial, VS Code walkthrough, governance panel, research prompts panel, 15 commands (12 user-facing, 3 internal). Scope significantly exceeded plan |
-| **Phase 4: Expand and Harden** | Event logging, cross-project memory, multi-worker parallelism, FastMCP 3.0 migration, installation script | E2E test harness (14 scenarios, 292+ assertions), full governance system (not in original plan), research system (not in original plan), project hygiene system (not in original plan). Cross-project memory and FastMCP migration remain future items |
+| **Phase 4: Expand and Harden** | Event logging, cross-project memory, multi-worker parallelism, FastMCP 3.0 migration, installation script | E2E test harness (14 scenarios, 292+ assertions), full governance system (not in original plan), research system (not in original plan), project hygiene system (not in original plan), AVT Gateway with headless web mode and multi-project management (not in original plan). Cross-project memory and FastMCP migration remain future items |
 
 ---
 
-## 18. Verification
+## 19. Verification
 
-### 18.1 E2E Test Harness (Primary Verification)
+### 19.1 E2E Test Harness (Primary Verification)
 
 The E2E test harness is the primary verification mechanism for all three MCP servers. It exercises the Python library APIs directly with structural, domain-agnostic assertions.
 
@@ -4110,7 +4369,7 @@ Or use the `/e2e` skill from within Claude Code.
 | s10 | `s10_completion_guard.py` | Unresolved blocks and missing plan reviews are caught by completion review |
 | s12 | `s12_cross_server_integration.py` | KG + Governance + Task system interplay across servers |
 
-### 18.2 Component Verification
+### 19.2 Component Verification
 
 Each component can be verified independently. The following table provides concrete verification steps for both automated (E2E) and manual approaches.
 
@@ -4127,7 +4386,7 @@ Each component can be verified independently. The following table provides concr
 | **Project steward agent** | Spawn with "Perform a full project hygiene review". Verify: report output with categorized findings (naming conventions, folder organization, documentation completeness, cruft detection), priority levels, and specific file references |
 | **VS Code extension** | Launch VS Code with extension installed. Verify: Activity Bar shows "Collab Intelligence" container with 4 views (Actions, Memory Browser, Findings, Tasks). Click "Connect to Servers" -- verify 3 MCP clients connect. Open Dashboard -- verify React webview loads with agent cards, activity feed, governance panel. Open Setup Wizard -- verify 9-step flow renders. Open Workflow Tutorial -- verify 10-step flow renders |
 
-### 18.3 Integration Verification
+### 19.3 Integration Verification
 
 The full integration test validates that all components work together in the governed development workflow, end to end, without extension involvement. This is the successor to the v1 "Phase 2 Validation Test" and reflects the actual system with governance integration.
 
