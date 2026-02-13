@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, ResearchBriefInfo } from '../types';
+import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, ResearchBriefInfo, BootstrapScaleProfile } from '../types';
 import { useTransport } from '../hooks/useTransport';
 import { DEMO_DATA } from '../data/demoData';
 
@@ -48,6 +48,10 @@ interface DashboardContextValue {
   // Tutorial
   showTutorial: boolean;
   setShowTutorial: (show: boolean) => void;
+  // Bootstrap
+  showBootstrap: boolean;
+  setShowBootstrap: (show: boolean) => void;
+  bootstrapScaleProfile: BootstrapScaleProfile | null;
   // Demo mode
   demoMode: boolean;
 }
@@ -96,6 +100,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
+
+  // Bootstrap state
+  const [showBootstrap, setShowBootstrap] = useState(false);
+  const [bootstrapScaleProfile, setBootstrapScaleProfile] = useState<BootstrapScaleProfile | null>(null);
 
   // Demo mode state
   const [demoMode, setDemoMode] = useState(false);
@@ -235,6 +243,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         case 'showTutorial':
           setShowTutorial(true);
           break;
+        case 'bootstrapScaleResult':
+          setBootstrapScaleProfile(msg.profile);
+          break;
+        case 'bootstrapStarted':
+          setShowBootstrap(false);
+          break;
       }
     };
     window.addEventListener('message', handler);
@@ -277,6 +291,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       researchBriefs,
       researchBriefContent,
       showTutorial, setShowTutorial,
+      showBootstrap, setShowBootstrap,
+      bootstrapScaleProfile,
       demoMode,
     }}>
       {children}

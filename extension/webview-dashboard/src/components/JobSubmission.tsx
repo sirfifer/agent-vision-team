@@ -9,6 +9,7 @@ const AGENT_TYPES = [
   { value: 'quality-reviewer', label: 'Quality Reviewer' },
   { value: 'kg-librarian', label: 'KG Librarian' },
   { value: 'project-steward', label: 'Project Steward' },
+  { value: 'project-bootstrapper', label: 'Project Bootstrapper' },
 ];
 
 const MODELS = [

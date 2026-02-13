@@ -446,7 +446,9 @@ export type ExtensionMessage =
   | { type: 'researchBriefsList'; briefs: ResearchBriefInfo[] }
   | { type: 'showWizard' }
   | { type: 'showTutorial' }
-  | { type: 'toggleDemo' };
+  | { type: 'toggleDemo' }
+  | { type: 'bootstrapScaleResult'; profile: BootstrapScaleProfile }
+  | { type: 'bootstrapStarted'; jobId?: string };
 
 export type WebviewMessage =
   | { type: 'connect' }
@@ -470,7 +472,9 @@ export type WebviewMessage =
   | { type: 'dismissFinding'; findingId: string; justification: string; dismissedBy: string }
   | { type: 'requestFindings' }
   | { type: 'readResearchBrief'; briefPath: string }
-  | { type: 'listResearchBriefs' };
+  | { type: 'listResearchBriefs' }
+  | { type: 'bootstrapScaleCheck' }
+  | { type: 'runBootstrap'; context: string; focusAreas: BootstrapFocusAreas };
 
 export interface IngestionResult {
   tier: 'vision' | 'architecture';
@@ -478,4 +482,29 @@ export interface IngestionResult {
   entities: string[];
   errors: string[];
   skipped: string[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bootstrap Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface BootstrapScaleProfile {
+  sourceFiles: number;
+  sourceLoc: number;
+  docFiles: number;
+  topLevelDirs: number;
+  languages: { extension: string; count: number }[];
+  packages: string[];
+  monorepoIndicators: string[];
+  configFiles: string[];
+  tier: 'Small' | 'Medium' | 'Large' | 'Massive' | 'Enterprise';
+  estimatedTimeMinutes: number;
+  estimatedAgents: number;
+}
+
+export interface BootstrapFocusAreas {
+  visionStandards: boolean;
+  architectureDocs: boolean;
+  conventions: boolean;
+  projectRules: boolean;
 }

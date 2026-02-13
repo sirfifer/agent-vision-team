@@ -104,6 +104,7 @@ from .routers.governance import router as governance_router
 from .routers.quality import router as quality_router
 from .routers.research import router as research_router
 from .routers.jobs import router as jobs_router
+from .routers.bootstrap import router as bootstrap_router
 
 project_api = APIRouter(prefix="/api/projects/{project_id}")
 project_api.include_router(dashboard_router)
@@ -113,6 +114,7 @@ project_api.include_router(governance_router)
 project_api.include_router(quality_router)
 project_api.include_router(research_router)
 project_api.include_router(jobs_router)
+project_api.include_router(bootstrap_router)
 app.include_router(project_api)
 
 

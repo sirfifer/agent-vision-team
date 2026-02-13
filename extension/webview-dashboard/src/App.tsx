@@ -14,6 +14,7 @@ import { SetupWizard } from './components/wizard/SetupWizard';
 import { SettingsPanel } from './components/SettingsPanel';
 import { ResearchPromptsPanel } from './components/ResearchPromptsPanel';
 import { WorkflowTutorial } from './components/tutorial/WorkflowTutorial';
+import { BootstrapDialog } from './components/bootstrap/BootstrapDialog';
 import { JobSubmission } from './components/JobSubmission';
 import { JobList } from './components/JobList';
 
@@ -157,6 +158,7 @@ export default function App() {
         <SettingsPanel />
         <ResearchPromptsPanel />
         <WorkflowTutorial />
+        <BootstrapDialog />
       </DashboardProvider>
     </ProjectProvider>
   );

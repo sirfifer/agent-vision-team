@@ -334,6 +334,14 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         case 'listResearchBriefs':
           this.handleListResearchBriefs();
           break;
+
+        case 'bootstrapScaleCheck':
+          this.handleBootstrapScaleCheck();
+          break;
+
+        case 'runBootstrap':
+          this.handleRunBootstrap(message.context, message.focusAreas);
+          break;
       }
     });
   }
@@ -759,6 +767,153 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       this.postMessage({ type: 'researchBriefsList', briefs: files });
     } catch {
       this.postMessage({ type: 'researchBriefsList', briefs: [] });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Bootstrap Handlers
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  private async handleBootstrapScaleCheck(): Promise<void> {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) return;
+
+    const scriptPath = path.join(root, 'scripts', 'bootstrap-scale-check.py');
+    if (!fs.existsSync(scriptPath)) {
+      vscode.window.showErrorMessage('Bootstrap scale check script not found.');
+      return;
+    }
+
+    try {
+      const result = await new Promise<string>((resolve, reject) => {
+        const proc = spawn('uv', ['run', 'python', scriptPath, root], {
+          cwd: root,
+          timeout: 30000,
+        });
+
+        let stdout = '';
+        let stderr = '';
+        proc.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
+        proc.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+        proc.on('error', (err: NodeJS.ErrnoException) => {
+          reject(new Error(`Failed to run scale check: ${err.message}`));
+        });
+
+        proc.on('close', (code: number | null) => {
+          if (code !== 0) {
+            reject(new Error(`Scale check exited with code ${code}: ${stderr.trim()}`));
+          } else {
+            resolve(stdout.trim());
+          }
+        });
+      });
+
+      const profile = JSON.parse(result);
+      this.postMessage({ type: 'bootstrapScaleResult', profile });
+    } catch (err) {
+      vscode.window.showErrorMessage(`Scale check failed: ${err}`);
+    }
+  }
+
+  private async handleRunBootstrap(context: string, focusAreas: Record<string, boolean>): Promise<void> {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) return;
+
+    // Build the bootstrap prompt
+    const areas: string[] = [];
+    if (focusAreas.visionStandards) areas.push('vision standards');
+    if (focusAreas.architectureDocs) areas.push('architecture documentation');
+    if (focusAreas.conventions) areas.push('coding conventions and style guide');
+    if (focusAreas.projectRules) areas.push('project rules');
+
+    let prompt = `Bootstrap the project at ${root}.`;
+    if (areas.length < 4) {
+      prompt += ` Focus on: ${areas.join(', ')}.`;
+    }
+    if (context.trim()) {
+      prompt += `\n\nProject context from user:\n${context.trim()}`;
+    }
+
+    // Notify webview that bootstrap has started
+    this.postMessage({ type: 'bootstrapStarted' });
+
+    // Add activity entry
+    this.addActivity({
+      id: `activity-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      agent: 'project-bootstrapper',
+      type: 'status',
+      summary: 'Bootstrap started',
+      detail: areas.length < 4 ? `Focus: ${areas.join(', ')}` : 'Full bootstrap (all focus areas)',
+    });
+
+    // Execute via claude CLI with project-bootstrapper agent
+    try {
+      const stamp = `avt-bootstrap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const inputPath = path.join(os.tmpdir(), `${stamp}-input.md`);
+      const outputPath = path.join(os.tmpdir(), `${stamp}-output.md`);
+
+      fs.writeFileSync(inputPath, prompt, 'utf-8');
+
+      await new Promise<void>((resolve, reject) => {
+        const inputFd = fs.openSync(inputPath, 'r');
+        const outputFd = fs.openSync(outputPath, 'w');
+
+        const proc = spawn('claude', [
+          '--print',
+          '--model', 'opus',
+          '--agent', 'project-bootstrapper',
+        ], {
+          stdio: [inputFd, outputFd, 'pipe'],
+          cwd: root,
+          timeout: 3600000, // 1 hour timeout for large projects
+        });
+
+        fs.closeSync(inputFd);
+        fs.closeSync(outputFd);
+
+        let stderr = '';
+        proc.stderr!.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+        proc.on('error', (err: NodeJS.ErrnoException) => {
+          reject(new Error(`Bootstrap failed to start: ${err.message}`));
+        });
+
+        proc.on('close', (code: number | null) => {
+          if (code !== 0) {
+            reject(new Error(`Bootstrap exited with code ${code}${stderr ? `: ${stderr.trim().slice(0, 500)}` : ''}`));
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      this.addActivity({
+        id: `activity-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        agent: 'project-bootstrapper',
+        type: 'status',
+        summary: 'Bootstrap completed',
+        detail: 'Review the bootstrap report in .avt/bootstrap-report.md',
+      });
+
+      // Clean up temp files
+      try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
+      try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
+
+      // Refresh config data to pick up any new docs
+      this.refreshConfigData();
+    } catch (err) {
+      this.addActivity({
+        id: `activity-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        agent: 'project-bootstrapper',
+        type: 'status',
+        summary: 'Bootstrap failed',
+        detail: String(err),
+      });
+      vscode.window.showErrorMessage(`Bootstrap failed: ${err}`);
     }
   }
 
