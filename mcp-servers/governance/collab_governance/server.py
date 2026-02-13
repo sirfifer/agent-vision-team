@@ -48,6 +48,9 @@ def submit_decision(
     category: str,
     summary: str,
     detail: str = "",
+    intent: str = "",
+    expected_outcome: str = "",
+    vision_references: Optional[list[str]] = None,
     components_affected: Optional[list[str]] = None,
     alternatives_considered: Optional[list[dict]] = None,
     confidence: str = "high",
@@ -64,6 +67,9 @@ def submit_decision(
         category: One of: pattern_choice, component_design, api_design, deviation, scope_change.
         summary: Brief summary of the decision.
         detail: Detailed explanation of the decision.
+        intent: WHY this decision is being made. What problem does it solve?
+        expected_outcome: WHAT measurable result is expected from this decision.
+        vision_references: Which vision standard names this outcome serves.
         components_affected: List of component names affected by this decision.
         alternatives_considered: List of {option, reason_rejected} dicts.
         confidence: One of: high, medium, low.
@@ -73,6 +79,7 @@ def submit_decision(
         verdict is one of: approved, blocked, needs_human_review
     """
     components = components_affected or []
+    vrefs = vision_references or []
     alts = [
         Alternative(option=a.get("option", ""), reason_rejected=a.get("reason_rejected", ""))
         for a in (alternatives_considered or [])
@@ -84,6 +91,9 @@ def submit_decision(
         category=DecisionCategory(category),
         summary=summary,
         detail=detail,
+        intent=intent,
+        expected_outcome=expected_outcome,
+        vision_references=vrefs,
         components_affected=components,
         alternatives_considered=alts,
         confidence=Confidence(confidence),
@@ -110,7 +120,10 @@ def submit_decision(
             standards_verified=[s.get("name", "") for s in vision_standards],
         )
         store.store_review(review)
-        kg.record_decision(decision.id, summary, "needs_human_review", agent)
+        kg.record_decision(
+            decision.id, summary, "needs_human_review", agent,
+            intent=decision.intent, expected_outcome=decision.expected_outcome,
+        )
         return {
             "verdict": "needs_human_review",
             "decision_id": decision.id,
@@ -127,7 +140,10 @@ def submit_decision(
     store.store_review(review)
 
     # 6. Record in KG for institutional memory
-    kg.record_decision(decision.id, summary, review.verdict.value, agent)
+    kg.record_decision(
+        decision.id, summary, review.verdict.value, agent,
+        intent=decision.intent, expected_outcome=decision.expected_outcome,
+    )
 
     # 7. Return the verdict
     return {

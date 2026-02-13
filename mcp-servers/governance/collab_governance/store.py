@@ -145,6 +145,14 @@ class GovernanceStore:
             except sqlite3.OperationalError:
                 pass  # Column already exists
 
+        # Idempotent migration: add intent/outcome columns to decisions
+        for col in ("intent", "expected_outcome", "vision_references"):
+            try:
+                conn.execute(f"ALTER TABLE decisions ADD COLUMN {col} TEXT DEFAULT ''")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
     def next_sequence(self, task_id: str) -> int:
         conn = self._get_conn()
         row = conn.execute(
@@ -160,8 +168,9 @@ class GovernanceStore:
         conn.execute(
             """INSERT INTO decisions
                (id, task_id, sequence, agent, category, summary, detail,
+                intent, expected_outcome, vision_references,
                 components_affected, alternatives, confidence, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 decision.id,
                 decision.task_id,
@@ -170,6 +179,9 @@ class GovernanceStore:
                 decision.category.value,
                 decision.summary,
                 decision.detail,
+                decision.intent,
+                decision.expected_outcome,
+                json.dumps(decision.vision_references),
                 json.dumps(decision.components_affected),
                 json.dumps([a.model_dump() for a in decision.alternatives_considered]),
                 decision.confidence.value,
@@ -255,8 +267,9 @@ class GovernanceStore:
         query += " ORDER BY d.created_at DESC"
 
         rows = conn.execute(query, params).fetchall()
-        return [
-            {
+        results = []
+        for r in rows:
+            entry = {
                 "id": r["id"],
                 "task_id": r["task_id"],
                 "sequence": r["sequence"],
@@ -268,8 +281,17 @@ class GovernanceStore:
                 "guidance": r["review_guidance"] or "",
                 "created_at": r["created_at"],
             }
-            for r in rows
-        ]
+            # Include intent/outcome if available (post-migration)
+            try:
+                entry["intent"] = r["intent"] or ""
+            except (IndexError, KeyError):
+                entry["intent"] = ""
+            try:
+                entry["expected_outcome"] = r["expected_outcome"] or ""
+            except (IndexError, KeyError):
+                entry["expected_outcome"] = ""
+            results.append(entry)
+        return results
 
     def get_status(self) -> dict:
         conn = self._get_conn()
@@ -328,6 +350,19 @@ class GovernanceStore:
 
     def _row_to_decision(self, row: sqlite3.Row) -> Decision:
         alts_raw = json.loads(row["alternatives"] or "[]")
+        # intent/outcome columns may not exist in older DBs before migration
+        try:
+            intent = row["intent"] or ""
+        except (IndexError, KeyError):
+            intent = ""
+        try:
+            expected_outcome = row["expected_outcome"] or ""
+        except (IndexError, KeyError):
+            expected_outcome = ""
+        try:
+            vision_references = json.loads(row["vision_references"] or "[]")
+        except (IndexError, KeyError):
+            vision_references = []
         return Decision(
             id=row["id"],
             task_id=row["task_id"],
@@ -336,6 +371,9 @@ class GovernanceStore:
             category=DecisionCategory(row["category"]),
             summary=row["summary"],
             detail=row["detail"] or "",
+            intent=intent,
+            expected_outcome=expected_outcome,
+            vision_references=vision_references,
             components_affected=json.loads(row["components_affected"] or "[]"),
             alternatives_considered=[Alternative(**a) for a in alts_raw],
             confidence=Confidence(row["confidence"]),

@@ -6,7 +6,7 @@ This project uses a collaborative intelligence system with:
 - **Knowledge Graph MCP server** — persistent institutional memory with tier protection
 - **Quality MCP server** — deterministic quality verification with trust engine
 - **Governance MCP server** — transactional review checkpoints for agent decisions
-- **Custom subagents** — worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward (defined in `.claude/agents/`)
+- **Custom subagents** — architect, worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward, project-bootstrapper (defined in `.claude/agents/`)
 
 ## Your Role as Orchestrator
 
@@ -181,6 +181,106 @@ After any significant code change:
    - **Architecture findings**: Route to worker with the full constructive context (strengths, salvage guidance, suggestion). The worker revises the specific deviation while preserving aligned work.
    - **Quality findings**: Route to worker, auto-fixable issues can be fixed inline
 3. **Verify resolution**: Ensure findings are addressed before proceeding
+
+## Bootstrap Protocol
+
+The project-bootstrapper subagent onboards an existing, mature codebase into the AVT system by discovering governance artifacts that already exist implicitly in the code and documentation.
+
+### When to Use the Bootstrapper
+
+- **Onboarding an existing project**: The project has code and documentation but no AVT governance artifacts (no KG entities, no vision standards, no architecture docs)
+- **Inherited codebase**: Someone is taking over a project and needs to understand its architecture, patterns, and conventions
+- **Incremental discovery**: Some governance artifacts exist but there are gaps (e.g., vision standards defined but no architecture docs)
+
+### How to Invoke
+
+```
+Task tool -> subagent_type: project-bootstrapper
+prompt: "Bootstrap the project at /path/to/codebase"
+```
+
+The bootstrapper automatically:
+1. Runs a cheap scale assessment (file counts, LOC, package boundaries) in under 5 seconds
+2. Classifies the project into a scale tier (Small through Enterprise)
+3. Builds a partition map using natural code boundaries
+4. Spawns discovery sub-agents in waves (bounded parallelism, up to 15 concurrent)
+5. Synthesizes findings into draft artifacts for human review
+
+### What It Produces
+
+| Artifact | Location | Purpose |
+|----------|----------|---------|
+| **Bootstrap report** | `.avt/bootstrap-report.md` | Primary human review artifact with APPROVE/REJECT/REVISE actions |
+| **Vision standard drafts** | `docs/vision/*.md` | One doc per discovered vision standard |
+| **Architecture docs** | `docs/architecture/` | Multi-level with Mermaid diagrams: overview, components, patterns, flows |
+| **Style guide** | `docs/style/style-guide.md` | Discovered coding conventions |
+| **Draft rules** | `.avt/bootstrap-rules-draft.json` | Discovered project rules |
+
+### Human Review Workflow
+
+1. **Read the bootstrap report** (`.avt/bootstrap-report.md`). It contains all discoveries organized by category with confidence levels and source citations.
+2. **Review each artifact**: Mark as APPROVE, REJECT, or REVISE. Pay special attention to vision standards since they become immutable once ingested.
+3. **After approval**, the bootstrapper (or orchestrator) runs:
+   - `ingest_documents("docs/vision/", "vision")` for approved vision standards
+   - `ingest_documents("docs/architecture/", "architecture")` for approved architecture docs
+   - Merges approved rules from `.avt/bootstrap-rules-draft.json` into `.avt/project-config.json`
+4. **Rejected items**: Delete the corresponding draft files
+5. **Revised items**: Edit the draft files per feedback, then re-run ingestion
+
+### Scale Handling
+
+The bootstrapper adapts to any codebase size using wave-based bounded parallelism:
+
+| Tier | Source LOC | Estimated Time | Agent Invocations |
+|------|-----------|---------------|-------------------|
+| Small | < 10K | ~5 min | Inline (no sub-agents) |
+| Medium | 10K-100K | ~10 min | ~19 |
+| Large | 100K-500K | ~15 min | ~66 |
+| Massive | 500K-2M | ~35 min | ~230 |
+| Enterprise | 2M+ | ~41 min | ~300 |
+
+### Integration with Other Agents
+
+After bootstrap completes and artifacts are approved:
+- **Workers** can now query KG for vision standards and architecture patterns
+- **Quality reviewer** can check work against discovered standards
+- **Governance reviewer** has vision standards to verify against
+- **Architect** has existing patterns to build on
+- **KG librarian** can curate the bootstrapped entities
+
+## Architect Protocol
+
+The architect subagent designs architecture with explicit intent and expected outcomes for every decision.
+
+### When to Spawn the Architect
+
+- **Project bootstrap**: When setting up a new project's architecture from vision standards
+- **Major feature design**: When a feature requires multiple new architectural decisions
+- **Cross-cutting concerns**: When a change affects multiple components or layers
+- **Vision alignment questions**: When it's unclear how to serve a vision standard architecturally
+
+### Architect vs Worker
+
+| Concern | Architect | Worker |
+|---------|-----------|--------|
+| Designs architecture | Yes | No |
+| Writes implementation code | No | Yes |
+| Submits decisions with intent/outcome | Yes (required) | Yes (required) |
+| Produces task briefs for workers | Yes | No |
+| Implements task briefs | No | Yes |
+| Runs quality gates | No | Yes |
+
+### Intent and Outcome Protocol
+
+Every architectural decision (whether from architect or worker) must include when calling `submit_decision`:
+
+- **intent**: WHY this decision is being made. What problem does it solve?
+- **expected_outcome**: WHAT measurable result is expected. Tied to vision where applicable.
+- **vision_references**: WHICH vision standard names this outcome serves.
+
+The governance reviewer evaluates intent/outcome quality as part of every decision review. Missing or vague intent/outcome is flagged as a quality finding.
+
+This protocol forces deliberate thinking: articulating an expected outcome before choosing an approach changes how options are evaluated and produces architecture traceable back to vision standards.
 
 ## Project Rules Protocol
 
@@ -440,7 +540,7 @@ Available tools:
 ### Governance Server
 
 Available tools:
-- `submit_decision(task_id, agent, category, summary, ...)` — submit a decision for transactional review (blocks until verdict)
+- `submit_decision(task_id, agent, category, summary, intent, expected_outcome, vision_references, ...)` — submit a decision for transactional review (blocks until verdict)
 - `submit_plan_for_review(task_id, agent, plan_summary, plan_content, ...)` — submit a plan for full governance review
 - `submit_completion_review(task_id, agent, summary_of_work, files_changed)` — final governance check before completion
 - `get_decision_history(task_id?, agent?, verdict?)` — query past decisions and verdicts
@@ -490,7 +590,8 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 │   ├── kg-librarian.md
 │   ├── governance-reviewer.md
 │   ├── researcher.md
-│   └── project-steward.md
+│   ├── project-steward.md
+│   └── project-bootstrapper.md
 ├── collab/
 │   ├── knowledge-graph.jsonl        # KG persistence (managed by server)
 │   ├── trust-engine.db              # Trust engine SQLite DB (managed by server)
@@ -500,6 +601,8 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 .avt/                                # Agent Vision Team system config
 ├── task-briefs/                     # Task briefs for workers
 ├── session-state.md                 # Current session progress
+├── bootstrap-report.md              # Bootstrap discovery report (generated by bootstrapper)
+├── bootstrap-rules-draft.json       # Draft project rules from bootstrap (pending approval)
 ├── .holistic-review-pending         # Flag file: gates mutation tools during holistic review
 ├── memory/                          # Archival memory files (synced by KG Librarian)
 │   ├── architectural-decisions.md   # Significant decisions and rationale
@@ -516,6 +619,12 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 docs/                                    # Project-level documentation
 ├── vision/                              # Vision standard documents (project artifacts)
 ├── architecture/                        # Architecture documents (project artifacts)
+│   ├── overview.md                      # System-level architecture overview with diagrams
+│   ├── components/                      # Per-component architecture docs
+│   ├── patterns/                        # Cross-cutting architectural pattern docs
+│   └── flows/                           # Key interaction sequence diagrams
+├── style/                               # Coding conventions and style guide
+│   └── style-guide.md                   # Discovered conventions (generated by bootstrapper)
 └── project-overview.md                  # Project overview
 
 e2e/                                     # Autonomous E2E testing harness
@@ -662,7 +771,12 @@ e2e/
    get_entities_by_tier("vision")
    ```
 
-3. **Create task brief**: Write `.avt/task-briefs/001-add-auth.md` (reference the research brief)
+3. **Design architecture** (for tasks requiring architectural decisions):
+   ```
+   Task tool → subagent_type: architect
+   prompt: "Design the authentication architecture for our API. Reference the research brief in .avt/research-briefs/. Produce task briefs for workers."
+   ```
+   The architect submits each decision with intent, expected_outcome, and vision_references. Governance reviews each decision. The architect produces task briefs in `.avt/task-briefs/`.
 
 4. **Spawn worker**:
    ```

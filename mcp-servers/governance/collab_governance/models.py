@@ -40,6 +40,9 @@ class Decision(BaseModel):
     category: DecisionCategory
     summary: str
     detail: str = ""
+    intent: str = ""  # WHY this decision is being made
+    expected_outcome: str = ""  # WHAT measurable result is expected
+    vision_references: list[str] = Field(default_factory=list)  # Which vision standards this serves
     components_affected: list[str] = Field(default_factory=list)
     alternatives_considered: list[Alternative] = Field(default_factory=list)
     confidence: Confidence = Confidence.HIGH

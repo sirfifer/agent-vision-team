@@ -67,7 +67,12 @@ def _write_architectural_decisions(kg: KnowledgeGraph, memory_dir: Path) -> int:
             for obs in entry.observations:
                 if obs.startswith("protection_tier:"):
                     continue
-                lines.append(f"- {obs}")
+                if obs.startswith("Intent:"):
+                    lines.append(f"- **Intent**: {obs[7:].strip()}")
+                elif obs.startswith("Expected outcome:"):
+                    lines.append(f"- **Expected Outcome**: {obs[17:].strip()}")
+                else:
+                    lines.append(f"- {obs}")
             lines.append("")
 
     (memory_dir / "architectural-decisions.md").write_text(

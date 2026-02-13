@@ -95,6 +95,14 @@ Before implementing any key decision, you MUST call the governance server for tr
 
 ### How:
 Call `submit_decision` on the `collab-governance` MCP server with your decision details.
+
+**Always include intent and expected outcome.** Every `submit_decision` call must provide:
+- **intent**: WHY you are making this choice. Not "because it works" but the specific problem this solves and why this approach addresses it.
+- **expected_outcome**: WHAT measurable result you expect. Tie it to vision standards where possible. Not "it will be better" but "reduces response latency to under 200ms" or "eliminates the single point of failure in the auth path."
+- **vision_references**: List of vision standard names this outcome serves. If no vision standard applies, leave empty.
+
+The governance reviewer flags missing or vague intent/outcome as quality findings. Providing them upfront saves you a review round-trip.
+
 **Wait for the response.** Act on the verdict:
 - **approved**: Proceed with implementation.
 - **blocked**: The response includes `guidance` explaining what to change. Revise your approach and submit a new decision.

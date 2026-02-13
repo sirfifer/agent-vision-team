@@ -263,6 +263,10 @@ class GovernanceReviewer:
             for a in decision.alternatives_considered
         )
 
+        intent_text = decision.intent or "(not provided)"
+        outcome_text = decision.expected_outcome or "(not provided)"
+        vrefs_text = ", ".join(decision.vision_references) if decision.vision_references else "(none)"
+
         return f"""You are a governance reviewer. Evaluate this decision against the project's vision and architecture standards.
 
 ## Vision Standards
@@ -276,6 +280,9 @@ class GovernanceReviewer:
 - **Category**: {decision.category.value}
 - **Summary**: {decision.summary}
 - **Detail**: {decision.detail}
+- **Intent**: {intent_text}
+- **Expected Outcome**: {outcome_text}
+- **Vision References**: {vrefs_text}
 - **Components affected**: {', '.join(decision.components_affected)}
 - **Alternatives considered**:
 {alts_text or '  (none provided)'}
@@ -299,6 +306,12 @@ Apply PIN (Positive, Innovative, Negative) methodology in your review:
 - Does it deviate unjustifiably from architecture patterns? If yes, verdict is "blocked".
 - If the category is "deviation" or "scope_change", verdict should be "needs_human_review".
 - If the decision aligns with standards, verdict is "approved".
+
+### 4. INTENT & OUTCOME QUALITY
+- If intent is missing or vague, include a quality-tier finding asking the agent to articulate WHY this decision is being made.
+- If expected outcome is missing or not measurable, include a quality-tier finding requesting a concrete, measurable outcome.
+- If vision references are provided, verify the named standards exist above and that the outcome logically serves them.
+- If vision references are NOT provided but the decision clearly relates to vision standards listed above, suggest which standards should be referenced.
 
 For EVERY finding, include what related work can be preserved and what is specifically problematic.
 
@@ -334,6 +347,8 @@ Respond with ONLY a JSON object (no markdown, no explanation outside the JSON):
 
         decisions_text = "\n".join(
             f"  - [{d.category.value}] {d.summary} (confidence: {d.confidence.value})"
+            + (f"\n    Intent: {d.intent}" if d.intent else "")
+            + (f"\n    Expected Outcome: {d.expected_outcome}" if d.expected_outcome else "")
             for d in decisions
         )
         reviews_text = "\n".join(
@@ -410,7 +425,10 @@ Respond with ONLY a JSON object:
     ) -> str:
         standards_text = self._format_standards(vision_standards)
         decisions_text = "\n".join(
-            f"  - [{d.category.value}] {d.summary}" for d in decisions
+            f"  - [{d.category.value}] {d.summary}"
+            + (f"\n    Intent: {d.intent}" if d.intent else "")
+            + (f"\n    Expected Outcome: {d.expected_outcome}" if d.expected_outcome else "")
+            for d in decisions
         )
         reviews_text = "\n".join(
             f"  - Decision {r.decision_id}: {r.verdict.value}" for r in reviews

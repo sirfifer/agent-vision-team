@@ -179,6 +179,10 @@
     "governance-reviewer": {
       "model": "sonnet",
       "tools": ["Read", "Glob", "Grep", "mcp:collab-kg"]
+    },
+    "project-bootstrapper": {
+      "model": "opus",
+      "tools": ["Read", "Write", "Glob", "Grep", "Bash", "Task", "mcp:collab-kg", "mcp:collab-governance"]
     }
   },
   "workspace": {

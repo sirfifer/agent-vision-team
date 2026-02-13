@@ -1,0 +1,10 @@
+{
+  "session_id": "1744d1bc-7c9f-4ce8-9ae6-b1dd8249d4c3",
+  "transcript_path": "/Users/ramerman/.claude/projects/-private-tmp-avt-stop-hook-exp-uRpkPK/1744d1bc-7c9f-4ce8-9ae6-b1dd8249d4c3.jsonl",
+  "cwd": "/private/tmp/avt-stop-hook-exp-uRpkPK",
+  "permission_mode": "bypassPermissions",
+  "hook_event_name": "SubagentStop",
+  "stop_hook_active": false,
+  "agent_id": "a666568",
+  "agent_transcript_path": "/Users/ramerman/.claude/projects/-private-tmp-avt-stop-hook-exp-uRpkPK/1744d1bc-7c9f-4ce8-9ae6-b1dd8249d4c3/subagents/agent-a666568.jsonl"
+}

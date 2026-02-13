@@ -77,6 +77,11 @@ def parse_document(filepath: Path, tier: str) -> Optional[dict]:
     if examples:
         observations.append(f"examples: {examples}")
 
+    # Extract Dependencies section (for architecture component docs)
+    dependencies = _extract_section(content, 'Dependencies')
+    if dependencies:
+        observations.append(f"dependencies: {dependencies}")
+
     # Add the full document title as an observation
     observations.append(f"title: {raw_title}")
 
@@ -121,14 +126,19 @@ def _extract_section(content: str, section_name: str) -> Optional[str]:
     """Extract content from a markdown section.
 
     Looks for ## Section Name and extracts content until the next ## or end.
+    Strips fenced code blocks (e.g. Mermaid diagrams) before collapsing
+    whitespace so they don't get mangled into the observation text.
     """
     pattern = rf'^##\s+{re.escape(section_name)}\s*\n(.*?)(?=^##|\Z)'
     match = re.search(pattern, content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
     if match:
         text = match.group(1).strip()
+        # Remove fenced code blocks (```...```) so Mermaid diagrams
+        # and other code blocks don't get collapsed into gibberish
+        text = re.sub(r'```[^`]*```', '', text, flags=re.DOTALL)
         # Collapse multiple whitespace
         text = re.sub(r'\s+', ' ', text)
-        return text if text else None
+        return text.strip() if text.strip() else None
     return None
 
 
@@ -165,9 +175,9 @@ def ingest_folder(
     errors = []
     skipped = []
 
-    # Find all .md files (excluding README.md)
+    # Find all .md files recursively (excluding README.md)
     md_files = [
-        f for f in folder.glob('*.md')
+        f for f in folder.rglob('*.md')
         if f.name.lower() != 'readme.md'
     ]
 

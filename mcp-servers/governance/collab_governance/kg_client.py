@@ -74,18 +74,29 @@ class KGClient:
         return results
 
     def record_decision(
-        self, decision_id: str, summary: str, verdict: str, agent: str
+        self,
+        decision_id: str,
+        summary: str,
+        verdict: str,
+        agent: str,
+        intent: str = "",
+        expected_outcome: str = "",
     ) -> None:
         """Append a governance observation to the KG JSONL file."""
         self.kg_path.parent.mkdir(parents=True, exist_ok=True)
+        observations = [
+            f"Governance decision by {agent}: {summary}",
+            f"Verdict: {verdict}",
+        ]
+        if intent:
+            observations.append(f"Intent: {intent}")
+        if expected_outcome:
+            observations.append(f"Expected outcome: {expected_outcome}")
         record = {
             "type": "entity",
             "name": f"governance_decision_{decision_id}",
             "entityType": "governance_decision",
-            "observations": [
-                f"Governance decision by {agent}: {summary}",
-                f"Verdict: {verdict}",
-            ],
+            "observations": observations,
         }
         with open(self.kg_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")
