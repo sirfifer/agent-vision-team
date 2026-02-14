@@ -1,8 +1,8 @@
 # Agent Vision Team — Project Overview
 
-> A platform-native multi-agent system for software development built on Claude Code, providing tier-protected institutional memory, transactional governance, and deterministic quality verification through three MCP servers, six specialized subagents, and a standalone web gateway for remote operation.
+> A platform-native multi-agent system for software development built on Claude Code, providing tier-protected institutional memory, transactional governance, and deterministic quality verification through three MCP servers, eight specialized subagents, and a standalone web gateway for remote operation.
 
-**Last Updated**: 2026-02-08
+**Last Updated**: 2026-02-13
 
 ---
 
@@ -12,7 +12,7 @@ Agent Vision Team is a collaborative intelligence system that coordinates multip
 
 The system is organized around a three-tier governance hierarchy: **Vision** (immutable project principles), **Architecture** (human-gated structural patterns), and **Quality** (automated code standards). Every piece of work an agent produces is measured against this hierarchy. A perfectly linted function that violates the project's design philosophy is a failure, not a success.
 
-A human developer, working through a primary Claude Code session (the orchestrator), decomposes complex tasks and delegates them to six specialized subagents. Workers implement scoped tasks. The quality reviewer evaluates work through a three-lens model. The KG librarian curates institutional memory so knowledge survives across sessions. The governance reviewer provides AI-powered decision review inside the governance server. The researcher gathers intelligence, monitoring external dependencies and investigating unfamiliar domains, so workers implement from informed positions rather than guessing. The project steward maintains organizational hygiene: naming conventions, folder structure, documentation completeness, and cruft detection. Each agent has a distinct role, and together they sustain coherent, high-quality development over extended autonomous sessions.
+A human developer, working through a primary Claude Code session (the orchestrator), decomposes complex tasks and delegates them to eight specialized subagents. The architect designs system architecture with explicit intent and expected outcomes for every decision, producing task briefs that workers implement. Workers implement scoped tasks. The quality reviewer evaluates work through a three-lens model. The KG librarian curates institutional memory so knowledge survives across sessions. The governance reviewer provides AI-powered decision review inside the governance server. The researcher gathers intelligence, monitoring external dependencies and investigating unfamiliar domains, so workers implement from informed positions rather than guessing. The project steward maintains organizational hygiene: naming conventions, folder structure, documentation completeness, and cruft detection. The project bootstrapper onboards existing codebases by discovering governance artifacts (vision standards, architecture patterns, coding conventions) that already exist implicitly in code and documentation. Each agent has a distinct role, and together they sustain coherent, high-quality development over extended autonomous sessions.
 
 The system operates in two modes: **locally** via the VS Code extension for developers at their workstation, or **remotely** via a standalone web gateway that serves the same React dashboard over HTTPS. The remote mode enables job submission from any device (including phones), persistent container-based deployment, and full management without VS Code.
 
@@ -26,17 +26,20 @@ The system operates in two modes: **locally** via the VS Code extension for deve
 │    Interactive Claude Code session (Opus 4.6)                     │
 │    Reads: CLAUDE.md, session-state.md                            │
 │    Uses: Task tool to spawn all subagents                        │
-└──┬──────────┬──────────┬──────────┬──────────┬───────────────────┘
-   │          │          │          │          │
-┌──▼───────┐ ┌▼────────┐ ┌▼────────┐ ┌▼────────┐ ┌▼──────────────┐
-│ WORKER   │ │QUALITY  │ │  KG     │ │RESEARCH-│ │  PROJECT      │
-│          │ │REVIEWER │ │LIBRARIAN│ │  ER     │ │  STEWARD      │
-│(Opus 4.6)│ │(Opus 4.6│ │(Sonnet │ │(Opus 4.6│ │  (Sonnet 4.5) │
-│          │ │)        │ │ 4.5)    │ │/Sonnet │ │               │
-│          │ │         │ │         │ │  4.5)   │ │               │
-└──┬───────┘ └──┬──────┘ └──┬──────┘ └──┬──────┘ └──┬────────────┘
-   │            │            │           │           │
-┌──▼────────────▼────────────▼───────────▼───────────▼───────────┐
+└──┬──────┬──────────┬──────────┬──────────┬──────────┬────────────┘
+   │      │          │          │          │          │
+┌──▼───┐ ┌▼────────┐ ┌▼────────┐ ┌▼────────┐ ┌▼────────┐ ┌──────────────┐
+│ARCHI-│ │ WORKER  │ │QUALITY  │ │  KG     │ │RESEARCH-│ │  PROJECT     │
+│ TECT │ │         │ │REVIEWER │ │LIBRARIAN│ │  ER     │ │  STEWARD     │
+│(Opus │ │(Opus 4.6│ │(Opus 4.6│ │(Sonnet │ │(Opus 4.6│ │ (Sonnet 4.5) │
+│ 4.6) │ │)        │ │)        │ │ 4.5)    │ │/Sonnet │ │              │
+│      │ │         │ │         │ │         │ │  4.5)   │ │  PROJECT     │
+│      │ │         │ │         │ │         │ │         │ │  BOOTSTRAP-  │
+│      │ │         │ │         │ │         │ │         │ │  PER         │
+│      │ │         │ │         │ │         │ │         │ │ (Opus 4.6)   │
+└──┬───┘ └──┬──────┘ └──┬──────┘ └──┬──────┘ └──┬──────┘ └──┬───────────┘
+   │        │            │           │           │           │
+┌──▼────────▼────────────▼───────────▼───────────▼───────────▼───┐
 │                     THREE MCP SERVERS                           │
 │                                                                 │
 │  ┌──────────────┐   ┌──────────────┐   ┌────────────────────┐  │
@@ -158,18 +161,20 @@ Transactional review checkpoints for agent decisions, implementing the "intercep
 
 ---
 
-## Six Custom Subagents
+## Eight Custom Subagents
 
 All defined in `.claude/agents/` as markdown files with YAML frontmatter specifying model, tools, and system prompt.
 
 | Agent | Model | Role | MCP Access |
 |-------|-------|------|------------|
+| **Architect** | Opus 4.6 | Designs architecture with explicit intent and expected outcomes. Operates in two modes: upfront design (project bootstrap) and ongoing decisions (feature evolution). Produces task briefs for workers. Does not write implementation code. | KG, Governance |
 | **Worker** | Opus 4.6 | Implements scoped tasks from task briefs. Queries KG for constraints, submits decisions for governance review, runs quality gates before completion. | KG, Quality, Governance |
-| **Quality Reviewer** | Opus 4.6 | Three-lens evaluation: Vision (highest) → Architecture → Quality. Returns structured findings with project-specific rationale. | KG, Quality |
+| **Quality Reviewer** | Opus 4.6 | Three-lens evaluation: Vision (highest) -> Architecture -> Quality. Returns structured findings with project-specific rationale. | KG, Quality |
 | **KG Librarian** | Sonnet 4.5 | Curates institutional memory after work sessions. Consolidates observations, promotes recurring solutions to patterns, removes stale entries, syncs to archival files. | KG |
 | **Governance Reviewer** | Sonnet 4.5 | Evaluates decisions and plans against vision and architecture standards. Called internally by the governance server via `claude --print`. Returns structured verdicts. | KG |
 | **Researcher** | Opus 4.6/Sonnet 4.5 | Gathers intelligence in two modes: periodic/maintenance (tracking external dependencies) and exploratory/design (informing architectural decisions). Produces research briefs. | KG, Governance |
 | **Project Steward** | Sonnet 4.5 | Maintains project hygiene: naming conventions, folder organization, documentation completeness, cruft detection, consistency checks. | KG |
+| **Project Bootstrapper** | Opus 4.6 | Onboards existing codebases by discovering governance artifacts (vision standards, architecture patterns, conventions) implicitly present in code and documentation. Produces bootstrap report, draft vision/architecture docs, style guide, and draft project rules. | KG, Governance |
 
 ### The Quality Reviewer — Three-Lens Evaluation
 
@@ -211,9 +216,46 @@ The project steward maintains everything that makes a project professional and m
 
 The steward can make mechanical fixes directly (renaming files, removing cruft) when the change is non-controversial. For structural changes or deletions that might affect other developers, it flags them for the orchestrator. It records naming conventions and project structure patterns as KG entities so future reviews have an established baseline.
 
+### The Architect — Intent-Driven Design
+
+The architect designs system architecture with a strict protocol: every decision must articulate its intent (why), expected outcome (what measurable result), and vision references (which standards it serves) before proposing a solution. This forces deliberate thinking and produces architecture traceable back to vision standards.
+
+**Two operating modes**:
+
+**Upfront Design** (project bootstrap or major features): The architect loads all vision standards and existing architecture from the KG, identifies key architectural decisions, explores at least two alternatives per decision, submits each via `submit_decision` with full intent/outcome chain, and produces design documents and task briefs for workers.
+
+**Ongoing Decisions** (feature evolution): The architect checks existing patterns, identifies the gap the new feature creates, traces it to vision standards, submits the decision for governance review, and produces a task brief for the worker who will implement it.
+
+The architect does not write implementation code. It designs and the worker implements. This separation ensures architectural decisions are deliberate and documented, not buried in implementation details.
+
+### The Project Bootstrapper — Codebase Onboarding
+
+The project bootstrapper onboards an existing, mature codebase into the AVT system by discovering governance artifacts that already exist implicitly in code and documentation. It is a discoverer, not a creator: it surfaces what exists and presents it for human review.
+
+**How it works**:
+
+1. **Scale assessment**: Runs a cheap CLI-based analysis (file counts, LOC, package boundaries) in under 5 seconds, classifying the project into a scale tier (Small through Enterprise)
+2. **Partition map**: Builds a map of natural code boundaries for bounded parallelism
+3. **Discovery waves**: Spawns sub-agents in waves (up to 15 concurrent) to discover vision standards, architecture patterns, coding conventions, and project rules
+4. **Synthesis**: Produces draft artifacts for human review
+
+**What it produces**:
+
+| Artifact | Location | Purpose |
+|----------|----------|---------|
+| Bootstrap report | `.avt/bootstrap-report.md` | Primary review artifact with APPROVE/REJECT/REVISE actions |
+| Vision standard drafts | `docs/vision/*.md` | One doc per discovered vision standard |
+| Architecture docs | `docs/architecture/` | Multi-level with Mermaid diagrams |
+| Style guide | `docs/style/style-guide.md` | Discovered coding conventions |
+| Draft rules | `.avt/bootstrap-rules-draft.json` | Discovered project rules |
+
+**Scale handling**: The bootstrapper adapts from small codebases (< 10K LOC, inline discovery, ~5 min) to enterprise scale (2M+ LOC, ~300 agent invocations, ~41 min) using wave-based bounded parallelism.
+
+**Dashboard integration**: The VS Code extension and AVT Gateway provide a bootstrap UI (`BootstrapDialog.tsx`) with scale profile visualization and a REST endpoint (`/bootstrap/scale-check`) for triggering the scale assessment.
+
 ### The Governance Reviewer — The Brain Inside Governance
 
-The governance reviewer is unique among the six agents: it is not spawned directly by the orchestrator. Instead, it runs inside the governance server, called via `claude --print` whenever a decision, plan, or completion review is submitted.
+The governance reviewer is unique among the eight agents: it is not spawned directly by the orchestrator. Instead, it runs inside the governance server, called via `claude --print` whenever a decision, plan, or completion review is submitted.
 
 When the governance server receives a `submit_decision` call, it loads vision standards from the KG, passes them along with the decision details to the governance reviewer, and the reviewer applies three checks in strict order:
 
@@ -289,6 +331,37 @@ The project steward runs periodically or before significant events (releases, ma
 4. Steward records naming conventions as KG entities for future reference
 5. Steward returns structured review report with prioritized findings
 6. Orchestrator addresses findings or delegates to workers
+```
+
+### Architecture Design Flow
+
+For tasks requiring architectural decisions, the orchestrator spawns the architect before creating worker tasks:
+
+```
+1. Orchestrator identifies a task requiring architectural decisions
+2. Orchestrator spawns architect with a design brief
+3. Architect loads vision standards and existing architecture from KG
+4. For each decision: articulates intent, expected outcome, vision references
+5. Architect submits each decision via submit_decision (blocks until verdict)
+6. Architect produces design documents and task briefs in .avt/task-briefs/
+7. Architect submits the full plan via submit_plan_for_review
+8. Workers implement from task briefs with architectural context
+```
+
+### Bootstrap Flow
+
+For onboarding an existing codebase into the AVT system:
+
+```
+1. Orchestrator spawns project bootstrapper with the target codebase path
+2. Bootstrapper runs scale assessment (< 5 seconds, CLI-based)
+3. Bootstrapper classifies project into scale tier and builds partition map
+4. Bootstrapper spawns discovery sub-agents in waves (up to 15 concurrent)
+5. Discovery covers: vision standards, architecture patterns, conventions, rules
+6. Bootstrapper synthesizes findings into draft artifacts
+7. Human reviews bootstrap report (.avt/bootstrap-report.md)
+8. Human marks each artifact as APPROVE, REJECT, or REVISE
+9. Approved artifacts are ingested into KG via ingest_documents()
 ```
 
 ---
@@ -501,7 +574,7 @@ The KG Librarian syncs important graph entries to human-readable files:
 
 | Path | What |
 |------|------|
-| `.claude/agents/*.md` | Six custom subagent definitions (worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward) |
+| `.claude/agents/*.md` | Eight custom subagent definitions (architect, worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward, project-bootstrapper) |
 | `.claude/settings.json` | MCP server registration, lifecycle hooks (PostToolUse, PreToolUse), holistic review coordination, agent tool permissions |
 | `CLAUDE.md` | Orchestrator instructions — task decomposition, governance protocol, quality review, memory protocol, drift detection |
 
@@ -647,7 +720,7 @@ These principles, drawn from the system's development, govern how it's built and
 All five implementation phases are complete:
 
 - **Phase 1** (MCP Servers): KG with JSONL persistence and tier protection, Quality with trust engine and multi-language tool wrapping, Governance with transactional review and governed tasks
-- **Phase 2** (Subagents + Validation): Six custom subagent definitions, orchestrator CLAUDE.md, settings and hooks
+- **Phase 2** (Subagents + Validation): Eight custom subagent definitions (including architect and project bootstrapper), orchestrator CLAUDE.md, settings and hooks
 - **Phase 3** (Extension): VS Code extension with Memory Browser, Findings Panel, Tasks Panel, Dashboard webview, setup wizard
 - **Phase 4** (Governance + E2E): Governance server, governed task system, AI-powered review, holistic collective-intent review with two-layer assurance, E2E harness with 14 scenarios and 292+ assertions
 - **Phase 5** (Remote Operation): AVT Gateway (FastAPI, 35 REST endpoints, WebSocket push, job runner), dual-mode React dashboard, container packaging (Docker, Codespaces), mobile-responsive layout
