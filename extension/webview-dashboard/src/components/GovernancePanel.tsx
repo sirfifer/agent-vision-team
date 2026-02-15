@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDashboard } from '../context/DashboardContext';
 import { GovernanceItem } from './GovernanceItem';
 import { FindingsPanel } from './FindingsPanel';
+import { UsagePanel } from './UsagePanel';
 
 export function GovernancePanel({ className = '' }: { className?: string }) {
   const { data } = useDashboard();
@@ -72,6 +73,9 @@ export function GovernancePanel({ className = '' }: { className?: string }) {
 
       {/* Quality Findings */}
       <FindingsPanel />
+
+      {/* Token Usage */}
+      <UsagePanel />
     </div>
   );
 }

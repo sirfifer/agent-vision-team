@@ -448,7 +448,8 @@ export type ExtensionMessage =
   | { type: 'showTutorial' }
   | { type: 'toggleDemo' }
   | { type: 'bootstrapScaleResult'; profile: BootstrapScaleProfile }
-  | { type: 'bootstrapStarted'; jobId?: string };
+  | { type: 'bootstrapStarted'; jobId?: string }
+  | { type: 'usageReport'; report: unknown };
 
 export type WebviewMessage =
   | { type: 'connect' }
@@ -474,7 +475,8 @@ export type WebviewMessage =
   | { type: 'readResearchBrief'; briefPath: string }
   | { type: 'listResearchBriefs' }
   | { type: 'bootstrapScaleCheck' }
-  | { type: 'runBootstrap'; context: string; focusAreas: BootstrapFocusAreas };
+  | { type: 'runBootstrap'; context: string; focusAreas: BootstrapFocusAreas }
+  | { type: 'requestUsageReport'; period: string; groupBy: string };
 
 export interface IngestionResult {
   tier: 'vision' | 'architecture';

@@ -342,6 +342,10 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         case 'runBootstrap':
           this.handleRunBootstrap(message.context, message.focusAreas);
           break;
+
+        case 'requestUsageReport':
+          this.handleRequestUsageReport(message.period, message.groupBy);
+          break;
       }
     });
   }
@@ -914,6 +918,32 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         detail: String(err),
       });
       vscode.window.showErrorMessage(`Bootstrap failed: ${err}`);
+    }
+  }
+
+  private async handleRequestUsageReport(period: string, groupBy: string): Promise<void> {
+    try {
+      const response = await fetch('http://localhost:3103/tools/call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'get_usage_report',
+          arguments: { period, group_by: groupBy },
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // FastMCP wraps tool results in content array
+        const report = result?.content?.[0]?.text
+          ? JSON.parse(result.content[0].text)
+          : result;
+        this.postMessage({ type: 'usageReport', report });
+      } else {
+        this.postMessage({ type: 'usageReport', report: null });
+      }
+    } catch {
+      this.postMessage({ type: 'usageReport', report: null });
     }
   }
 
