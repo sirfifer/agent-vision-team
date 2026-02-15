@@ -771,9 +771,8 @@ All five implementation phases are complete, plus an Agent Teams adaptation:
 ## Related Documentation
 
 - [CLAUDE.md](../CLAUDE.md) -- Orchestrator instructions and protocols
-- [Architecture](./architecture/) -- System architecture documentation
-- [COLLABORATIVE_INTELLIGENCE_VISION.md](../COLLABORATIVE_INTELLIGENCE_VISION.md) -- Original vision document (conceptual foundation)
 - [ARCHITECTURE.md](../ARCHITECTURE.md) -- Engineering-level architecture specification
+- [COLLABORATIVE_INTELLIGENCE_VISION.md](../COLLABORATIVE_INTELLIGENCE_VISION.md) -- Original vision document (conceptual foundation)
 - [E2E Testing Harness](../e2e/README.md) -- Autonomous test suite documentation
 - [Knowledge Graph Server](../mcp-servers/knowledge-graph/README.md) -- KG API and tier protection
 - [Quality Server](../mcp-servers/quality/README.md) -- Quality tools and trust engine
