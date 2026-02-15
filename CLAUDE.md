@@ -6,16 +6,88 @@ This project uses a collaborative intelligence system with:
 - **Knowledge Graph MCP server** — persistent institutional memory with tier protection
 - **Quality MCP server** — deterministic quality verification with trust engine
 - **Governance MCP server** — transactional review checkpoints for agent decisions
-- **Custom subagents** — architect, worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward, project-bootstrapper (defined in `.claude/agents/`)
+- **Agent Teams** — specialized teammates (architect, worker, quality-reviewer, kg-librarian, researcher, project-steward, project-bootstrapper) spawned as full Claude Code sessions with independent MCP access
+- **Agent definitions** — `.claude/agents/` contains system prompts and role specifications for each agent type
+- **Governance reviewer** — runs via `claude --print` (text-only, no MCP needed; isolation is a security feature)
 
 ## Your Role as Orchestrator
 
-You coordinate multiple specialized subagents to accomplish complex development tasks. You:
+You coordinate multiple specialized agents to accomplish complex development tasks. You:
 - Decompose complex tasks into discrete units of work
-- Spawn worker subagents with scoped task briefs
-- Ensure quality review via the quality-reviewer subagent
-- Maintain institutional memory via the kg-librarian subagent
+- Spawn teammates via Agent Teams with scoped task briefs and embedded system prompts
+- Ensure quality review via the quality-reviewer teammate
+- Maintain institutional memory via the kg-librarian teammate
 - Manage the three-tier governance hierarchy (Vision > Architecture > Quality)
+
+## Agent Teams Orchestration Protocol
+
+This project uses Claude Code Agent Teams for parallel work. Each teammate is a full Claude Code session with independent MCP access, CLAUDE.md context, and hook enforcement.
+
+### How Agent Teams Work
+
+- **Agent Teams are enabled** via `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` (set in `.claude/settings.json` env)
+- **Each teammate loads project context independently**: CLAUDE.md, MCP servers (from `~/.claude/mcp.json`), hooks, skills
+- **Shared task list**: All teammates share a task list (set via `CLAUDE_CODE_TASK_LIST_ID`)
+- **Self-claim**: Teammates pick up the next unassigned, unblocked task automatically
+- **Direct messaging**: Teammates can message each other (not just report to lead)
+- **Hooks fire for all teammates**: PostToolUse, PreToolUse, TeammateIdle, TaskCompleted
+
+### Spawning Teammates
+
+Since `.claude/agents/` definitions cannot yet be used directly as teammates (Issue #24316), embed the agent's full system prompt in the spawn instruction:
+
+1. Read the relevant `.claude/agents/{role}.md` file
+2. Extract the system prompt (everything after the YAML frontmatter)
+3. Include it in the teammate spawn instruction along with the specific task brief
+
+Example:
+```
+Spawn a teammate named "worker-1". Use Opus model. Their system prompt:
+[full content of .claude/agents/worker.md after frontmatter]
+
+Their task brief:
+[content of .avt/task-briefs/001-add-auth.md]
+```
+
+When #24316 is fixed, teammates will load `.claude/agents/` definitions directly.
+
+### Which Agents Become Teammates vs Stay As-Is
+
+| Agent | Mechanism | Why |
+|-------|-----------|-----|
+| Worker | **Teammate** | Needs MCP for KG, Quality, Governance |
+| Quality Reviewer | **Teammate** | Needs MCP for KG, Quality |
+| Architect | **Teammate** | Needs MCP for KG, Governance |
+| KG Librarian | **Teammate** | Needs MCP for KG |
+| Researcher | **Teammate** | Needs MCP for KG, Governance; uses WebSearch |
+| Project Steward | **Teammate** | Needs MCP for KG |
+| Project Bootstrapper | **Teammate** | Needs MCP for KG, Governance; spawns sub-tasks |
+| Governance Reviewer | **`claude --print`** | Text-only, no MCP needed; isolation is a security feature |
+
+### Task Flow with Agent Teams
+
+1. **Lead creates tasks** via TaskCreate. Each task automatically gets a governance review blocker (PostToolUse hook).
+2. **Holistic review runs** if multiple tasks created (settle checker triggers after 3s of quiet).
+3. **Reviews complete** asynchronously. Tasks unblock as reviews approve them.
+4. **Lead spawns teammates** with embedded system prompts from `.claude/agents/`.
+5. **Teammates self-claim** available (unblocked, pending) tasks from the shared task list.
+6. **Teammates work** independently with full MCP access, submitting decisions via `submit_decision()`.
+7. **TaskCompleted hook** enforces governance gates when teammates mark tasks done.
+8. **Quality review**: Lead spawns a quality-reviewer teammate after workers complete.
+9. **Memory curation**: Lead spawns a kg-librarian teammate after quality review.
+10. **Lead creates checkpoint**: `git tag checkpoint-NNN`.
+
+### Drift Detection in Agent Teams
+
+Monitor teammate progress via the shared task list:
+- **Time drift**: Teammate's task stays "in_progress" too long without progress
+- **Loop drift**: Teammate keeps creating new tasks without completing any
+- **Scope drift**: TeammateIdle hook checks task completion before allowing idle
+- **Quality drift**: TaskCompleted hook verifies governance status before allowing completion
+
+### Fallback: Task Tool Subagents
+
+If Agent Teams is unavailable or disabled, fall back to Task-tool subagents. The `.claude/agents/` definitions and `agents` section in `.claude/settings.json` remain in place for this purpose. MCP access depends on user-scope configuration (`~/.claude/mcp.json`).
 
 ## Task Decomposition
 
@@ -27,9 +99,9 @@ When given a complex task:
    ```bash
    git worktree add ../project-worker-N -b task/NNN-description
    ```
-4. **Spawn workers**: Use the Task tool to launch worker subagents, one per task brief
-5. **Review work**: After each worker completes, spawn quality-reviewer with the worker's diff
-6. **Route findings**: Send findings back to workers for resolution
+4. **Spawn teammates**: Use Agent Teams to spawn worker teammates, each with the worker system prompt and their task brief (see "Agent Teams Orchestration Protocol" above). Fallback: use Task tool subagents if Agent Teams is unavailable.
+5. **Review work**: After each worker completes, spawn a quality-reviewer teammate with the worker's diff
+6. **Route findings**: Send findings back to workers for resolution (message the teammate directly)
 7. **Merge and cleanup**: When all findings are resolved and gates pass, merge and clean up
 
 ## Task Governance Protocol — "Intercept Early, Redirect Early"
@@ -80,7 +152,7 @@ The holistic review system detects this by evaluating all tasks from a session a
 ```
 Agent creates Task 1 → PostToolUse fires:
   - Records task with session_id in governance DB
-  - Creates flag file: .avt/.holistic-review-pending
+  - Creates session-scoped flag file: .avt/.holistic-review-pending-{session_id}
   - Spawns background settle checker (waits 3s)
 
 Agent creates Task 2 → PostToolUse fires:
@@ -98,17 +170,18 @@ Background: Settle checker for Task 3 wakes up after 3s:
 
 Meanwhile: Agent tries to Write/Edit/Bash/Task:
   → PreToolUse checkpoint fires (~1ms)
-  → Flag file exists? YES → exit 2 (redirect with feedback)
+  → Any session-scoped flag file exists? YES → exit 2 (redirect with feedback)
   → Agent sees "Holistic review in progress, please wait"
 ```
 
 **Key properties:**
 - **Detection is timing-based** (settle/debounce), not reliant on agent behavior
 - **Verification is deterministic** (PreToolUse coordinates work sequencing at the platform level)
-- **Works for all agent behaviors**: direct work, subagent spawning, or mixed
-- **Fast path is ~1ms** when no review is pending (flag file existence check)
+- **Works for all agent behaviors**: direct work, teammate spawning, subagent spawning, or mixed
+- **Fast path is ~1ms** when no review is pending (flag file glob check)
 - **Single tasks skip holistic review** (MIN_TASKS_FOR_REVIEW = 2)
-- **Subagent tasks are handled**: if a subagent creates tasks after the session was already approved, the settle checker cleans up the re-created flag
+- **Session-scoped flag files**: Each session gets its own flag (`.holistic-review-pending-{session_id}`), so concurrent Agent Teams teammates don't interfere with each other's holistic reviews
+- **Teammate tasks are handled**: if a teammate creates tasks in its own session, it gets its own holistic review independent of the lead's batch
 
 ### Explicit Governance (Optional)
 
@@ -471,13 +544,17 @@ The tool call blocks until the review completes. The worker then acts on the ver
 
 ### Hook-Based Verification Layer
 
-Three hooks provide deterministic governance verification:
+Five hooks provide deterministic governance verification:
 
-1. **PostToolUse on TaskCreate** (`scripts/hooks/governance-task-intercept.py`): The primary verification mechanism. Fires after every TaskCreate, pairs it with a governance review, tracks session_id, creates the holistic review flag file, and spawns the settle checker for collective review. 100% interception rate, universal and deterministic.
+1. **PostToolUse on TaskCreate** (`scripts/hooks/governance-task-intercept.py`): The primary verification mechanism. Fires after every TaskCreate, pairs it with a governance review, tracks session_id, creates a session-scoped holistic review flag file, and spawns the settle checker for collective review. 100% interception rate, universal and deterministic.
 
 2. **PreToolUse on ExitPlanMode** (`scripts/hooks/verify-governance-review.sh`): Ensures plans are verified before presentation. Redirects agents to submit a plan review if none exists. Checks `.avt/governance.db` for plan review records.
 
-3. **PreToolUse on Write|Edit|Bash|Task** (`scripts/hooks/holistic-review-gate.sh`): Coordinates work sequencing while holistic review completes. Uses a flag file (`.avt/.holistic-review-pending`) as a fast-path checkpoint (~1ms when no review is pending). Stale flags older than 5 minutes are auto-cleared.
+3. **PreToolUse on Write|Edit|Bash|Task** (`scripts/hooks/holistic-review-gate.sh`): Coordinates work sequencing while holistic review completes. Uses session-scoped flag files (`.avt/.holistic-review-pending-{session_id}`) with glob-based fast-path check (~1ms when no review is pending). Stale flags older than 5 minutes are auto-cleared. With multiple concurrent sessions, the gate blocks on the most restrictive status across all active flags.
+
+4. **TeammateIdle** (`scripts/hooks/teammate-idle-gate.sh`): Prevents Agent Teams teammates from going idle while they have pending governance obligations. Checks the governance DB for pending reviews and governed tasks still awaiting review. Exit 2 keeps the teammate working.
+
+5. **TaskCompleted** (`scripts/hooks/task-completed-gate.sh`): Prevents task completion if governance review is still pending or blocked. Verifies the governed_tasks table for the task's current status. Skips review tasks (detected by subject prefix). Exit 2 blocks completion with feedback.
 
 ### Internal Review Flow
 
@@ -553,6 +630,9 @@ Available tools:
 - `get_task_review_status(implementation_task_id)` — get review status and blockers for a task
 - `get_pending_reviews()` — list all reviews awaiting attention
 
+**Usage Tracking Tools**:
+- `get_usage_report(period?, group_by?, session_id?)` — token usage report for governance AI calls, with breakdown by agent/operation and prompt size trend
+
 ## Quality Gates
 
 Workers must pass all gates before completion:
@@ -583,12 +663,16 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 ## File Organization
 
 ```
+~/.claude/
+└── mcp.json                         # User-scope MCP server config (KG, Quality, Governance)
+
 .claude/
-├── agents/                          # Custom subagent definitions
+├── agents/                          # Agent definitions (system prompts + role specs)
 │   ├── worker.md
 │   ├── quality-reviewer.md
 │   ├── kg-librarian.md
 │   ├── governance-reviewer.md
+│   ├── architect.md
 │   ├── researcher.md
 │   ├── project-steward.md
 │   └── project-bootstrapper.md
@@ -596,14 +680,14 @@ This creates an audit trail. Future occurrences of the same finding will be trac
 │   ├── knowledge-graph.jsonl        # KG persistence (managed by server)
 │   ├── trust-engine.db              # Trust engine SQLite DB (managed by server)
 │   └── governance.db                # Governance SQLite DB (managed by server)
-└── settings.json                    # Claude Code settings and hooks
+└── settings.json                    # Claude Code settings, hooks, env vars, agents
 
 .avt/                                # Agent Vision Team system config
 ├── task-briefs/                     # Task briefs for workers
 ├── session-state.md                 # Current session progress
 ├── bootstrap-report.md              # Bootstrap discovery report (generated by bootstrapper)
 ├── bootstrap-rules-draft.json       # Draft project rules from bootstrap (pending approval)
-├── .holistic-review-pending         # Flag file: gates mutation tools during holistic review
+├── .holistic-review-pending-*       # Session-scoped flag files: gate mutation tools during holistic review
 ├── memory/                          # Archival memory files (synced by KG Librarian)
 │   ├── architectural-decisions.md   # Significant decisions and rationale
 │   ├── troubleshooting-log.md       # Problems, attempts, solutions
@@ -649,9 +733,18 @@ server/                                  # AVT Gateway (headless web mode)
 └── nginx.conf                           # TLS reverse proxy + WebSocket upgrade
 ```
 
-## Starting MCP Servers
+## MCP Server Configuration
 
-Before using the system, ensure all MCP servers are running:
+MCP servers are registered at **user scope** (`~/.claude/mcp.json`) using stdio transport. Claude Code spawns each server as a child process automatically when a session starts. This applies to the lead session, all Agent Teams teammates, and Task tool subagents.
+
+**Why user scope**: Project-scope MCP (`.claude/settings.json`) causes custom subagents to hallucinate MCP results (Issue #13898). User-scope MCP works correctly for all agent types.
+
+The three servers:
+- **collab-kg**: Knowledge Graph with tier-protected entities (JSONL persistence)
+- **collab-quality**: Quality gates (build, lint, test, coverage, findings)
+- **collab-governance**: Governance decisions, task integration, AI review
+
+For SSE mode (standalone/development), servers can also run on ports 3101-3103:
 
 ```bash
 # Terminal 1: Knowledge Graph server (SSE on port 3101)
@@ -666,8 +759,6 @@ uv run python -m collab_quality.server
 cd mcp-servers/governance
 uv run python -m collab_governance.server
 ```
-
-All servers will be available to all Claude Code sessions and subagents.
 
 ### Headless Web Mode (AVT Gateway)
 
@@ -761,8 +852,9 @@ e2e/
 
 1. **Research first** (for complex/unfamiliar tasks):
    ```
-   Task tool → subagent_type: researcher
-   prompt: "Research authentication approaches for our API. Compare JWT vs session-based auth, evaluate libraries, and recommend an approach."
+   Spawn a researcher teammate with system prompt from .claude/agents/researcher.md
+   Task: "Research authentication approaches for our API. Compare JWT vs
+   session-based auth, evaluate libraries, and recommend an approach."
    ```
 
 2. **Query KG for context**:
@@ -773,31 +865,37 @@ e2e/
 
 3. **Design architecture** (for tasks requiring architectural decisions):
    ```
-   Task tool → subagent_type: architect
-   prompt: "Design the authentication architecture for our API. Reference the research brief in .avt/research-briefs/. Produce task briefs for workers."
+   Spawn an architect teammate with system prompt from .claude/agents/architect.md
+   Task: "Design the authentication architecture for our API. Reference
+   the research brief in .avt/research-briefs/. Produce task briefs for workers."
    ```
    The architect submits each decision with intent, expected_outcome, and vision_references. Governance reviews each decision. The architect produces task briefs in `.avt/task-briefs/`.
 
-4. **Spawn worker**:
+4. **Create tasks and spawn workers**:
    ```
-   Task tool → subagent_type: worker
-   prompt: "Implement the task in .avt/task-briefs/001-add-auth.md"
+   Lead creates tasks via TaskCreate for each task brief
+   → PostToolUse hook creates governance pairs → holistic review runs
+   → Tasks unblock after approval
+   Spawn worker teammates with system prompt from .claude/agents/worker.md
+   Workers self-claim available tasks from the shared task list
    ```
 
-5. **Worker completes and runs gates**: Worker calls `check_all_gates()` before completion
+5. **Worker completes and runs gates**: Worker calls `check_all_gates()` before completion. TaskCompleted hook verifies governance status.
 
 6. **Review work**:
    ```
-   Task tool → subagent_type: quality-reviewer
-   prompt: "Review the diff for task 001-add-auth"
+   Spawn a quality-reviewer teammate with system prompt from
+   .claude/agents/quality-reviewer.md
+   Task: "Review the diff for task 001-add-auth"
    ```
 
-7. **Address findings**: If findings exist, route back to worker for resolution
+7. **Address findings**: If findings exist, message the worker teammate directly for resolution
 
 8. **Curate memory**:
    ```
-   Task tool → subagent_type: kg-librarian
-   prompt: "Curate the knowledge graph after task 001-add-auth"
+   Spawn a kg-librarian teammate with system prompt from
+   .claude/agents/kg-librarian.md
+   Task: "Curate the knowledge graph after task 001-add-auth"
    ```
 
 9. **Merge and checkpoint**:

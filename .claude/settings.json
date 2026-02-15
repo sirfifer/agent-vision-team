@@ -107,25 +107,9 @@
       "Bash(./scripts/hooks/test-hook-live.sh:*)"
     ]
   },
-  "mcpServers": {
-    "collab-kg": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "collab_kg.server"],
-      "cwd": "./mcp-servers/knowledge-graph",
-      "env": {}
-    },
-    "collab-quality": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "collab_quality.server"],
-      "cwd": "./mcp-servers/quality",
-      "env": {}
-    },
-    "collab-governance": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "collab_governance.server"],
-      "cwd": "./mcp-servers/governance",
-      "env": {}
-    }
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "ENABLE_TOOL_SEARCH": "auto:5"
   },
   "hooks": {
     "PostToolUse": [
@@ -160,6 +144,28 @@
           }
         ]
       }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/teammate-idle-gate.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/task-completed-gate.sh",
+            "timeout": 60
+          }
+        ]
+      }
     ]
   },
   "agents": {
@@ -169,7 +175,7 @@
       "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp:collab-kg", "mcp:collab-quality", "mcp:collab-governance"]
     },
     "quality-reviewer": {
-      "model": "opus",
+      "model": "sonnet",
       "tools": ["Read", "Glob", "Grep", "Bash", "mcp:collab-kg", "mcp:collab-quality"]
     },
     "kg-librarian": {
@@ -181,8 +187,20 @@
       "tools": ["Read", "Glob", "Grep", "mcp:collab-kg"]
     },
     "project-bootstrapper": {
-      "model": "opus",
+      "model": "sonnet",
       "tools": ["Read", "Write", "Glob", "Grep", "Bash", "Task", "mcp:collab-kg", "mcp:collab-governance"]
+    },
+    "architect": {
+      "model": "opus",
+      "tools": ["Read", "Glob", "Grep", "Bash", "mcp:collab-kg", "mcp:collab-governance"]
+    },
+    "researcher": {
+      "model": "sonnet",
+      "tools": ["Read", "Glob", "Grep", "Bash", "WebSearch", "WebFetch", "mcp:collab-kg", "mcp:collab-governance"]
+    },
+    "project-steward": {
+      "model": "sonnet",
+      "tools": ["Read", "Write", "Glob", "Grep", "Bash", "mcp:collab-kg"]
     }
   },
   "workspace": {

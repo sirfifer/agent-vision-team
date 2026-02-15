@@ -315,8 +315,12 @@ def _create_or_update_flag_file(session_id: str) -> None:
 
     This flag gates Write/Edit/Bash/Task tools via the PreToolUse hook
     (holistic-review-gate.sh). While the flag exists, mutation tools are blocked.
+
+    Flag files are session-scoped (.holistic-review-pending-{session_id}) so
+    that multiple concurrent Agent Teams teammates don't interfere with each
+    other's holistic reviews.
     """
-    flag_path = Path(PROJECT_DIR) / ".avt" / ".holistic-review-pending"
+    flag_path = Path(PROJECT_DIR) / ".avt" / f".holistic-review-pending-{session_id}"
     flag_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Count tasks for this session

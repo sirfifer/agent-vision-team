@@ -41,6 +41,13 @@ kg = KGClient()
 reviewer = GovernanceReviewer()
 
 
+def _store_reviewer_usage() -> None:
+    """Store the reviewer's last usage record in the governance DB."""
+    usage = reviewer.last_usage
+    if usage is not None:
+        store.store_usage(usage)
+
+
 @mcp.tool()
 def submit_decision(
     task_id: str,
@@ -132,20 +139,46 @@ def submit_decision(
             "standards_verified": review.standards_verified,
         }
 
-    # 4. Run AI review via claude --print
+    # 4. Skip AI review if no standards exist (nothing to check against)
+    if not vision_standards and not architecture:
+        from .models import ReviewVerdict as RV, Verdict as V
+
+        review = RV(
+            decision_id=decision.id,
+            verdict=V.APPROVED,
+            findings=[],
+            guidance="Auto-approved: no vision standards or architecture patterns configured yet.",
+            standards_verified=[],
+        )
+        store.store_review(review)
+        kg.record_decision(
+            decision.id, summary, "approved", agent,
+            intent=decision.intent, expected_outcome=decision.expected_outcome,
+        )
+        return {
+            "verdict": "approved",
+            "decision_id": decision.id,
+            "findings": [],
+            "guidance": review.guidance,
+            "strengths_summary": "",
+            "standards_verified": [],
+        }
+
+    # 5. Run AI review via claude --print
     review = reviewer.review_decision(decision, vision_standards, architecture)
     review.decision_id = decision.id
 
-    # 5. Store the review
+    # 6. Store the review and usage
     store.store_review(review)
+    _store_reviewer_usage()
 
-    # 6. Record in KG for institutional memory
+    # 7. Record in KG for institutional memory
     kg.record_decision(
         decision.id, summary, review.verdict.value, agent,
         intent=decision.intent, expected_outcome=decision.expected_outcome,
     )
 
-    # 7. Return the verdict
+    # 8. Return the verdict
     return {
         "verdict": review.verdict.value,
         "decision_id": decision.id,
@@ -200,8 +233,9 @@ def submit_plan_for_review(
         architecture=architecture,
     )
 
-    # Store
+    # Store review and usage
     store.store_review(review)
+    _store_reviewer_usage()
 
     # Record in KG
     kg.record_decision(
@@ -302,6 +336,7 @@ def submit_completion_review(
         vision_standards=vision_standards,
     )
     store.store_review(review)
+    _store_reviewer_usage()
 
     return {
         "verdict": review.verdict.value,
@@ -714,6 +749,52 @@ def get_pending_reviews() -> dict:
             for r in reviews
         ],
         "count": len(reviews),
+    }
+
+
+@mcp.tool()
+def get_usage_report(
+    period: str = "day",
+    group_by: str = "agent",
+    session_id: Optional[str] = None,
+) -> dict:
+    """Get token usage report for monitoring and optimization.
+
+    Tracks estimated token usage from governance review AI calls (claude --print).
+    Use this to monitor consumption patterns, identify expensive operations,
+    and detect prompt bloat over time.
+
+    Args:
+        period: Time period - 'day' (last 24h), 'week' (last 7d), or 'session'.
+        group_by: Breakdown dimension - 'agent', 'operation', or 'model'.
+        session_id: Filter to a specific session (optional, required if period='session').
+
+    Returns:
+        {period, summary: {totals}, breakdown: [{group, tokens, calls}], prompt_size_trend: [...]}
+    """
+    summary = store.get_usage_summary(period=period, session_id=session_id)
+
+    if group_by == "operation":
+        breakdown = store.get_usage_by_operation(period=period, session_id=session_id)
+    else:
+        breakdown = store.get_usage_by_agent(period=period, session_id=session_id)
+
+    # Always include prompt size trend (by operation) for bloat detection
+    prompt_trend = store.get_usage_by_operation(period=period, session_id=session_id)
+
+    return {
+        "period": period,
+        "group_by": group_by,
+        "summary": summary,
+        "breakdown": breakdown,
+        "prompt_size_trend": [
+            {
+                "operation": p["operation"],
+                "avg_prompt_bytes": p["avg_prompt_bytes"],
+                "call_count": p["call_count"],
+            }
+            for p in prompt_trend
+        ],
     }
 
 

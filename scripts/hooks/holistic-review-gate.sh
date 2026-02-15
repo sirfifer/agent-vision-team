@@ -14,48 +14,71 @@
 set -euo pipefail
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-FLAG_FILE="${PROJECT_DIR}/.avt/.holistic-review-pending"
+FLAG_DIR="${PROJECT_DIR}/.avt"
+FLAG_PATTERN=".holistic-review-pending-*"
 STALE_TIMEOUT=300  # 5 minutes: auto-expire stale flags
 
-# Fast path: no flag = no pending review
-if [ ! -f "$FLAG_FILE" ]; then
+# Fast path: no flag files = no pending review
+# Session-scoped flag files (.holistic-review-pending-{session_id}) allow
+# multiple concurrent Agent Teams teammates to have independent reviews.
+if ! ls "${FLAG_DIR}"/${FLAG_PATTERN} 1>/dev/null 2>&1; then
     exit 0
 fi
 
-# Check for stale flag (older than STALE_TIMEOUT seconds)
-if command -v python3 &>/dev/null; then
-    IS_STALE=$(python3 -c "
-import json, sys, time
-from datetime import datetime, timezone
-try:
-    data = json.load(open('$FLAG_FILE'))
-    created = data.get('created_at', '')
-    if created:
-        ts = datetime.fromisoformat(created).timestamp()
-        if time.time() - ts > $STALE_TIMEOUT:
-            print('stale')
-            sys.exit(0)
-    print('fresh')
-except Exception:
-    print('fresh')
-" 2>/dev/null || echo "fresh")
+# Find the most restrictive flag file (check all, remove stale ones)
+# Priority: blocked > needs_human_review > pending > (none)
+FLAG_FILE=""
+STATUS=""
 
-    if [ "$IS_STALE" = "stale" ]; then
-        # Remove stale flag and allow
-        rm -f "$FLAG_FILE" 2>/dev/null || true
-        exit 0
-    fi
+if command -v python3 &>/dev/null; then
+    RESULT=$(python3 -c "
+import json, glob, os, sys, time
+from datetime import datetime, timezone
+from pathlib import Path
+
+flag_dir = '${FLAG_DIR}'
+pattern = '${FLAG_PATTERN}'
+stale_timeout = ${STALE_TIMEOUT}
+
+# Priority map: higher = more restrictive
+priority = {'blocked': 3, 'needs_human_review': 2, 'pending': 1}
+best_file = ''
+best_status = ''
+best_priority = 0
+
+for flag_path in glob.glob(os.path.join(flag_dir, pattern)):
+    try:
+        with open(flag_path) as f:
+            data = json.load(f)
+
+        # Check for stale flag
+        created = data.get('created_at', '')
+        if created:
+            ts = datetime.fromisoformat(created).timestamp()
+            if time.time() - ts > stale_timeout:
+                os.unlink(flag_path)
+                continue
+
+        status = data.get('status', 'pending')
+        p = priority.get(status, 1)
+        if p > best_priority:
+            best_priority = p
+            best_status = status
+            best_file = flag_path
+    except Exception:
+        continue
+
+print(f'{best_file}|{best_status}')
+" 2>/dev/null || echo "|")
+
+    FLAG_FILE=$(echo "$RESULT" | cut -d'|' -f1)
+    STATUS=$(echo "$RESULT" | cut -d'|' -f2)
 fi
 
-# Flag exists and is fresh: read status
-STATUS=$(python3 -c "
-import json, sys
-try:
-    data = json.load(open('$FLAG_FILE'))
-    print(data.get('status', 'pending'))
-except Exception:
-    print('pending')
-" 2>/dev/null || echo "pending")
+# All flags were stale and removed
+if [ -z "$FLAG_FILE" ] || [ -z "$STATUS" ]; then
+    exit 0
+fi
 
 case "$STATUS" in
     pending)

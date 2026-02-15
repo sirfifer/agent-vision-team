@@ -27,7 +27,10 @@ MIN_TASKS_FOR_REVIEW = 2  # Single tasks skip holistic review
 PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
 GOVERNANCE_DIR = Path(PROJECT_DIR) / "mcp-servers" / "governance"
 DB_PATH = Path(PROJECT_DIR) / ".avt" / "governance.db"
-FLAG_PATH = Path(PROJECT_DIR) / ".avt" / ".holistic-review-pending"
+# FLAG_PATH is set dynamically in main() using the session_id argument.
+# Session-scoped flag files (.holistic-review-pending-{session_id}) allow
+# multiple concurrent Agent Teams teammates to have independent reviews.
+FLAG_PATH: Path = Path(PROJECT_DIR) / ".avt" / ".holistic-review-pending-unknown"
 LOG_PATH = Path(PROJECT_DIR) / ".avt" / "hook-holistic.log"
 
 sys.path.insert(0, str(GOVERNANCE_DIR))
@@ -137,6 +140,8 @@ def _update_flag(status: str, guidance: str = "", findings: list = None, strengt
 
 
 def main() -> None:
+    global FLAG_PATH
+
     if len(sys.argv) < 3:
         print("Usage: _holistic-settle-check.py <session_id> <my_timestamp> [transcript_path]")
         sys.exit(1)
@@ -144,6 +149,9 @@ def main() -> None:
     session_id = sys.argv[1]
     my_timestamp = float(sys.argv[2])
     transcript_path = sys.argv[3] if len(sys.argv) > 3 else ""
+
+    # Set session-scoped flag path
+    FLAG_PATH = Path(PROJECT_DIR) / ".avt" / f".holistic-review-pending-{session_id}"
 
     _log(f"Settle checker started: session={session_id} ts={my_timestamp}")
 

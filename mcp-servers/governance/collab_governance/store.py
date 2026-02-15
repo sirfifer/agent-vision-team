@@ -17,6 +17,7 @@ from .models import (
     ReviewVerdict,
     TaskReviewRecord,
     TaskReviewStatus,
+    UsageRecord,
     Verdict,
 )
 
@@ -126,6 +127,30 @@ class GovernanceStore:
 
             CREATE INDEX IF NOT EXISTS idx_holistic_reviews_session
                 ON holistic_reviews(session_id);
+
+            -- Token usage tracking
+            CREATE TABLE IF NOT EXISTS token_usage (
+                id TEXT PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                session_id TEXT DEFAULT '',
+                agent TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                model TEXT DEFAULT '',
+                input_tokens INTEGER DEFAULT 0,
+                output_tokens INTEGER DEFAULT 0,
+                cache_read_tokens INTEGER DEFAULT 0,
+                cache_creation_tokens INTEGER DEFAULT 0,
+                duration_ms INTEGER DEFAULT 0,
+                related_id TEXT DEFAULT '',
+                prompt_bytes INTEGER DEFAULT 0
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_token_usage_timestamp
+                ON token_usage(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_token_usage_session
+                ON token_usage(session_id);
+            CREATE INDEX IF NOT EXISTS idx_token_usage_agent
+                ON token_usage(agent);
             """
         )
         conn.commit()
@@ -734,3 +759,169 @@ class GovernanceStore:
             created_at=row["created_at"],
             completed_at=row["completed_at"],
         )
+
+    # =========================================================================
+    # Token Usage Tracking Methods
+    # =========================================================================
+
+    def store_usage(self, record: UsageRecord) -> UsageRecord:
+        """Store a token usage record."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO token_usage
+               (id, timestamp, session_id, agent, operation, model,
+                input_tokens, output_tokens, cache_read_tokens,
+                cache_creation_tokens, duration_ms, related_id, prompt_bytes)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                record.id,
+                record.timestamp,
+                record.session_id,
+                record.agent,
+                record.operation,
+                record.model,
+                record.input_tokens,
+                record.output_tokens,
+                record.cache_read_tokens,
+                record.cache_creation_tokens,
+                record.duration_ms,
+                record.related_id,
+                record.prompt_bytes,
+            ),
+        )
+        conn.commit()
+        return record
+
+    def get_usage_summary(
+        self,
+        period: str = "day",
+        session_id: Optional[str] = None,
+    ) -> dict:
+        """Get aggregated token usage for a time period.
+
+        Args:
+            period: 'day', 'week', or 'session'
+            session_id: Filter to a specific session (required if period='session')
+        """
+        conn = self._get_conn()
+        where_clause, params = self._usage_period_filter(period, session_id)
+
+        row = conn.execute(
+            f"""SELECT
+                COUNT(*) as call_count,
+                COALESCE(SUM(input_tokens), 0) as total_input,
+                COALESCE(SUM(output_tokens), 0) as total_output,
+                COALESCE(SUM(cache_read_tokens), 0) as total_cache_reads,
+                COALESCE(SUM(cache_creation_tokens), 0) as total_cache_creation,
+                COALESCE(SUM(duration_ms), 0) as total_duration_ms,
+                COALESCE(SUM(prompt_bytes), 0) as total_prompt_bytes
+            FROM token_usage
+            WHERE {where_clause}""",
+            params,
+        ).fetchone()
+
+        return {
+            "period": period,
+            "call_count": row["call_count"],
+            "total_input_tokens": row["total_input"],
+            "total_output_tokens": row["total_output"],
+            "total_tokens": row["total_input"] + row["total_output"],
+            "total_cache_reads": row["total_cache_reads"],
+            "total_cache_creation": row["total_cache_creation"],
+            "total_duration_ms": row["total_duration_ms"],
+            "total_prompt_bytes": row["total_prompt_bytes"],
+        }
+
+    def get_usage_by_agent(
+        self,
+        period: str = "day",
+        session_id: Optional[str] = None,
+    ) -> list[dict]:
+        """Get token usage broken down by agent."""
+        conn = self._get_conn()
+        where_clause, params = self._usage_period_filter(period, session_id)
+
+        rows = conn.execute(
+            f"""SELECT
+                agent,
+                COUNT(*) as call_count,
+                COALESCE(SUM(input_tokens), 0) as total_input,
+                COALESCE(SUM(output_tokens), 0) as total_output,
+                COALESCE(SUM(duration_ms), 0) as total_duration_ms
+            FROM token_usage
+            WHERE {where_clause}
+            GROUP BY agent
+            ORDER BY total_input + total_output DESC""",
+            params,
+        ).fetchall()
+
+        return [
+            {
+                "agent": r["agent"],
+                "call_count": r["call_count"],
+                "input_tokens": r["total_input"],
+                "output_tokens": r["total_output"],
+                "total_tokens": r["total_input"] + r["total_output"],
+                "duration_ms": r["total_duration_ms"],
+            }
+            for r in rows
+        ]
+
+    def get_usage_by_operation(
+        self,
+        period: str = "day",
+        session_id: Optional[str] = None,
+    ) -> list[dict]:
+        """Get token usage broken down by operation type."""
+        conn = self._get_conn()
+        where_clause, params = self._usage_period_filter(period, session_id)
+
+        rows = conn.execute(
+            f"""SELECT
+                operation,
+                COUNT(*) as call_count,
+                COALESCE(SUM(input_tokens), 0) as total_input,
+                COALESCE(SUM(output_tokens), 0) as total_output,
+                COALESCE(AVG(prompt_bytes), 0) as avg_prompt_bytes,
+                COALESCE(SUM(duration_ms), 0) as total_duration_ms
+            FROM token_usage
+            WHERE {where_clause}
+            GROUP BY operation
+            ORDER BY total_input + total_output DESC""",
+            params,
+        ).fetchall()
+
+        return [
+            {
+                "operation": r["operation"],
+                "call_count": r["call_count"],
+                "input_tokens": r["total_input"],
+                "output_tokens": r["total_output"],
+                "total_tokens": r["total_input"] + r["total_output"],
+                "avg_prompt_bytes": int(r["avg_prompt_bytes"]),
+                "duration_ms": r["total_duration_ms"],
+            }
+            for r in rows
+        ]
+
+    def _usage_period_filter(
+        self, period: str, session_id: Optional[str] = None
+    ) -> tuple[str, list]:
+        """Build WHERE clause for usage queries based on period."""
+        if period == "session" and session_id:
+            return "session_id = ?", [session_id]
+
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        if period == "week":
+            cutoff = (now - timedelta(days=7)).isoformat()
+        else:  # day
+            cutoff = (now - timedelta(days=1)).isoformat()
+
+        params: list = [cutoff]
+        clause = "timestamp >= ?"
+        if session_id:
+            clause += " AND session_id = ?"
+            params.append(session_id)
+        return clause, params
