@@ -52,6 +52,9 @@ interface DashboardContextValue {
   showBootstrap: boolean;
   setShowBootstrap: (show: boolean) => void;
   bootstrapScaleProfile: BootstrapScaleProfile | null;
+  bootstrapRunning: boolean;
+  bootstrapProgress: { phase: string; detail: string; percent?: number } | null;
+  bootstrapResult: { success: boolean; reportPath?: string; error?: string } | null;
   // Demo mode
   demoMode: boolean;
 }
@@ -104,6 +107,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   // Bootstrap state
   const [showBootstrap, setShowBootstrap] = useState(false);
   const [bootstrapScaleProfile, setBootstrapScaleProfile] = useState<BootstrapScaleProfile | null>(null);
+  const [bootstrapRunning, setBootstrapRunning] = useState(false);
+  const [bootstrapProgress, setBootstrapProgress] = useState<{ phase: string; detail: string; percent?: number } | null>(null);
+  const [bootstrapResult, setBootstrapResult] = useState<{ success: boolean; reportPath?: string; error?: string } | null>(null);
 
   // Demo mode state
   const [demoMode, setDemoMode] = useState(false);
@@ -247,7 +253,17 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           setBootstrapScaleProfile(msg.profile);
           break;
         case 'bootstrapStarted':
-          setShowBootstrap(false);
+          setBootstrapRunning(true);
+          setBootstrapResult(null);
+          setBootstrapProgress({ phase: 'Starting', detail: 'Initializing bootstrap agent...' });
+          break;
+        case 'bootstrapProgress':
+          setBootstrapProgress({ phase: msg.phase, detail: msg.detail, percent: msg.percent });
+          break;
+        case 'bootstrapComplete':
+          setBootstrapRunning(false);
+          setBootstrapResult({ success: msg.success, reportPath: msg.reportPath, error: msg.error });
+          setBootstrapProgress(null);
           break;
       }
     };
@@ -293,6 +309,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       showTutorial, setShowTutorial,
       showBootstrap, setShowBootstrap,
       bootstrapScaleProfile,
+      bootstrapRunning,
+      bootstrapProgress,
+      bootstrapResult,
       demoMode,
     }}>
       {children}

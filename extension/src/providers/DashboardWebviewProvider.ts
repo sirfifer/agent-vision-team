@@ -839,7 +839,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       prompt += `\n\nProject context from user:\n${context.trim()}`;
     }
 
-    // Notify webview that bootstrap has started
+    // Notify webview that bootstrap has started (transitions dialog to progress view)
     this.postMessage({ type: 'bootstrapStarted' });
 
     // Add activity entry
@@ -852,17 +852,25 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       detail: areas.length < 4 ? `Focus: ${areas.join(', ')}` : 'Full bootstrap (all focus areas)',
     });
 
-    // Execute via claude CLI with project-bootstrapper agent
-    try {
-      const stamp = `avt-bootstrap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const inputPath = path.join(os.tmpdir(), `${stamp}-input.md`);
-      const outputPath = path.join(os.tmpdir(), `${stamp}-output.md`);
+    this.postMessage({ type: 'bootstrapProgress', phase: 'Initializing', detail: 'Preparing bootstrap agent...', percent: 5 });
 
+    // Execute via claude CLI with project-bootstrapper agent
+    const stamp = `avt-bootstrap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const inputPath = path.join(os.tmpdir(), `${stamp}-input.md`);
+    const outputPath = path.join(os.tmpdir(), `${stamp}-output.md`);
+
+    try {
       fs.writeFileSync(inputPath, prompt, 'utf-8');
+
+      this.postMessage({ type: 'bootstrapProgress', phase: 'Analyzing', detail: 'Bootstrap agent is analyzing your codebase...', percent: 15 });
 
       await new Promise<void>((resolve, reject) => {
         const inputFd = fs.openSync(inputPath, 'r');
         const outputFd = fs.openSync(outputPath, 'w');
+
+        // Build env: inherit process.env but remove CLAUDECODE to avoid nested session detection
+        const env = { ...process.env };
+        delete env.CLAUDECODE;
 
         const proc = spawn('claude', [
           '--print',
@@ -871,6 +879,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         ], {
           stdio: [inputFd, outputFd, 'pipe'],
           cwd: root,
+          env,
           timeout: 3600000, // 1 hour timeout for large projects
         });
 
@@ -878,13 +887,40 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         fs.closeSync(outputFd);
 
         let stderr = '';
-        proc.stderr!.on('data', (data: Buffer) => { stderr += data.toString(); });
+        proc.stderr!.on('data', (data: Buffer) => {
+          const chunk = data.toString();
+          stderr += chunk;
+          // Parse stderr for progress hints (claude CLI outputs status lines)
+          if (chunk.includes('tool_use') || chunk.includes('Task')) {
+            this.postMessage({ type: 'bootstrapProgress', phase: 'Working', detail: 'Agent is creating artifacts...', percent: 50 });
+          }
+        });
+
+        // Periodic progress updates while running
+        const progressInterval = setInterval(() => {
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          const minutes = Math.floor(elapsed / 60);
+          const seconds = elapsed % 60;
+          const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+          this.postMessage({
+            type: 'bootstrapProgress',
+            phase: 'Working',
+            detail: `Bootstrap agent running... (${timeStr} elapsed)`,
+          });
+        }, 10000);
+        const startTime = Date.now();
 
         proc.on('error', (err: NodeJS.ErrnoException) => {
-          reject(new Error(`Bootstrap failed to start: ${err.message}`));
+          clearInterval(progressInterval);
+          if (err.code === 'ENOENT') {
+            reject(new Error('Claude CLI not found. Ensure "claude" is installed and on your PATH.'));
+          } else {
+            reject(new Error(`Bootstrap failed to start: ${err.message}`));
+          }
         });
 
         proc.on('close', (code: number | null) => {
+          clearInterval(progressInterval);
           if (code !== 0) {
             reject(new Error(`Bootstrap exited with code ${code}${stderr ? `: ${stderr.trim().slice(0, 500)}` : ''}`));
           } else {
@@ -893,18 +929,28 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         });
       });
 
+      this.postMessage({ type: 'bootstrapProgress', phase: 'Finishing', detail: 'Bootstrap complete, preparing report...', percent: 95 });
+
+      // Check if bootstrap report was created
+      const reportPath = path.join(root, '.avt', 'bootstrap-report.md');
+      const hasReport = fs.existsSync(reportPath);
+
       this.addActivity({
         id: `activity-${Date.now()}`,
         timestamp: new Date().toISOString(),
         agent: 'project-bootstrapper',
         type: 'status',
         summary: 'Bootstrap completed',
-        detail: 'Review the bootstrap report in .avt/bootstrap-report.md',
+        detail: hasReport
+          ? 'Review the bootstrap report in .avt/bootstrap-report.md'
+          : 'Bootstrap completed. Check .avt/ for generated artifacts.',
       });
 
-      // Clean up temp files
-      try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
-      try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
+      this.postMessage({
+        type: 'bootstrapComplete',
+        success: true,
+        reportPath: hasReport ? '.avt/bootstrap-report.md' : undefined,
+      });
 
       // Refresh config data to pick up any new docs
       this.refreshConfigData();
@@ -917,7 +963,15 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         summary: 'Bootstrap failed',
         detail: String(err),
       });
-      vscode.window.showErrorMessage(`Bootstrap failed: ${err}`);
+      this.postMessage({
+        type: 'bootstrapComplete',
+        success: false,
+        error: String(err),
+      });
+    } finally {
+      // Clean up temp files
+      try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
+      try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
     }
   }
 

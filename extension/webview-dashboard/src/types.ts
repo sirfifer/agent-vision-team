@@ -449,6 +449,8 @@ export type ExtensionMessage =
   | { type: 'toggleDemo' }
   | { type: 'bootstrapScaleResult'; profile: BootstrapScaleProfile }
   | { type: 'bootstrapStarted'; jobId?: string }
+  | { type: 'bootstrapProgress'; phase: string; detail: string; percent?: number }
+  | { type: 'bootstrapComplete'; success: boolean; reportPath?: string; error?: string }
   | { type: 'usageReport'; report: unknown };
 
 export type WebviewMessage =
