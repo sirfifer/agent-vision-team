@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useDashboard } from '../../context/DashboardContext';
 import { getActiveProjectId } from '../../hooks/useTransport';
-import type { BootstrapScaleProfile, BootstrapFocusAreas } from '../../types';
+import type { BootstrapScaleProfile, BootstrapFocusAreas, BootstrapActivity } from '../../types';
 
 const TIER_COLORS: Record<string, string> = {
   Small: 'text-green-400',
@@ -30,8 +30,31 @@ function ScaleBadge({ profile }: { profile: BootstrapScaleProfile }) {
   );
 }
 
+const TOOL_COLORS: Record<string, string> = {
+  Read: 'bg-green-400',
+  Glob: 'bg-yellow-400',
+  Grep: 'bg-yellow-400',
+  Bash: 'bg-orange-400',
+  Write: 'bg-blue-400',
+  Edit: 'bg-blue-400',
+  Task: 'bg-purple-400',
+  TodoWrite: 'bg-vscode-muted',
+};
+
+function ToolDot({ tool }: { tool: string }) {
+  return <div className={`w-1.5 h-1.5 rounded-full ${TOOL_COLORS[tool] || 'bg-vscode-muted'} flex-shrink-0`} />;
+}
+
 function ProgressView() {
   const { bootstrapProgress, bootstrapResult, setShowBootstrap } = useDashboard();
+  const [elapsed, setElapsed] = useState(0);
+  const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const start = Date.now();
+    const interval = setInterval(() => setElapsed(Math.round((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (bootstrapResult) {
     return (
@@ -80,31 +103,51 @@ function ProgressView() {
     );
   }
 
+  const activities = bootstrapProgress?.activities || [];
+  const elapsedStr = elapsed >= 60 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : `${elapsed}s`;
+
   return (
-    <div className="px-6 py-8 space-y-5">
-      <div className="flex flex-col items-center gap-4">
-        <svg className="w-8 h-8 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-        <div className="text-center">
-          <div className="text-sm font-semibold">{bootstrapProgress?.phase || 'Starting...'}</div>
-          <div className="text-xs text-vscode-muted mt-1">{bootstrapProgress?.detail || 'Initializing bootstrap agent...'}</div>
+    <div className="px-5 py-4 space-y-3">
+      {/* Header: Phase + spinner + elapsed */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <svg className="w-5 h-5 animate-spin text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold truncate">{bootstrapProgress?.phase || 'Starting...'}</div>
+            <div className="text-xs text-vscode-muted truncate">{bootstrapProgress?.detail || 'Initializing bootstrap agent...'}</div>
+          </div>
         </div>
+        <div className="text-xs text-vscode-muted font-mono flex-shrink-0 ml-3">{elapsedStr}</div>
       </div>
 
-      {bootstrapProgress?.percent != null && (
-        <div className="w-full bg-vscode-bg rounded-full h-1.5">
-          <div
-            className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
-            style={{ width: `${bootstrapProgress.percent}%` }}
-          />
+      {/* Pulsing activity indicator */}
+      <div className="w-full h-1 bg-vscode-bg rounded-full overflow-hidden">
+        <div className="h-full bg-blue-500/50 rounded-full animate-[pulse_2s_ease-in-out_infinite]" style={{ width: '100%' }} />
+      </div>
+
+      {/* Activity log */}
+      {activities.length > 0 && (
+        <div ref={logRef} className="space-y-0.5 max-h-36 overflow-y-auto pr-1">
+          {activities.map((act, i) => (
+            <div
+              key={`${act.timestamp}-${i}`}
+              className={`flex items-start gap-2 text-2xs py-0.5 transition-opacity duration-300 ${
+                i === 0 ? 'text-vscode-fg' : 'text-vscode-muted opacity-70'
+              }`}
+            >
+              <ToolDot tool={act.tool} />
+              <span className={`${i === 0 ? 'font-medium' : ''} break-words`}>{act.summary}</span>
+            </div>
+          ))}
         </div>
       )}
 
-      <p className="text-2xs text-vscode-muted text-center">
-        This may take several minutes for large projects. You can close this dialog;
-        the bootstrap will continue in the background and progress appears in the Activity feed.
+      {/* Dismissal note */}
+      <p className="text-2xs text-vscode-muted text-center pt-1">
+        You can close this dialog; the bootstrap continues in the background.
       </p>
     </div>
   );

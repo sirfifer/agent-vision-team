@@ -19,18 +19,15 @@
       "Bash(uv run python:*)",
       "Bash(pip install:*)",
       "Bash(sqlite3:*)",
-
       "mcp__collab-kg__*",
       "mcp__collab-quality__*",
       "mcp__collab-governance__*",
       "mcp__claude_ai_Mermaid_Chart__*",
       "mcp__claude_ai_Hugging_Face__*",
       "mcp__claude_ai_PubMed__*",
-
-      "Read(/Users/ramerman/dev/agent-vision-team/**)",
-      "Write(/Users/ramerman/dev/agent-vision-team/**)",
-      "Edit(/Users/ramerman/dev/agent-vision-team/**)",
-
+      "Read(/Users/ramerman/dev/agent-vision-team-devhost/**)",
+      "Write(/Users/ramerman/dev/agent-vision-team-devhost/**)",
+      "Edit(/Users/ramerman/dev/agent-vision-team-devhost/**)",
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:claudelog.com)",
@@ -50,7 +47,6 @@
       "WebFetch(domain:npmjs.com)",
       "WebFetch(domain:stackoverflow.com)",
       "WebFetch(domain:huggingface.co)",
-
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git add:*)",
@@ -66,7 +62,6 @@
       "Bash(git rev-parse:*)",
       "Bash(git remote:*)",
       "Bash(git fetch:*)",
-
       "Bash(cat:*)",
       "Bash(head:*)",
       "Bash(tail:*)",
@@ -96,14 +91,10 @@
       "Bash(grep:*)",
       "Bash(find:*)",
       "Bash(tee:*)",
-
       "Bash(docker:*)",
       "Bash(docker compose:*)",
-
       "Bash(claude:*)",
-
       "Bash(gh:*)",
-
       "Bash(./scripts/hooks/test-hook-live.sh:*)"
     ]
   },
@@ -172,35 +163,95 @@
     "defaultModel": "sonnet",
     "worker": {
       "model": "opus",
-      "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp:collab-kg", "mcp:collab-quality", "mcp:collab-governance"]
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep",
+        "mcp:collab-kg",
+        "mcp:collab-quality",
+        "mcp:collab-governance"
+      ]
     },
     "quality-reviewer": {
       "model": "sonnet",
-      "tools": ["Read", "Glob", "Grep", "Bash", "mcp:collab-kg", "mcp:collab-quality"]
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "mcp:collab-kg",
+        "mcp:collab-quality"
+      ]
     },
     "kg-librarian": {
       "model": "sonnet",
-      "tools": ["Read", "Write", "Glob", "Grep", "mcp:collab-kg"]
+      "tools": [
+        "Read",
+        "Write",
+        "Glob",
+        "Grep",
+        "mcp:collab-kg"
+      ]
     },
     "governance-reviewer": {
       "model": "sonnet",
-      "tools": ["Read", "Glob", "Grep", "mcp:collab-kg"]
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "mcp:collab-kg"
+      ]
     },
     "project-bootstrapper": {
       "model": "sonnet",
-      "tools": ["Read", "Write", "Glob", "Grep", "Bash", "Task", "mcp:collab-kg", "mcp:collab-governance"]
+      "tools": [
+        "Read",
+        "Write",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Task",
+        "mcp:collab-kg",
+        "mcp:collab-governance"
+      ]
     },
     "architect": {
       "model": "opus",
-      "tools": ["Read", "Glob", "Grep", "Bash", "mcp:collab-kg", "mcp:collab-governance"]
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "mcp:collab-kg",
+        "mcp:collab-governance"
+      ]
     },
     "researcher": {
       "model": "sonnet",
-      "tools": ["Read", "Glob", "Grep", "Bash", "WebSearch", "WebFetch", "mcp:collab-kg", "mcp:collab-governance"]
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "WebSearch",
+        "WebFetch",
+        "mcp:collab-kg",
+        "mcp:collab-governance"
+      ]
     },
     "project-steward": {
       "model": "sonnet",
-      "tools": ["Read", "Write", "Glob", "Grep", "Bash", "mcp:collab-kg"]
+      "tools": [
+        "Read",
+        "Write",
+        "Glob",
+        "Grep",
+        "Bash",
+        "mcp:collab-kg"
+      ]
     }
   },
   "workspace": {

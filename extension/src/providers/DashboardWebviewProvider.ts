@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { spawn } from 'child_process';
+import { createInterface } from 'readline';
 import { Entity } from '../models/Entity';
 import { AgentStatus, ActivityEntry, GovernedTask, GovernanceStats } from '../models/Activity';
 import { ProjectConfig, SetupReadiness } from '../models/ProjectConfig';
@@ -127,6 +128,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     governedTasks: [],
     governanceStats: { totalDecisions: 0, approved: 0, blocked: 0, pending: 0, pendingReviews: 0, totalGovernedTasks: 0 },
   };
+
+  // Bootstrap streaming state
+  private bootstrapActivities: Array<{ tool: string; summary: string; timestamp: number }> = [];
+  private currentBootstrapPhase: string = 'Starting';
+  private subAgentCount: number = 0;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -839,6 +845,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       prompt += `\n\nProject context from user:\n${context.trim()}`;
     }
 
+    // Reset bootstrap streaming state
+    this.bootstrapActivities = [];
+    this.currentBootstrapPhase = 'Starting';
+    this.subAgentCount = 0;
+
     // Notify webview that bootstrap has started (transitions dialog to progress view)
     this.postMessage({ type: 'bootstrapStarted' });
 
@@ -852,21 +863,19 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       detail: areas.length < 4 ? `Focus: ${areas.join(', ')}` : 'Full bootstrap (all focus areas)',
     });
 
-    this.postMessage({ type: 'bootstrapProgress', phase: 'Initializing', detail: 'Preparing bootstrap agent...', percent: 5 });
+    this.postMessage({ type: 'bootstrapProgress', phase: 'Initializing', detail: 'Preparing bootstrap agent...', activities: [] });
 
-    // Execute via claude CLI with project-bootstrapper agent
+    // Write prompt to temp file for stdin
     const stamp = `avt-bootstrap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const inputPath = path.join(os.tmpdir(), `${stamp}-input.md`);
-    const outputPath = path.join(os.tmpdir(), `${stamp}-output.md`);
 
     try {
       fs.writeFileSync(inputPath, prompt, 'utf-8');
 
-      this.postMessage({ type: 'bootstrapProgress', phase: 'Analyzing', detail: 'Bootstrap agent is analyzing your codebase...', percent: 15 });
+      let finalResult = '';
 
       await new Promise<void>((resolve, reject) => {
         const inputFd = fs.openSync(inputPath, 'r');
-        const outputFd = fs.openSync(outputPath, 'w');
 
         // Build env: inherit process.env but remove CLAUDECODE to avoid nested session detection
         const env = { ...process.env };
@@ -874,44 +883,68 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         const proc = spawn('claude', [
           '--print',
+          '--output-format', 'stream-json',
+          '--verbose',
           '--model', 'opus',
           '--agent', 'project-bootstrapper',
         ], {
-          stdio: [inputFd, outputFd, 'pipe'],
+          stdio: [inputFd, 'pipe', 'pipe'],
           cwd: root,
           env,
           timeout: 3600000, // 1 hour timeout for large projects
         });
 
         fs.closeSync(inputFd);
-        fs.closeSync(outputFd);
 
-        let stderr = '';
-        proc.stderr!.on('data', (data: Buffer) => {
-          const chunk = data.toString();
-          stderr += chunk;
-          // Parse stderr for progress hints (claude CLI outputs status lines)
-          if (chunk.includes('tool_use') || chunk.includes('Task')) {
-            this.postMessage({ type: 'bootstrapProgress', phase: 'Working', detail: 'Agent is creating artifacts...', percent: 50 });
+        // Parse stdout as stream-json: one JSON object per line
+        const rl = createInterface({ input: proc.stdout! });
+        rl.on('line', (line: string) => {
+          try {
+            const event = JSON.parse(line);
+            this.handleBootstrapStreamEvent(event);
+            // Capture the final result text
+            if (event.type === 'result' && event.result) {
+              finalResult = event.result;
+            }
+          } catch {
+            // Skip non-JSON lines (e.g., blank lines, warnings)
           }
         });
 
-        // Periodic progress updates while running
-        const progressInterval = setInterval(() => {
-          const elapsed = Math.round((Date.now() - startTime) / 1000);
-          const minutes = Math.floor(elapsed / 60);
-          const seconds = elapsed % 60;
-          const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-          this.postMessage({
-            type: 'bootstrapProgress',
-            phase: 'Working',
-            detail: `Bootstrap agent running... (${timeStr} elapsed)`,
-          });
+        // Capture stderr for error reporting
+        let stderr = '';
+        proc.stderr!.on('data', (data: Buffer) => {
+          stderr += data.toString();
+        });
+
+        // Heartbeat: if no stream events for 30s, send a pulse so UI doesn't look frozen
+        let lastEventTime = Date.now();
+        const heartbeat = setInterval(() => {
+          if (Date.now() - lastEventTime > 30000) {
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+            this.postMessage({
+              type: 'bootstrapProgress',
+              phase: this.currentBootstrapPhase,
+              detail: `Agent is thinking... (${timeStr} elapsed)`,
+              activities: this.bootstrapActivities.slice(0, 8),
+            });
+          }
         }, 10000);
         const startTime = Date.now();
 
+        // Patch lastEventTime on each stream event
+        const origHandler = this.handleBootstrapStreamEvent.bind(this);
+        this.handleBootstrapStreamEvent = (event: any) => {
+          lastEventTime = Date.now();
+          origHandler(event);
+        };
+
         proc.on('error', (err: NodeJS.ErrnoException) => {
-          clearInterval(progressInterval);
+          clearInterval(heartbeat);
+          this.handleBootstrapStreamEvent = origHandler; // restore
           if (err.code === 'ENOENT') {
             reject(new Error('Claude CLI not found. Ensure "claude" is installed and on your PATH.'));
           } else {
@@ -920,7 +953,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         });
 
         proc.on('close', (code: number | null) => {
-          clearInterval(progressInterval);
+          clearInterval(heartbeat);
+          this.handleBootstrapStreamEvent = origHandler; // restore
           if (code !== 0) {
             reject(new Error(`Bootstrap exited with code ${code}${stderr ? `: ${stderr.trim().slice(0, 500)}` : ''}`));
           } else {
@@ -928,8 +962,6 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
           }
         });
       });
-
-      this.postMessage({ type: 'bootstrapProgress', phase: 'Finishing', detail: 'Bootstrap complete, preparing report...', percent: 95 });
 
       // Check if bootstrap report was created
       const reportPath = path.join(root, '.avt', 'bootstrap-report.md');
@@ -971,8 +1003,117 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     } finally {
       // Clean up temp files
       try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
-      try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
     }
+  }
+
+  /**
+   * Handle a single stream-json event from the bootstrap claude CLI process.
+   * Parses tool calls and text to send real-time progress to the webview.
+   */
+  private handleBootstrapStreamEvent(event: any): void {
+    switch (event.type) {
+      case 'system':
+        this.currentBootstrapPhase = 'Analyzing';
+        this.postMessage({
+          type: 'bootstrapProgress',
+          phase: 'Analyzing',
+          detail: 'Bootstrap agent initialized',
+          activities: [],
+        });
+        break;
+
+      case 'assistant':
+        for (const block of event.message?.content || []) {
+          if (block.type === 'tool_use') {
+            const summary = this.summarizeToolCall(block.name, block.input);
+            this.bootstrapActivities.unshift({ tool: block.name, summary, timestamp: Date.now() });
+            if (this.bootstrapActivities.length > 20) this.bootstrapActivities.pop();
+
+            const phase = this.deriveBootstrapPhase(block.name, block.input);
+            this.currentBootstrapPhase = phase;
+
+            this.postMessage({
+              type: 'bootstrapProgress',
+              phase,
+              detail: summary,
+              activities: this.bootstrapActivities.slice(0, 8),
+            });
+          }
+          if (block.type === 'text' && block.text?.trim()) {
+            const snippet = block.text.trim().slice(0, 120);
+            this.postMessage({
+              type: 'bootstrapProgress',
+              phase: this.currentBootstrapPhase || 'Working',
+              detail: snippet,
+              activities: this.bootstrapActivities.slice(0, 8),
+            });
+          }
+        }
+        break;
+
+      // 'user' events (tool results) and 'result' events are ignored for progress display
+    }
+  }
+
+  /**
+   * Translate a raw tool call into a human-readable summary.
+   */
+  private summarizeToolCall(tool: string, input: any): string {
+    try {
+      switch (tool) {
+        case 'Read': return `Reading ${this.shortenPath(input?.file_path)}`;
+        case 'Glob': return `Searching for ${input?.pattern || 'files'}`;
+        case 'Grep': return `Searching for "${(input?.pattern || '').slice(0, 40)}"`;
+        case 'Bash': return `Running: ${(input?.command || '').slice(0, 60)}`;
+        case 'Write': return `Writing ${this.shortenPath(input?.file_path)}`;
+        case 'Edit': return `Editing ${this.shortenPath(input?.file_path)}`;
+        case 'Task': return `Sub-agent: ${input?.description || 'analysis task'}`;
+        case 'TodoWrite': return 'Updating task list';
+        default:
+          if (tool.startsWith('mcp__')) {
+            const parts = tool.split('__');
+            return `MCP: ${parts.slice(1).join('.')}`;
+          }
+          return `Using ${tool}`;
+      }
+    } catch {
+      return `Using ${tool}`;
+    }
+  }
+
+  /**
+   * Derive the current bootstrap phase from the tool being called.
+   */
+  private deriveBootstrapPhase(tool: string, input: any): string {
+    try {
+      if (tool === 'Bash') {
+        const cmd = input?.command || '';
+        if (cmd.includes('find') || cmd.includes('wc') || cmd.includes('ls')) return 'Scanning';
+      }
+      if (tool === 'Task') {
+        this.subAgentCount++;
+        return `Working (${this.subAgentCount} sub-agents)`;
+      }
+      if (tool === 'Write') {
+        const fp = input?.file_path || '';
+        if (fp.includes('docs/architecture') || fp.includes('docs/vision') || fp.includes('docs/style')) return 'Writing Docs';
+        if (fp.includes('bootstrap-report')) return 'Writing Report';
+        return 'Writing';
+      }
+      if (tool === 'Glob' || tool === 'Grep') return 'Analyzing';
+      if (tool === 'Read') return 'Reading';
+      if (tool.startsWith('mcp__')) return 'Recording';
+    } catch { /* ignore */ }
+    return this.currentBootstrapPhase || 'Working';
+  }
+
+  /**
+   * Shorten a file path for display (show last 2-3 segments).
+   */
+  private shortenPath(filePath: string | undefined): string {
+    if (!filePath) return 'file';
+    const parts = filePath.replace(/\\/g, '/').split('/');
+    return parts.length <= 3 ? parts.join('/') : '...' + '/' + parts.slice(-3).join('/');
   }
 
   private async handleRequestUsageReport(period: string, groupBy: string): Promise<void> {

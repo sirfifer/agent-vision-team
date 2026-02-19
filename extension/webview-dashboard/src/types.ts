@@ -449,7 +449,7 @@ export type ExtensionMessage =
   | { type: 'toggleDemo' }
   | { type: 'bootstrapScaleResult'; profile: BootstrapScaleProfile }
   | { type: 'bootstrapStarted'; jobId?: string }
-  | { type: 'bootstrapProgress'; phase: string; detail: string; percent?: number }
+  | { type: 'bootstrapProgress'; phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] }
   | { type: 'bootstrapComplete'; success: boolean; reportPath?: string; error?: string }
   | { type: 'usageReport'; report: unknown };
 
@@ -511,4 +511,10 @@ export interface BootstrapFocusAreas {
   architectureDocs: boolean;
   conventions: boolean;
   projectRules: boolean;
+}
+
+export interface BootstrapActivity {
+  tool: string;
+  summary: string;
+  timestamp: number;
 }

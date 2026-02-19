@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, ResearchBriefInfo, BootstrapScaleProfile } from '../types';
+import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, ResearchBriefInfo, BootstrapScaleProfile, BootstrapActivity } from '../types';
 import { useTransport } from '../hooks/useTransport';
 import { DEMO_DATA } from '../data/demoData';
 
@@ -53,7 +53,7 @@ interface DashboardContextValue {
   setShowBootstrap: (show: boolean) => void;
   bootstrapScaleProfile: BootstrapScaleProfile | null;
   bootstrapRunning: boolean;
-  bootstrapProgress: { phase: string; detail: string; percent?: number } | null;
+  bootstrapProgress: { phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] } | null;
   bootstrapResult: { success: boolean; reportPath?: string; error?: string } | null;
   // Demo mode
   demoMode: boolean;
@@ -108,7 +108,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [showBootstrap, setShowBootstrap] = useState(false);
   const [bootstrapScaleProfile, setBootstrapScaleProfile] = useState<BootstrapScaleProfile | null>(null);
   const [bootstrapRunning, setBootstrapRunning] = useState(false);
-  const [bootstrapProgress, setBootstrapProgress] = useState<{ phase: string; detail: string; percent?: number } | null>(null);
+  const [bootstrapProgress, setBootstrapProgress] = useState<{ phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] } | null>(null);
   const [bootstrapResult, setBootstrapResult] = useState<{ success: boolean; reportPath?: string; error?: string } | null>(null);
 
   // Demo mode state
@@ -258,7 +258,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           setBootstrapProgress({ phase: 'Starting', detail: 'Initializing bootstrap agent...' });
           break;
         case 'bootstrapProgress':
-          setBootstrapProgress({ phase: msg.phase, detail: msg.detail, percent: msg.percent });
+          setBootstrapProgress({ phase: msg.phase, detail: msg.detail, percent: msg.percent, activities: msg.activities });
           break;
         case 'bootstrapComplete':
           setBootstrapRunning(false);

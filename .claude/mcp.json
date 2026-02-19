@@ -1,0 +1,37 @@
+{
+  "mcpServers": {
+    "collab-kg": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "collab_kg.server"
+      ],
+      "cwd": "/Users/ramerman/dev/agent-vision-team-devhost/mcp-servers/knowledge-graph",
+      "env": {}
+    },
+    "collab-quality": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "collab_quality.server"
+      ],
+      "cwd": "/Users/ramerman/dev/agent-vision-team-devhost/mcp-servers/quality",
+      "env": {}
+    },
+    "collab-governance": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "collab_governance.server"
+      ],
+      "cwd": "/Users/ramerman/dev/agent-vision-team-devhost/mcp-servers/governance",
+      "env": {}
+    }
+  }
+}
