@@ -9,7 +9,9 @@ const TIER_LABELS: Record<ProtectionTier, string> = {
 };
 
 export class MemoryTreeProvider implements vscode.TreeDataProvider<MemoryTreeItem | TierGroupItem> {
-  private _onDidChangeTreeData = new vscode.EventEmitter<MemoryTreeItem | TierGroupItem | undefined>();
+  private _onDidChangeTreeData = new vscode.EventEmitter<
+    MemoryTreeItem | TierGroupItem | undefined
+  >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private entities: Entity[] = [];
@@ -29,9 +31,9 @@ export class MemoryTreeProvider implements vscode.TreeDataProvider<MemoryTreeIte
 
   getChildren(element?: MemoryTreeItem | TierGroupItem): (MemoryTreeItem | TierGroupItem)[] {
     if (!element) {
-      return TIER_ORDER.map(tier => {
-        const count = this.entities.filter(e =>
-          e.observations.some(o => o.includes(`protection_tier: ${tier}`))
+      return TIER_ORDER.map((tier) => {
+        const count = this.entities.filter((e) =>
+          e.observations.some((o) => o.includes(`protection_tier: ${tier}`)),
         ).length;
         return new TierGroupItem(tier, count);
       });
@@ -39,10 +41,8 @@ export class MemoryTreeProvider implements vscode.TreeDataProvider<MemoryTreeIte
 
     if (element instanceof TierGroupItem) {
       return this.entities
-        .filter(e =>
-          e.observations.some(o => o.includes(`protection_tier: ${element.tier}`))
-        )
-        .map(e => new MemoryTreeItem(e));
+        .filter((e) => e.observations.some((o) => o.includes(`protection_tier: ${element.tier}`)))
+        .map((e) => new MemoryTreeItem(e));
     }
 
     return [];
@@ -52,12 +52,9 @@ export class MemoryTreeProvider implements vscode.TreeDataProvider<MemoryTreeIte
 class TierGroupItem extends vscode.TreeItem {
   constructor(
     public readonly tier: ProtectionTier,
-    count: number
+    count: number,
   ) {
-    super(
-      `${TIER_LABELS[tier]} (${count})`,
-      vscode.TreeItemCollapsibleState.Collapsed
-    );
+    super(`${TIER_LABELS[tier]} (${count})`, vscode.TreeItemCollapsibleState.Collapsed);
     this.contextValue = 'memoryTierGroup';
   }
 }
@@ -69,8 +66,8 @@ class MemoryTreeItem extends vscode.TreeItem {
     this.description = `[${entity.entityType}] ${entity.observations.length} observations, ${entity.relations.length} relations`;
     this.tooltip = new vscode.MarkdownString(
       `**${entity.name}** (${entity.entityType})\n\n` +
-      `**Observations:**\n${entity.observations.map(o => `- ${o}`).join('\n')}\n\n` +
-      `**Relations:**\n${entity.relations.map(r => `- ${r.relationType} → ${r.to}`).join('\n')}`
+        `**Observations:**\n${entity.observations.map((o) => `- ${o}`).join('\n')}\n\n` +
+        `**Relations:**\n${entity.relations.map((r) => `- ${r.relationType} → ${r.to}`).join('\n')}`,
     );
     this.contextValue = 'memoryEntity';
   }

@@ -48,8 +48,8 @@ export function ReviewItemCard({
   const handleSaveEdit = () => {
     const newObs = editText
       .split('\n')
-      .map(l => l.trim())
-      .filter(l => l.length > 0);
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
     if (newObs.length > 0) {
       onEdit(item.id, newObs);
     }
@@ -64,9 +64,11 @@ export function ReviewItemCard({
   const entityLabel = ENTITY_TYPE_LABELS[item.entityType] || item.entityType;
 
   return (
-    <div className={`border rounded bg-vscode-widget-bg ${
-      item.isContradiction ? 'border-yellow-500/30' : 'border-vscode-border'
-    }`}>
+    <div
+      className={`border rounded bg-vscode-widget-bg ${
+        item.isContradiction ? 'border-yellow-500/30' : 'border-vscode-border'
+      }`}
+    >
       {/* Header row */}
       <div
         className="px-3 py-2 flex items-center gap-2 cursor-pointer select-none"
@@ -78,7 +80,9 @@ export function ReviewItemCard({
         </span>
 
         {/* Status badge */}
-        <span className={`text-2xs px-1.5 py-0.5 rounded font-medium ${STATUS_STYLES[item.status]}`}>
+        <span
+          className={`text-2xs px-1.5 py-0.5 rounded font-medium ${STATUS_STYLES[item.status]}`}
+        >
           {item.status}
         </span>
 
@@ -89,7 +93,9 @@ export function ReviewItemCard({
 
         {/* Confidence badge */}
         {item.confidence && (
-          <span className={`text-2xs px-1.5 py-0.5 rounded ${CONFIDENCE_STYLES[item.confidence] || ''}`}>
+          <span
+            className={`text-2xs px-1.5 py-0.5 rounded ${CONFIDENCE_STYLES[item.confidence] || ''}`}
+          >
             {item.confidence}
           </span>
         )}
@@ -117,7 +123,7 @@ export function ReviewItemCard({
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           {item.status !== 'approved' && (
             <button
               onClick={() => onApprove(item.id)}
@@ -158,7 +164,7 @@ export function ReviewItemCard({
               </div>
               <textarea
                 value={editText}
-                onChange={e => setEditText(e.target.value)}
+                onChange={(e) => setEditText(e.target.value)}
                 className="w-full h-32 text-2xs p-2 rounded bg-vscode-bg border border-vscode-border text-vscode-fg resize-y font-mono"
               />
               <div className="flex gap-2">
@@ -192,16 +198,13 @@ export function ReviewItemCard({
               {/* Source files */}
               {item.sourceFiles && item.sourceFiles.length > 0 && (
                 <div className="text-2xs text-vscode-muted pt-1 border-t border-vscode-border/50">
-                  <span className="font-medium">Sources:</span>{' '}
-                  {item.sourceFiles.join(', ')}
+                  <span className="font-medium">Sources:</span> {item.sourceFiles.join(', ')}
                 </div>
               )}
 
               {/* Source evidence */}
               {item.sourceEvidence && (
-                <div className="text-2xs text-vscode-muted italic">
-                  {item.sourceEvidence}
-                </div>
+                <div className="text-2xs text-vscode-muted italic">{item.sourceEvidence}</div>
               )}
 
               {/* Contradiction details */}
@@ -226,13 +229,17 @@ export function ReviewItemCard({
                         />
                       </div>
                       <div className="text-2xs text-vscode-muted">{alt.description}</div>
-                      <div className="text-2xs italic text-vscode-fg">{alt.qualitativeAssessment}</div>
+                      <div className="text-2xs italic text-vscode-fg">
+                        {alt.qualitativeAssessment}
+                      </div>
                     </div>
                   ))}
                   {/* Recommendation */}
                   <div className="bg-blue-500/10 border border-blue-500/20 rounded p-2">
                     <div className="text-2xs font-medium text-blue-400 mb-0.5">Recommendation</div>
-                    <div className="text-2xs text-vscode-fg">{item.contradiction.recommendation}</div>
+                    <div className="text-2xs text-vscode-fg">
+                      {item.contradiction.recommendation}
+                    </div>
                   </div>
                 </div>
               )}

@@ -4,10 +4,10 @@ Provides the foundational classes for defining test scenarios with
 structured assertions, timing, and result collection.
 """
 
-from dataclasses import dataclass, field
-from pathlib import Path
 import time
 import traceback
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Optional
 
 
@@ -221,11 +221,7 @@ class BaseScenario:
             name: Descriptive label.
             result: Dictionary returned by the system under test.
         """
-        has_error = (
-            bool(result.get("error"))
-            or result.get("success") is False
-            or result.get("status") == "error"
-        )
+        has_error = bool(result.get("error")) or result.get("success") is False or result.get("status") == "error"
         assertion = AssertionResult(
             name=name,
             passed=has_error,
@@ -245,17 +241,15 @@ class BaseScenario:
             name: Descriptive label.
             result: Dictionary returned by the system under test.
         """
-        has_error = (
-            bool(result.get("error"))
-            or result.get("success") is False
-            or result.get("status") == "error"
-        )
+        has_error = bool(result.get("error")) or result.get("success") is False or result.get("status") == "error"
         assertion = AssertionResult(
             name=name,
             passed=not has_error,
             expected="no error",
             actual=self._summarize_result(result),
-            error=None if not has_error else f"Unexpected error: {result.get('error', result.get('status', 'unknown'))}",
+            error=None
+            if not has_error
+            else f"Unexpected error: {result.get('error', result.get('status', 'unknown'))}",
         )
         self._assertions.append(assertion)
         return assertion

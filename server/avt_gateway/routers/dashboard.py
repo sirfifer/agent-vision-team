@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..auth import require_auth
 from ..app_state import ProjectState
+from ..auth import require_auth
 from ..deps import get_project_state
 
 router = APIRouter(tags=["dashboard"], dependencies=[Depends(require_auth)])
@@ -33,8 +33,12 @@ async def get_dashboard(state: ProjectState = Depends(get_project_state)) -> dic
         "sessionPhase": fs.read_session_state().get("phase", "inactive"),
         "governedTasks": [],
         "governanceStats": {
-            "totalDecisions": 0, "approved": 0, "blocked": 0,
-            "pending": 0, "pendingReviews": 0, "totalGovernedTasks": 0,
+            "totalDecisions": 0,
+            "approved": 0,
+            "blocked": 0,
+            "pending": 0,
+            "pendingReviews": 0,
+            "totalGovernedTasks": 0,
             "needsHumanReview": 0,
         },
         "setupReadiness": pc.get_readiness(),

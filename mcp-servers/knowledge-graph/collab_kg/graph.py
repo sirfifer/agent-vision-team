@@ -2,9 +2,9 @@
 
 from typing import Optional, Tuple
 
-from .models import Entity, EntityWithRelations, Relation, EntityType
-from .tier_protection import get_entity_tier, validate_write_access
+from .models import Entity, EntityWithRelations, Relation
 from .storage import JSONLStorage
+from .tier_protection import get_entity_tier, validate_write_access
 
 
 class KnowledgeGraph:
@@ -122,10 +122,7 @@ class KnowledgeGraph:
         del self._entities[entity_name]
 
         # Also remove any relations involving this entity
-        self._relations = [
-            r for r in self._relations
-            if r.from_entity != entity_name and r.to != entity_name
-        ]
+        self._relations = [r for r in self._relations if r.from_entity != entity_name and r.to != entity_name]
 
         # Re-persist
         self.storage.compact(self._entities, self._relations)
@@ -144,9 +141,7 @@ class KnowledgeGraph:
 
             # Find and remove matching relation
             for i, rel in enumerate(self._relations):
-                if (rel.from_entity == from_entity and
-                    rel.to == to_entity and
-                    rel.relation_type == relation_type):
+                if rel.from_entity == from_entity and rel.to == to_entity and rel.relation_type == relation_type:
                     self._relations.pop(i)
                     deleted += 1
                     break
@@ -159,14 +154,8 @@ class KnowledgeGraph:
         results = []
         query_lower = query.lower()
         for entity in self._entities.values():
-            if (
-                query_lower in entity.name.lower()
-                or any(query_lower in obs.lower() for obs in entity.observations)
-            ):
-                relations = [
-                    r for r in self._relations
-                    if r.from_entity == entity.name or r.to == entity.name
-                ]
+            if query_lower in entity.name.lower() or any(query_lower in obs.lower() for obs in entity.observations):
+                relations = [r for r in self._relations if r.from_entity == entity.name or r.to == entity.name]
                 results.append(
                     EntityWithRelations(
                         name=entity.name,
@@ -181,10 +170,7 @@ class KnowledgeGraph:
         entity = self._entities.get(name)
         if entity is None:
             return None
-        relations = [
-            r for r in self._relations
-            if r.from_entity == entity.name or r.to == entity.name
-        ]
+        relations = [r for r in self._relations if r.from_entity == entity.name or r.to == entity.name]
         return EntityWithRelations(
             name=entity.name,
             entityType=entity.entity_type,
@@ -197,10 +183,7 @@ class KnowledgeGraph:
         for entity in self._entities.values():
             entity_tier = get_entity_tier(entity.observations)
             if entity_tier and entity_tier.value == tier:
-                relations = [
-                    r for r in self._relations
-                    if r.from_entity == entity.name or r.to == entity.name
-                ]
+                relations = [r for r in self._relations if r.from_entity == entity.name or r.to == entity.name]
                 results.append(
                     EntityWithRelations(
                         name=entity.name,

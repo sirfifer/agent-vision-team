@@ -5,15 +5,20 @@ import { WarningDialog } from './ui/WarningDialog';
 
 type WarningType = 'mockTests' | 'mockTestsForCostlyOps' | null;
 
-const WARNINGS: Record<Exclude<WarningType, null>, { title: string; message: string; severity: 'warning' | 'danger' }> = {
+const WARNINGS: Record<
+  Exclude<WarningType, null>,
+  { title: string; message: string; severity: 'warning' | 'danger' }
+> = {
   mockTests: {
     title: 'Enable Mock Tests?',
-    message: 'Mocking all tests significantly reduces the value of AI-assisted development. Real tests catch real bugs that mocks hide. We strongly recommend leaving this OFF.',
+    message:
+      'Mocking all tests significantly reduces the value of AI-assisted development. Real tests catch real bugs that mocks hide. We strongly recommend leaving this OFF.',
     severity: 'danger',
   },
   mockTestsForCostlyOps: {
     title: 'Disable Mock Tests for Costly Operations?',
-    message: 'Disabling this means tests will make real API calls, database connections, and other operations that may incur costs or rate-limiting.',
+    message:
+      'Disabling this means tests will make real API calls, database connections, and other operations that may incur costs or rate-limiting.',
     severity: 'warning',
   },
 };
@@ -37,10 +42,14 @@ export function SettingsPanel() {
   }
 
   const updateSettings = (updates: Partial<ProjectConfig['settings']>) => {
-    setDraftConfig(prev => prev ? {
-      ...prev,
-      settings: { ...prev.settings, ...updates },
-    } : null);
+    setDraftConfig((prev) =>
+      prev
+        ? {
+            ...prev,
+            settings: { ...prev.settings, ...updates },
+          }
+        : null,
+    );
     setHasChanges(true);
   };
 
@@ -102,7 +111,12 @@ export function SettingsPanel() {
             className="p-1 hover:bg-vscode-widget-bg rounded transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -118,7 +132,7 @@ export function SettingsPanel() {
                 min="0"
                 max="100"
                 value={draftConfig.settings.coverageThreshold}
-                onChange={e => updateSettings({ coverageThreshold: Number(e.target.value) })}
+                onChange={(e) => updateSettings({ coverageThreshold: Number(e.target.value) })}
                 className="flex-1"
               />
               <span className="w-12 text-right font-mono">
@@ -145,9 +159,7 @@ export function SettingsPanel() {
                     Not Recommended
                   </span>
                 </div>
-                <p className="text-xs text-vscode-muted">
-                  Disables real test execution
-                </p>
+                <p className="text-xs text-vscode-muted">Disables real test execution</p>
               </div>
             </label>
 
@@ -165,9 +177,7 @@ export function SettingsPanel() {
                     Recommended
                   </span>
                 </div>
-                <p className="text-xs text-vscode-muted">
-                  Mock API calls and external services
-                </p>
+                <p className="text-xs text-vscode-muted">Mock API calls and external services</p>
               </div>
             </label>
           </div>
@@ -180,7 +190,9 @@ export function SettingsPanel() {
               <input
                 type="checkbox"
                 checked={draftConfig.settings.autoGovernance}
-                onChange={() => updateSettings({ autoGovernance: !draftConfig.settings.autoGovernance })}
+                onChange={() =>
+                  updateSettings({ autoGovernance: !draftConfig.settings.autoGovernance })
+                }
                 className="mt-1"
               />
               <div>
@@ -195,14 +207,14 @@ export function SettingsPanel() {
               <input
                 type="checkbox"
                 checked={draftConfig.settings.kgAutoCuration}
-                onChange={() => updateSettings({ kgAutoCuration: !draftConfig.settings.kgAutoCuration })}
+                onChange={() =>
+                  updateSettings({ kgAutoCuration: !draftConfig.settings.kgAutoCuration })
+                }
                 className="mt-1"
               />
               <div>
                 <span>KG Auto-Curation</span>
-                <p className="text-xs text-vscode-muted">
-                  Run kg-librarian after task completion
-                </p>
+                <p className="text-xs text-vscode-muted">Run kg-librarian after task completion</p>
               </div>
             </label>
           </div>
@@ -211,16 +223,18 @@ export function SettingsPanel() {
           <div>
             <h3 className="font-medium mb-3">Quality Gates</h3>
             <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(draftConfig.settings.qualityGates) as (keyof QualityGatesConfig)[]).map(gate => (
-                <label key={gate} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={draftConfig.settings.qualityGates[gate]}
-                    onChange={() => handleGateToggle(gate)}
-                  />
-                  <span className="capitalize text-sm">{gate}</span>
-                </label>
-              ))}
+              {(Object.keys(draftConfig.settings.qualityGates) as (keyof QualityGatesConfig)[]).map(
+                (gate) => (
+                  <label key={gate} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={draftConfig.settings.qualityGates[gate]}
+                      onChange={() => handleGateToggle(gate)}
+                    />
+                    <span className="capitalize text-sm">{gate}</span>
+                  </label>
+                ),
+              )}
             </div>
           </div>
 

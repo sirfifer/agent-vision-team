@@ -63,7 +63,7 @@ function FindingCard({
           <div className="text-2xs font-medium mb-1">Justification (required)</div>
           <textarea
             value={justification}
-            onChange={e => setJustification(e.target.value)}
+            onChange={(e) => setJustification(e.target.value)}
             placeholder="Explain why this finding is being dismissed..."
             className="w-full h-16 text-2xs p-2 rounded bg-vscode-bg border border-vscode-border text-vscode-fg resize-none"
           />
@@ -76,7 +76,10 @@ function FindingCard({
               Confirm Dismiss
             </button>
             <button
-              onClick={() => { setShowDismiss(false); setJustification(''); }}
+              onClick={() => {
+                setShowDismiss(false);
+                setJustification('');
+              }}
               className="text-2xs px-2 py-0.5 rounded bg-vscode-widget-bg text-vscode-muted hover:text-vscode-fg"
             >
               Cancel
@@ -93,8 +96,8 @@ export function FindingsPanel({ className = '' }: { className?: string }) {
   const findings = data.findings ?? [];
   const [showDismissed, setShowDismissed] = useState(false);
 
-  const openFindings = findings.filter(f => f.status === 'open');
-  const dismissedFindings = findings.filter(f => f.status === 'dismissed');
+  const openFindings = findings.filter((f) => f.status === 'open');
+  const dismissedFindings = findings.filter((f) => f.status === 'dismissed');
 
   const handleDismiss = (findingId: string, justification: string) => {
     sendMessage({
@@ -111,7 +114,9 @@ export function FindingsPanel({ className = '' }: { className?: string }) {
         onClick={() => setShowDismissed(!showDismissed)}
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-vscode-widget-bg/50 transition-colors border-b border-vscode-border"
       >
-        <span className="text-xs text-vscode-muted">{findings.length > 0 ? (showDismissed ? '▼' : '▶') : '▶'}</span>
+        <span className="text-xs text-vscode-muted">
+          {findings.length > 0 ? (showDismissed ? '▼' : '▶') : '▶'}
+        </span>
         <span className="text-xs font-semibold flex-1 text-left">Quality Findings</span>
         {openFindings.length > 0 && (
           <span className="text-2xs px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">
@@ -131,13 +136,13 @@ export function FindingsPanel({ className = '' }: { className?: string }) {
         </div>
       ) : (
         <div className="p-2 space-y-2">
-          {openFindings.map(f => (
+          {openFindings.map((f) => (
             <FindingCard key={f.id} finding={f} onDismiss={handleDismiss} />
           ))}
           {showDismissed && dismissedFindings.length > 0 && (
             <>
               <div className="text-2xs text-vscode-muted px-1 pt-1">Dismissed</div>
-              {dismissedFindings.map(f => (
+              {dismissedFindings.map((f) => (
                 <FindingCard key={f.id} finding={f} onDismiss={handleDismiss} />
               ))}
             </>

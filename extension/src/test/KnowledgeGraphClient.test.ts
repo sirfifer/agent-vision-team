@@ -48,9 +48,7 @@ suite('KnowledgeGraphClient Test Suite', () => {
     test.skip('should add observations', async () => {
       await mcpClient.connect();
 
-      const result = await kgClient.addObservations('test_entity', [
-        'New observation',
-      ]);
+      const result = await kgClient.addObservations('test_entity', ['New observation']);
 
       assert.strictEqual(result.added, 1);
     });
@@ -79,11 +77,7 @@ suite('KnowledgeGraphClient Test Suite', () => {
     test.skip('should validate tier access', async () => {
       await mcpClient.connect();
 
-      const result = await kgClient.validateTierAccess(
-        'test_entity',
-        'write',
-        'worker'
-      );
+      const result = await kgClient.validateTierAccess('test_entity', 'write', 'worker');
 
       assert.ok(result.allowed !== undefined);
     });

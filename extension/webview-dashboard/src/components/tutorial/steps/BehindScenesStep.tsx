@@ -32,11 +32,36 @@ const STAGES = [
 ];
 
 const colorMap: Record<string, { bg: string; border: string; text: string; iconColor: string }> = {
-  blue: { bg: 'bg-blue-900/10', border: 'border-blue-500/30', text: 'text-blue-300', iconColor: 'text-blue-400' },
-  amber: { bg: 'bg-amber-900/10', border: 'border-amber-500/30', text: 'text-amber-300', iconColor: 'text-amber-400' },
-  green: { bg: 'bg-green-900/10', border: 'border-green-500/30', text: 'text-green-300', iconColor: 'text-green-400' },
-  purple: { bg: 'bg-purple-900/10', border: 'border-purple-500/30', text: 'text-purple-300', iconColor: 'text-purple-400' },
-  teal: { bg: 'bg-teal-900/10', border: 'border-teal-500/30', text: 'text-teal-300', iconColor: 'text-teal-400' },
+  blue: {
+    bg: 'bg-blue-900/10',
+    border: 'border-blue-500/30',
+    text: 'text-blue-300',
+    iconColor: 'text-blue-400',
+  },
+  amber: {
+    bg: 'bg-amber-900/10',
+    border: 'border-amber-500/30',
+    text: 'text-amber-300',
+    iconColor: 'text-amber-400',
+  },
+  green: {
+    bg: 'bg-green-900/10',
+    border: 'border-green-500/30',
+    text: 'text-green-300',
+    iconColor: 'text-green-400',
+  },
+  purple: {
+    bg: 'bg-purple-900/10',
+    border: 'border-purple-500/30',
+    text: 'text-purple-300',
+    iconColor: 'text-purple-400',
+  },
+  teal: {
+    bg: 'bg-teal-900/10',
+    border: 'border-teal-500/30',
+    text: 'text-teal-300',
+    iconColor: 'text-teal-400',
+  },
 };
 
 export function BehindScenesStep() {
@@ -52,7 +77,9 @@ export function BehindScenesStep() {
         {STAGES.map((stage, i) => (
           <div key={i} className="flex items-center">
             {i > 0 && <span className="mx-1">&rarr;</span>}
-            <span className={`px-2 py-1 rounded ${colorMap[stage.color].bg} ${colorMap[stage.color].border} border ${colorMap[stage.color].text} font-medium`}>
+            <span
+              className={`px-2 py-1 rounded ${colorMap[stage.color].bg} ${colorMap[stage.color].border} border ${colorMap[stage.color].text} font-medium`}
+            >
               {stage.label}
             </span>
           </div>
@@ -64,8 +91,16 @@ export function BehindScenesStep() {
         {STAGES.map((stage, i) => {
           const colors = colorMap[stage.color];
           return (
-            <div key={i} className={`p-3 rounded-lg border ${colors.border} ${colors.bg} flex gap-3 items-start`}>
-              <svg className={`w-5 h-5 ${colors.iconColor} flex-shrink-0 mt-0.5`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div
+              key={i}
+              className={`p-3 rounded-lg border ${colors.border} ${colors.bg} flex gap-3 items-start`}
+            >
+              <svg
+                className={`w-5 h-5 ${colors.iconColor} flex-shrink-0 mt-0.5`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={stage.icon} />
               </svg>
               <div>

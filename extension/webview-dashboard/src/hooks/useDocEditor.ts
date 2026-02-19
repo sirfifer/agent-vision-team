@@ -2,13 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { WebviewMessage } from '../types';
 import type { FormatDocResult } from '../context/DashboardContext';
 
-export type DocEditorPhase =
-  | 'idle'
-  | 'drafting'
-  | 'formatting'
-  | 'reviewing'
-  | 'saving'
-  | 'error';
+export type DocEditorPhase = 'idle' | 'drafting' | 'formatting' | 'reviewing' | 'saving' | 'error';
 
 interface UseDocEditorOptions {
   tier: 'vision' | 'architecture';
@@ -52,14 +46,17 @@ export function useDocEditor({
   const docCountAtSave = useRef<number>(docCount);
 
   // Auto-transition from idle to drafting when content changes
-  const handleSetContent = useCallback((value: string) => {
-    setContent(value);
-    if (phase === 'idle' && value.length > 0) {
-      setPhase('drafting');
-    } else if (phase === 'drafting' && value.length === 0) {
-      setPhase('idle');
-    }
-  }, [phase]);
+  const handleSetContent = useCallback(
+    (value: string) => {
+      setContent(value);
+      if (phase === 'idle' && value.length > 0) {
+        setPhase('drafting');
+      } else if (phase === 'drafting' && value.length === 0) {
+        setPhase('idle');
+      }
+    },
+    [phase],
+  );
 
   // Handle format result from backend
   useEffect(() => {

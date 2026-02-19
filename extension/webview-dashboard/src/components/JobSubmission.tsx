@@ -84,7 +84,9 @@ export function JobSubmission({ onSubmitted }: JobSubmissionProps) {
             className="w-full px-2 py-1.5 text-sm rounded bg-[var(--vscode-dropdown-background)] text-[var(--vscode-foreground)] border border-[var(--vscode-input-border)]"
           >
             {AGENT_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
             ))}
           </select>
         </div>
@@ -97,7 +99,9 @@ export function JobSubmission({ onSubmitted }: JobSubmissionProps) {
             className="w-full px-2 py-1.5 text-sm rounded bg-[var(--vscode-dropdown-background)] text-[var(--vscode-foreground)] border border-[var(--vscode-input-border)]"
           >
             {MODELS.map((m) => (
-              <option key={m.value} value={m.value}>{m.label}</option>
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
             ))}
           </select>
         </div>
@@ -111,11 +115,7 @@ export function JobSubmission({ onSubmitted }: JobSubmissionProps) {
         {submitting ? 'Submitting...' : 'Submit Task'}
       </button>
 
-      {lastJobId && (
-        <div className="text-xs text-green-400">
-          Job submitted: {lastJobId}
-        </div>
-      )}
+      {lastJobId && <div className="text-xs text-green-400">Job submitted: {lastJobId}</div>}
     </div>
   );
 }

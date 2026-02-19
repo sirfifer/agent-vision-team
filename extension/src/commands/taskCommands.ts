@@ -54,6 +54,6 @@ export function registerTaskCommands(context: vscode.ExtensionContext): void {
 
       const doc = await vscode.workspace.openTextDocument(briefPath);
       await vscode.window.showTextDocument(doc);
-    })
+    }),
   );
 }

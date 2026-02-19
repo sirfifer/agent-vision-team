@@ -12,11 +12,13 @@ def test_delete_entity():
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
 
         # Create entities at different tiers
-        graph.create_entities([
-            {"name": "quality_entity", "entityType": "component", "observations": ["protection_tier: quality"]},
-            {"name": "arch_entity", "entityType": "component", "observations": ["protection_tier: architecture"]},
-            {"name": "vision_entity", "entityType": "vision_standard", "observations": ["protection_tier: vision"]},
-        ])
+        graph.create_entities(
+            [
+                {"name": "quality_entity", "entityType": "component", "observations": ["protection_tier: quality"]},
+                {"name": "arch_entity", "entityType": "component", "observations": ["protection_tier: architecture"]},
+                {"name": "vision_entity", "entityType": "vision_standard", "observations": ["protection_tier: vision"]},
+            ]
+        )
 
         # Quality tier entity can be deleted by agent
         deleted, error = graph.delete_entity("quality_entity", caller_role="worker")
@@ -54,20 +56,22 @@ def test_delete_relations():
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
 
         # Create entities and relations
-        graph.create_entities([
-            {"name": "A", "entityType": "component", "observations": []},
-            {"name": "B", "entityType": "pattern", "observations": []},
-            {"name": "C", "entityType": "component", "observations": []},
-        ])
-        graph.create_relations([
-            {"from": "A", "to": "B", "relationType": "follows_pattern"},
-            {"from": "A", "to": "C", "relationType": "depends_on"},
-        ])
+        graph.create_entities(
+            [
+                {"name": "A", "entityType": "component", "observations": []},
+                {"name": "B", "entityType": "pattern", "observations": []},
+                {"name": "C", "entityType": "component", "observations": []},
+            ]
+        )
+        graph.create_relations(
+            [
+                {"from": "A", "to": "B", "relationType": "follows_pattern"},
+                {"from": "A", "to": "C", "relationType": "depends_on"},
+            ]
+        )
 
         # Delete one relation
-        deleted = graph.delete_relations([
-            {"from": "A", "to": "B", "relationType": "follows_pattern"}
-        ])
+        deleted = graph.delete_relations([{"from": "A", "to": "B", "relationType": "follows_pattern"}])
         assert deleted == 1
 
         # Verify relation is gone
@@ -82,11 +86,15 @@ def test_delete_observations_with_approval():
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
 
         # Create architecture tier entity
-        graph.create_entities([{
-            "name": "TestComp",
-            "entityType": "component",
-            "observations": ["protection_tier: architecture", "initial obs"],
-        }])
+        graph.create_entities(
+            [
+                {
+                    "name": "TestComp",
+                    "entityType": "component",
+                    "observations": ["protection_tier: architecture", "initial obs"],
+                }
+            ]
+        )
 
         # Agent cannot delete without approval
         deleted, error = graph.delete_observations(
@@ -107,9 +115,7 @@ def test_delete_observations_nonexistent_entity():
     """Test deleting observations from nonexistent entity."""
     with tempfile.TemporaryDirectory() as tmpdir:
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
-        deleted, error = graph.delete_observations(
-            "nonexistent", ["some obs"], caller_role="human"
-        )
+        deleted, error = graph.delete_observations("nonexistent", ["some obs"], caller_role="human")
         assert deleted == 0
         assert "not found" in error.lower()
 
@@ -121,16 +127,24 @@ def test_persistence_across_restarts():
 
         # Create graph and add data
         graph1 = KnowledgeGraph(storage_path=storage_path)
-        graph1.create_entities([{
-            "name": "PersistentEntity",
-            "entityType": "component",
-            "observations": ["test observation"],
-        }])
-        graph1.create_relations([{
-            "from": "PersistentEntity",
-            "to": "PersistentEntity",
-            "relationType": "self_reference",
-        }])
+        graph1.create_entities(
+            [
+                {
+                    "name": "PersistentEntity",
+                    "entityType": "component",
+                    "observations": ["test observation"],
+                }
+            ]
+        )
+        graph1.create_relations(
+            [
+                {
+                    "from": "PersistentEntity",
+                    "to": "PersistentEntity",
+                    "relationType": "self_reference",
+                }
+            ]
+        )
 
         # Create new graph instance (simulates restart)
         graph2 = KnowledgeGraph(storage_path=storage_path)
@@ -151,11 +165,15 @@ def test_compaction_threshold():
 
         # Add entities to trigger compaction
         for i in range(6):
-            graph.create_entities([{
-                "name": f"entity_{i}",
-                "entityType": "component",
-                "observations": [],
-            }])
+            graph.create_entities(
+                [
+                    {
+                        "name": f"entity_{i}",
+                        "entityType": "component",
+                        "observations": [],
+                    }
+                ]
+            )
 
         # Compaction should have happened
         assert graph._write_count < 6  # Reset after compaction
@@ -166,16 +184,18 @@ def test_add_observations_to_quality_tier():
     with tempfile.TemporaryDirectory() as tmpdir:
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
 
-        graph.create_entities([{
-            "name": "QualityEntity",
-            "entityType": "component",
-            "observations": ["protection_tier: quality"],
-        }])
+        graph.create_entities(
+            [
+                {
+                    "name": "QualityEntity",
+                    "entityType": "component",
+                    "observations": ["protection_tier: quality"],
+                }
+            ]
+        )
 
         # Any role can add to quality tier
-        added, error = graph.add_observations(
-            "QualityEntity", ["new observation"], caller_role="worker"
-        )
+        added, error = graph.add_observations("QualityEntity", ["new observation"], caller_role="worker")
         assert added == 1
         assert error is None
 
@@ -185,10 +205,12 @@ def test_search_nodes_by_observation():
     with tempfile.TemporaryDirectory() as tmpdir:
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
 
-        graph.create_entities([
-            {"name": "A", "entityType": "component", "observations": ["uses protocol-based DI"]},
-            {"name": "B", "entityType": "component", "observations": ["uses singleton pattern"]},
-        ])
+        graph.create_entities(
+            [
+                {"name": "A", "entityType": "component", "observations": ["uses protocol-based DI"]},
+                {"name": "B", "entityType": "component", "observations": ["uses singleton pattern"]},
+            ]
+        )
 
         # Search by observation keyword
         results = graph.search_nodes("protocol")
@@ -201,10 +223,12 @@ def test_get_entities_by_tier_with_no_tier():
     with tempfile.TemporaryDirectory() as tmpdir:
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
 
-        graph.create_entities([
-            {"name": "WithTier", "entityType": "component", "observations": ["protection_tier: quality"]},
-            {"name": "WithoutTier", "entityType": "component", "observations": ["some observation"]},
-        ])
+        graph.create_entities(
+            [
+                {"name": "WithTier", "entityType": "component", "observations": ["protection_tier: quality"]},
+                {"name": "WithoutTier", "entityType": "component", "observations": ["some observation"]},
+            ]
+        )
 
         results = graph.get_entities_by_tier("quality")
         assert len(results) == 1

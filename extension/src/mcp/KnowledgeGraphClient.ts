@@ -9,7 +9,7 @@ export class KnowledgeGraphClient {
       name: string;
       entityType: string;
       observations: string[];
-    }[]
+    }[],
   ): Promise<{ created: number }> {
     return (await this.mcp.callTool('knowledge-graph', 'create_entities', {
       entities,
@@ -21,17 +21,14 @@ export class KnowledgeGraphClient {
       from: string;
       to: string;
       relationType: string;
-    }[]
+    }[],
   ): Promise<{ created: number }> {
     return (await this.mcp.callTool('knowledge-graph', 'create_relations', {
       relations,
     })) as { created: number };
   }
 
-  async addObservations(
-    entityName: string,
-    observations: string[]
-  ): Promise<{ added: number }> {
+  async addObservations(entityName: string, observations: string[]): Promise<{ added: number }> {
     return (await this.mcp.callTool('knowledge-graph', 'add_observations', {
       entityName,
       observations,
@@ -59,7 +56,7 @@ export class KnowledgeGraphClient {
   async validateTierAccess(
     entityName: string,
     operation: 'read' | 'write' | 'delete',
-    callerRole: string
+    callerRole: string,
   ): Promise<{ allowed: boolean; reason?: string }> {
     return (await this.mcp.callTool('knowledge-graph', 'validate_tier_access', {
       entityName,
@@ -73,9 +70,7 @@ export class KnowledgeGraphClient {
    * @param tier 'vision' or 'architecture'
    * @returns Ingestion result with counts and any errors
    */
-  async ingestDocuments(
-    tier: 'vision' | 'architecture'
-  ): Promise<{
+  async ingestDocuments(tier: 'vision' | 'architecture'): Promise<{
     ingested: number;
     entities: string[];
     errors: string[];

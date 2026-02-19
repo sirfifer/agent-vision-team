@@ -150,9 +150,7 @@ export function UsagePanel({ className = '' }: { className?: string }) {
             </div>
           </div>
 
-          {loading && (
-            <div className="text-xs text-vscode-muted text-center py-2">Loading...</div>
-          )}
+          {loading && <div className="text-xs text-vscode-muted text-center py-2">Loading...</div>}
 
           {report && !loading && (
             <>
@@ -164,11 +162,15 @@ export function UsagePanel({ className = '' }: { className?: string }) {
                 </div>
                 <div className="bg-vscode-widget-bg/50 rounded px-2 py-1.5 text-center">
                   <div className="text-2xs text-vscode-muted">Tokens</div>
-                  <div className="text-sm font-semibold">{formatTokens(report.summary.total_tokens)}</div>
+                  <div className="text-sm font-semibold">
+                    {formatTokens(report.summary.total_tokens)}
+                  </div>
                 </div>
                 <div className="bg-vscode-widget-bg/50 rounded px-2 py-1.5 text-center">
                   <div className="text-2xs text-vscode-muted">Duration</div>
-                  <div className="text-sm font-semibold">{formatDuration(report.summary.total_duration_ms)}</div>
+                  <div className="text-sm font-semibold">
+                    {formatDuration(report.summary.total_duration_ms)}
+                  </div>
                 </div>
               </div>
 
@@ -181,7 +183,9 @@ export function UsagePanel({ className = '' }: { className?: string }) {
                   <table className="w-full text-2xs">
                     <thead>
                       <tr className="text-vscode-muted border-b border-vscode-border">
-                        <th className="text-left py-1 pr-2">{groupBy === 'agent' ? 'Agent' : 'Operation'}</th>
+                        <th className="text-left py-1 pr-2">
+                          {groupBy === 'agent' ? 'Agent' : 'Operation'}
+                        </th>
                         <th className="text-right py-1 px-1">Calls</th>
                         <th className="text-right py-1 px-1">In</th>
                         <th className="text-right py-1 px-1">Out</th>
@@ -194,10 +198,16 @@ export function UsagePanel({ className = '' }: { className?: string }) {
                           <td className="py-1 pr-2 font-medium truncate max-w-[120px]">
                             {row.agent || row.operation || 'unknown'}
                           </td>
-                          <td className="text-right py-1 px-1 text-vscode-muted">{row.call_count}</td>
+                          <td className="text-right py-1 px-1 text-vscode-muted">
+                            {row.call_count}
+                          </td>
                           <td className="text-right py-1 px-1">{formatTokens(row.input_tokens)}</td>
-                          <td className="text-right py-1 px-1">{formatTokens(row.output_tokens)}</td>
-                          <td className="text-right py-1 pl-1 text-vscode-muted">{formatDuration(row.duration_ms)}</td>
+                          <td className="text-right py-1 px-1">
+                            {formatTokens(row.output_tokens)}
+                          </td>
+                          <td className="text-right py-1 pl-1 text-vscode-muted">
+                            {formatDuration(row.duration_ms)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -213,18 +223,25 @@ export function UsagePanel({ className = '' }: { className?: string }) {
                   </div>
                   <div className="space-y-1">
                     {report.prompt_size_trend.map((entry, i) => {
-                      const maxBytes = Math.max(...report.prompt_size_trend.map(e => e.avg_prompt_bytes), 1);
+                      const maxBytes = Math.max(
+                        ...report.prompt_size_trend.map((e) => e.avg_prompt_bytes),
+                        1,
+                      );
                       const pct = (entry.avg_prompt_bytes / maxBytes) * 100;
                       return (
                         <div key={i} className="flex items-center gap-2">
-                          <span className="text-2xs w-24 truncate" title={entry.operation}>{entry.operation}</span>
+                          <span className="text-2xs w-24 truncate" title={entry.operation}>
+                            {entry.operation}
+                          </span>
                           <div className="flex-1 h-2 bg-vscode-widget-bg rounded overflow-hidden">
                             <div
                               className="h-full bg-blue-500/60 rounded"
                               style={{ width: `${pct}%` }}
                             />
                           </div>
-                          <span className="text-2xs text-vscode-muted w-12 text-right">{formatBytes(entry.avg_prompt_bytes)}</span>
+                          <span className="text-2xs text-vscode-muted w-12 text-right">
+                            {formatBytes(entry.avg_prompt_bytes)}
+                          </span>
                         </div>
                       );
                     })}

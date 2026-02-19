@@ -20,7 +20,6 @@ data corruption that would only appear at scale.
 
 from __future__ import annotations
 
-import json
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -39,19 +38,19 @@ _HOOKS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts" / "hooks"
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
-from collab_governance.task_integration import (  # noqa: E402
-    Task,
-    TaskFileManager,
-    _generate_task_id,
-    release_task,
-    get_task_governance_status,
-)
-from collab_governance.store import GovernanceStore  # noqa: E402
 from collab_governance.models import (  # noqa: E402
     GovernedTaskRecord,
     ReviewType,
     TaskReviewRecord,
     TaskReviewStatus,
+)
+from collab_governance.store import GovernanceStore  # noqa: E402
+from collab_governance.task_integration import (  # noqa: E402
+    Task,
+    TaskFileManager,
+    _generate_task_id,
+    get_task_governance_status,
+    release_task,
 )
 
 from e2e.scenarios.base import BaseScenario, ScenarioResult  # noqa: E402
@@ -97,9 +96,7 @@ class HookPipelineAtScaleScenario(BaseScenario):
         manager.create_task(task)
         return task
 
-    def _intercept_task(
-        self, task_dir: Path, db_path: Path, impl_task: Task
-    ) -> dict:
+    def _intercept_task(self, task_dir: Path, db_path: Path, impl_task: Task) -> dict:
         """Simulate hook interception: create review pair + DB records."""
         manager = TaskFileManager(task_dir)
         review_id = f"review-{_generate_task_id()}"
@@ -108,10 +105,7 @@ class HookPipelineAtScaleScenario(BaseScenario):
         review_task = Task(
             id=review_id,
             subject=f"[GOVERNANCE] Review: {impl_task.subject}",
-            description=(
-                f"Governance review required.\n\n"
-                f"Context:\n{impl_task.description[:2000]}"
-            ),
+            description=(f"Governance review required.\n\nContext:\n{impl_task.description[:2000]}"),
             activeForm=f"Reviewing {impl_task.subject}",
             blocks=[impl_task.id],
             governance_metadata={
@@ -156,9 +150,7 @@ class HookPipelineAtScaleScenario(BaseScenario):
             "implementation_task_id": impl_task.id,
         }
 
-    def _create_and_intercept(
-        self, task_dir: Path, db_path: Path, index: int
-    ) -> dict:
+    def _create_and_intercept(self, task_dir: Path, db_path: Path, index: int) -> dict:
         """Combined: create a task and immediately intercept it.
 
         Returns dict with review_task_id, implementation_task_id.
@@ -172,7 +164,6 @@ class HookPipelineAtScaleScenario(BaseScenario):
     # ------------------------------------------------------------------
 
     def run(self, **kwargs: Any) -> ScenarioResult:
-
         # ==============================================================
         # PHASE 1: Rapid-fire sequential creation (50 tasks)
         # ==============================================================
@@ -211,7 +202,7 @@ class HookPipelineAtScaleScenario(BaseScenario):
             if len(t.blockedBy) == 1 and t.blockedBy[0].startswith("review-"):
                 blocked_count += 1
         self.assert_equal(
-            f"P1-T3: 100% of impl tasks have exactly 1 review blocker",
+            "P1-T3: 100% of impl tasks have exactly 1 review blocker",
             blocked_count,
             RAPID_FIRE_COUNT,
         )
@@ -222,7 +213,7 @@ class HookPipelineAtScaleScenario(BaseScenario):
             if len(t.blocks) == 1 and t.blocks[0].startswith("impl-"):
                 blocking_count += 1
         self.assert_equal(
-            f"P1-T4: 100% of review tasks block exactly 1 impl task",
+            "P1-T4: 100% of review tasks block exactly 1 impl task",
             blocking_count,
             RAPID_FIRE_COUNT,
         )
@@ -274,9 +265,7 @@ class HookPipelineAtScaleScenario(BaseScenario):
 
         with ThreadPoolExecutor(max_workers=CONCURRENT_WORKERS) as pool:
             futures = {
-                pool.submit(
-                    self._create_and_intercept, task_dir_conc, db_path_conc, i
-                ): i
+                pool.submit(self._create_and_intercept, task_dir_conc, db_path_conc, i): i
                 for i in range(CONCURRENT_COUNT)
             }
             for future in as_completed(futures):
@@ -318,12 +307,9 @@ class HookPipelineAtScaleScenario(BaseScenario):
         )
 
         # Every concurrent impl task has exactly 1 blocker
-        conc_blocked = sum(
-            1 for t in conc_impl
-            if len(t.blockedBy) == 1 and t.blockedBy[0].startswith("review-")
-        )
+        conc_blocked = sum(1 for t in conc_impl if len(t.blockedBy) == 1 and t.blockedBy[0].startswith("review-"))
         self.assert_equal(
-            f"P2-T5: 100% of concurrent impl tasks have 1 review blocker",
+            "P2-T5: 100% of concurrent impl tasks have 1 review blocker",
             conc_blocked,
             CONCURRENT_COUNT,
         )
@@ -374,8 +360,7 @@ class HookPipelineAtScaleScenario(BaseScenario):
                     released_count += 1
                 else:
                     release_errors.append(
-                        f"{pair['implementation_task_id']}: "
-                        f"blockedBy={released.blockedBy if released else 'None'}"
+                        f"{pair['implementation_task_id']}: blockedBy={released.blockedBy if released else 'None'}"
                     )
             except Exception as e:
                 release_errors.append(f"{pair['implementation_task_id']}: {e}")
@@ -394,9 +379,7 @@ class HookPipelineAtScaleScenario(BaseScenario):
 
         # All impl tasks should now be executable
         post_release = manager.get_pending_unblocked_tasks()
-        post_release_impl = [
-            t for t in post_release if t.id.startswith("impl-")
-        ]
+        post_release_impl = [t for t in post_release if t.id.startswith("impl-")]
         self.assert_equal(
             f"P3-T3: All {RAPID_FIRE_COUNT} impl tasks now executable",
             len(post_release_impl),
@@ -406,14 +389,12 @@ class HookPipelineAtScaleScenario(BaseScenario):
         # Verify each task individually via get_task_governance_status
         can_execute_count = 0
         for pair in pairs:
-            status = get_task_governance_status(
-                pair["implementation_task_id"], task_dir=task_dir
-            )
+            status = get_task_governance_status(pair["implementation_task_id"], task_dir=task_dir)
             if status.get("can_execute") is True:
                 can_execute_count += 1
 
         self.assert_equal(
-            f"P3-T4: 100% report can_execute=True after release",
+            "P3-T4: 100% report can_execute=True after release",
             can_execute_count,
             RAPID_FIRE_COUNT,
         )
@@ -430,9 +411,6 @@ class HookPipelineAtScaleScenario(BaseScenario):
         # PHASE 4: Cross-pair integrity (no task references a wrong pair)
         # ==============================================================
 
-        # Build a map of impl_id -> review_id from our pairs
-        pair_map = {p["implementation_task_id"]: p["review_task_id"] for p in pairs}
-
         # Verify every impl task's blockedBy was exactly the correct review
         # (before release they had 1 blocker; after release they have 0)
         # We already verified this, but let's also check that review tasks
@@ -444,7 +422,7 @@ class HookPipelineAtScaleScenario(BaseScenario):
                 integrity_ok += 1
 
         self.assert_equal(
-            f"P4-T1: 100% of review tasks point to correct impl task",
+            "P4-T1: 100% of review tasks point to correct impl task",
             integrity_ok,
             RAPID_FIRE_COUNT,
         )

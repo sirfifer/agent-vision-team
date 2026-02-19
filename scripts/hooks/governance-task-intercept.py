@@ -20,9 +20,7 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 import time
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,20 +33,18 @@ DB_PATH = Path(PROJECT_DIR) / ".avt" / "governance.db"
 # Add governance server to Python path so we can import its modules
 sys.path.insert(0, str(GOVERNANCE_DIR))
 
-from collab_governance.task_integration import (
-    Task,
-    TaskFileManager,
-    _generate_task_id,
-    _get_task_dir,
-)
-from collab_governance.store import GovernanceStore
 from collab_governance.models import (
     GovernedTaskRecord,
     ReviewType,
     TaskReviewRecord,
     TaskReviewStatus,
 )
-
+from collab_governance.store import GovernanceStore
+from collab_governance.task_integration import (
+    Task,
+    TaskFileManager,
+    _generate_task_id,
+)
 
 # ── Loop prevention ───────────────────────────────────────────────────────
 
@@ -65,6 +61,7 @@ def _is_review_task(subject: str, task_id: str = "") -> bool:
 
 
 # ── Extract task info from hook input ──────────────────────────────────────
+
 
 def _extract_task_info(hook_input: dict) -> dict | None:
     """Extract the created task's ID and details from PostToolUse input.
@@ -84,26 +81,12 @@ def _extract_task_info(hook_input: dict) -> dict | None:
             tool_result = {}
 
     # Try to get task ID from various possible locations in tool_result
-    task_id = (
-        tool_result.get("id")
-        or tool_result.get("taskId")
-        or tool_result.get("task_id")
-        or ""
-    )
+    task_id = tool_result.get("id") or tool_result.get("taskId") or tool_result.get("task_id") or ""
 
     # Try to get subject/description
-    subject = (
-        tool_result.get("subject")
-        or tool_input.get("subject")
-        or tool_input.get("prompt", "")[:200]
-        or ""
-    )
+    subject = tool_result.get("subject") or tool_input.get("subject") or tool_input.get("prompt", "")[:200] or ""
 
-    description = (
-        tool_result.get("description")
-        or tool_input.get("description")
-        or ""
-    )
+    description = tool_result.get("description") or tool_input.get("description") or ""
 
     if not task_id and not subject:
         return None
@@ -118,6 +101,7 @@ def _extract_task_info(hook_input: dict) -> dict | None:
 
 
 # ── Create governance pair ─────────────────────────────────────────────────
+
 
 def _create_governance_pair(task_info: dict, session_id: str = "") -> dict:
     """Create a review task and link it to the implementation task.
@@ -143,10 +127,7 @@ def _create_governance_pair(task_info: dict, session_id: str = "") -> dict:
     review_task = Task(
         id=review_id,
         subject=f"[GOVERNANCE] Review: {subject}",
-        description=(
-            f"Governance review required before execution.\n\n"
-            f"Context:\n{description[:2000]}"
-        ),
+        description=(f"Governance review required before execution.\n\nContext:\n{description[:2000]}"),
         activeForm=f"Reviewing {subject}",
         blocks=[impl_id] if impl_id else [],
         governance_metadata={
@@ -239,9 +220,7 @@ def _discover_task_id(manager: TaskFileManager, subject: str) -> str | None:
     return first_match
 
 
-def _try_find_and_block_task(
-    manager: TaskFileManager, subject: str, review_id: str
-) -> str | None:
+def _try_find_and_block_task(manager: TaskFileManager, subject: str, review_id: str) -> str | None:
     """Fallback: scan task directory for a recently created task matching subject.
 
     Returns the discovered task ID if found, or None.
@@ -257,6 +236,7 @@ def _try_find_and_block_task(
 
 
 # ── Async review queueing ──────────────────────────────────────────────────
+
 
 def _queue_async_review(review_info: dict) -> None:
     """Spawn an async governance review in the background.
@@ -310,6 +290,7 @@ def _log(msg: str) -> None:
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
+
 def _create_or_update_flag_file(session_id: str) -> None:
     """Create or update the holistic review flag file.
 
@@ -333,12 +314,16 @@ def _create_or_update_flag_file(session_id: str) -> None:
     except Exception:
         pass
 
-    flag_path.write_text(json.dumps({
-        "session_id": session_id,
-        "status": "pending",
-        "task_count": task_count,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }))
+    flag_path.write_text(
+        json.dumps(
+            {
+                "session_id": session_id,
+                "status": "pending",
+                "task_count": task_count,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    )
     _log(f"Flag file created/updated: session={session_id} tasks={task_count}")
 
 
@@ -360,9 +345,12 @@ def _spawn_settle_checker(session_id: str, transcript_path: str) -> None:
         env["CLAUDE_PROJECT_DIR"] = PROJECT_DIR
         subprocess.Popen(
             [
-                "uv", "run",
-                "--directory", str(GOVERNANCE_DIR),
-                "python", str(settle_script),
+                "uv",
+                "run",
+                "--directory",
+                str(GOVERNANCE_DIR),
+                "python",
+                str(settle_script),
                 session_id,
                 my_timestamp,
                 transcript_path,

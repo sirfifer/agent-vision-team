@@ -16,9 +16,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "go
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "quality"))
 
 from collab_governance.models import (
+    Confidence,
     Decision,
     DecisionCategory,
-    Confidence,
     ReviewVerdict,
     Verdict,
 )
@@ -39,13 +39,15 @@ class S10CompletionGuard(BaseScenario):
         task_id = "task-s10-completion"
 
         # -- Step 1: Store a decision WITHOUT a review ----------------------
-        d1 = store.store_decision(Decision(
-            task_id=task_id,
-            agent="worker-1",
-            category=DecisionCategory.PATTERN_CHOICE,
-            summary="Use observer pattern for event handling",
-            confidence=Confidence.HIGH,
-        ))
+        d1 = store.store_decision(
+            Decision(
+                task_id=task_id,
+                agent="worker-1",
+                category=DecisionCategory.PATTERN_CHOICE,
+                summary="Use observer pattern for event handling",
+                confidence=Confidence.HIGH,
+            )
+        )
 
         # has_unresolved_blocks checks for blocked verdicts specifically.
         # A decision with no review at all is not "blocked" -- it's just
@@ -68,11 +70,13 @@ class S10CompletionGuard(BaseScenario):
         )
 
         # -- Step 2: Store a BLOCKED review for the decision ----------------
-        store.store_review(ReviewVerdict(
-            decision_id=d1.id,
-            verdict=Verdict.BLOCKED,
-            guidance="Observer pattern conflicts with the event bus architecture standard",
-        ))
+        store.store_review(
+            ReviewVerdict(
+                decision_id=d1.id,
+                verdict=Verdict.BLOCKED,
+                guidance="Observer pattern conflicts with the event bus architecture standard",
+            )
+        )
 
         has_blocks_after_block = store.has_unresolved_blocks(task_id)
         self.assert_true(
@@ -81,19 +85,23 @@ class S10CompletionGuard(BaseScenario):
         )
 
         # -- Step 3: Store a second decision and approve it -----------------
-        d2 = store.store_decision(Decision(
-            task_id=task_id,
-            agent="worker-1",
-            category=DecisionCategory.PATTERN_CHOICE,
-            summary="Use mediator pattern instead of observer",
-            confidence=Confidence.HIGH,
-        ))
+        d2 = store.store_decision(
+            Decision(
+                task_id=task_id,
+                agent="worker-1",
+                category=DecisionCategory.PATTERN_CHOICE,
+                summary="Use mediator pattern instead of observer",
+                confidence=Confidence.HIGH,
+            )
+        )
 
-        store.store_review(ReviewVerdict(
-            decision_id=d2.id,
-            verdict=Verdict.APPROVED,
-            standards_verified=["event-bus-pattern"],
-        ))
+        store.store_review(
+            ReviewVerdict(
+                decision_id=d2.id,
+                verdict=Verdict.APPROVED,
+                standards_verified=["event-bus-pattern"],
+            )
+        )
 
         # Still blocked because d1 has a BLOCKED review
         still_blocked = store.has_unresolved_blocks(task_id)

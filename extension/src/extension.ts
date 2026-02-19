@@ -19,7 +19,11 @@ import { registerTaskCommands } from './commands/taskCommands';
 import { initializeLoggers, disposeLoggers } from './utils/logger';
 import { Entity } from './models/Entity';
 import { AgentStatus, ActivityEntry, GovernedTask, GovernanceStats } from './models/Activity';
-import type { GovernanceStatus, PendingReviewEntry, GovernedTaskListEntry } from './mcp/GovernanceClient';
+import type {
+  GovernanceStatus,
+  PendingReviewEntry,
+  GovernedTaskListEntry,
+} from './mcp/GovernanceClient';
 import type { DecisionHistoryEntry } from './mcp/GovernanceClient';
 
 let activityCounter = 0;
@@ -27,7 +31,7 @@ function makeActivity(
   agent: string,
   type: ActivityEntry['type'],
   summary: string,
-  opts?: { tier?: ActivityEntry['tier']; detail?: string; governanceRef?: string }
+  opts?: { tier?: ActivityEntry['tier']; detail?: string; governanceRef?: string },
 ): ActivityEntry {
   return {
     id: `act-${++activityCounter}`,
@@ -50,11 +54,26 @@ function detectAgents(root: string): AgentStatus[] {
 
   const agentDefs: Array<{ file: string; id: string; name: string; role: AgentStatus['role'] }> = [
     { file: 'worker.md', id: 'worker', name: 'Worker', role: 'worker' },
-    { file: 'quality-reviewer.md', id: 'quality-reviewer', name: 'Quality Reviewer', role: 'quality-reviewer' },
+    {
+      file: 'quality-reviewer.md',
+      id: 'quality-reviewer',
+      name: 'Quality Reviewer',
+      role: 'quality-reviewer',
+    },
     { file: 'kg-librarian.md', id: 'kg-librarian', name: 'KG Librarian', role: 'kg-librarian' },
-    { file: 'governance-reviewer.md', id: 'governance-reviewer', name: 'Governance Reviewer', role: 'governance-reviewer' },
+    {
+      file: 'governance-reviewer.md',
+      id: 'governance-reviewer',
+      name: 'Governance Reviewer',
+      role: 'governance-reviewer',
+    },
     { file: 'researcher.md', id: 'researcher', name: 'Researcher', role: 'researcher' },
-    { file: 'project-steward.md', id: 'project-steward', name: 'Project Steward', role: 'project-steward' },
+    {
+      file: 'project-steward.md',
+      id: 'project-steward',
+      name: 'Project Steward',
+      role: 'project-steward',
+    },
   ];
 
   for (const def of agentDefs) {
@@ -82,7 +101,7 @@ function enrichAgentStatus(
 ): AgentStatus[] {
   if (!govStatus) return agents;
 
-  return agents.map(agent => {
+  return agents.map((agent) => {
     // Skip not-configured agents
     if (agent.status === 'not-configured') return agent;
 
@@ -126,9 +145,7 @@ function enrichAgentStatus(
       }
       case 'quality-reviewer': {
         // Check recent activity for quality review events
-        const recentQR = govStatus.recent_activity.find(
-          a => a.agent === 'quality-reviewer'
-        );
+        const recentQR = govStatus.recent_activity.find((a) => a.agent === 'quality-reviewer');
         if (recentQR) {
           return {
             ...agent,
@@ -152,11 +169,13 @@ function getSessionPhase(root: string): string {
     const statePath = path.join(root, '.avt', 'session-state.md');
     if (fs.existsSync(statePath)) {
       const content = fs.readFileSync(statePath, 'utf-8');
-      const match = content.match(/##\s*Current Phase[:\s]*(.+)/i)
-        ?? content.match(/phase[:\s]*(.+)/i);
+      const match =
+        content.match(/##\s*Current Phase[:\s]*(.+)/i) ?? content.match(/phase[:\s]*(.+)/i);
       if (match) return match[1].trim();
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return 'inactive';
 }
 
@@ -164,10 +183,12 @@ function getTaskCounts(root: string): { active: number; total: number } {
   try {
     const briefsDir = path.join(root, '.avt', 'task-briefs');
     if (fs.existsSync(briefsDir)) {
-      const files = fs.readdirSync(briefsDir).filter(f => f.endsWith('.md'));
+      const files = fs.readdirSync(briefsDir).filter((f) => f.endsWith('.md'));
       return { active: 0, total: files.length };
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return { active: 0, total: 0 };
 }
 
@@ -183,7 +204,7 @@ function parseHookGovernanceLog(root: string): HookGovernanceStatus {
     const logPath = path.join(root, '.avt', 'hook-governance.log');
     if (!fs.existsSync(logPath)) return result;
     const content = fs.readFileSync(logPath, 'utf-8');
-    const lines = content.split('\n').filter(l => l.includes('[INTERCEPT]'));
+    const lines = content.split('\n').filter((l) => l.includes('[INTERCEPT]'));
     result.totalInterceptions = lines.length;
     if (lines.length > 0) {
       // Parse recent entries (last 10)
@@ -200,7 +221,9 @@ function parseHookGovernanceLog(root: string): HookGovernanceStatus {
         result.lastInterceptionAt = result.recentInterceptions[0].timestamp;
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return result;
 }
 
@@ -217,25 +240,29 @@ function getSessionState(root: string): SessionState {
     const { execSync } = require('child_process');
     const tagOutput = execSync(
       'git tag --list "checkpoint-*" --sort=-version:refname 2>/dev/null | head -1',
-      { cwd: root, encoding: 'utf-8', timeout: 5000 }
+      { cwd: root, encoding: 'utf-8', timeout: 5000 },
     ).trim();
     if (tagOutput) {
       state.lastCheckpoint = tagOutput;
     }
 
     // Parse worktrees
-    const wtOutput = execSync(
-      'git worktree list --porcelain 2>/dev/null',
-      { cwd: root, encoding: 'utf-8', timeout: 5000 }
-    );
-    const worktrees = wtOutput.split('\n')
+    const wtOutput = execSync('git worktree list --porcelain 2>/dev/null', {
+      cwd: root,
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
+    const worktrees = wtOutput
+      .split('\n')
       .filter((l: string) => l.startsWith('worktree '))
       .map((l: string) => l.replace('worktree ', ''))
       .filter((w: string) => w !== root); // exclude main worktree
     if (worktrees.length > 0) {
       state.activeWorktrees = worktrees;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return state;
 }
 
@@ -244,12 +271,14 @@ function classifyEntities(allEntities: Entity[]): { vision: Entity[]; architectu
   const architecture: Entity[] = [];
 
   for (const entity of allEntities) {
-    const isVision = entity.entityType === 'vision_standard'
-      || entity.observations.some(o => o.includes('protection_tier: vision'));
-    const isArch = entity.entityType === 'architectural_standard'
-      || entity.entityType === 'pattern'
-      || entity.entityType === 'component'
-      || entity.observations.some(o => o.includes('protection_tier: architecture'));
+    const isVision =
+      entity.entityType === 'vision_standard' ||
+      entity.observations.some((o) => o.includes('protection_tier: vision'));
+    const isArch =
+      entity.entityType === 'architectural_standard' ||
+      entity.entityType === 'pattern' ||
+      entity.entityType === 'component' ||
+      entity.observations.some((o) => o.includes('protection_tier: architecture'));
 
     if (isVision) {
       vision.push(entity);
@@ -284,8 +313,12 @@ async function fetchGovernanceData(governanceClient: GovernanceClient): Promise<
     const [govStatus, pendingResult, taskListResult, decisionResult] = await Promise.all([
       governanceClient.getGovernanceStatus(),
       governanceClient.getPendingReviews(),
-      governanceClient.listGovernedTasks().catch(() => ({ governed_tasks: [] as GovernedTaskListEntry[], total: 0 })),
-      governanceClient.getDecisionHistory().catch(() => ({ decisions: [] as DecisionHistoryEntry[] })),
+      governanceClient
+        .listGovernedTasks()
+        .catch(() => ({ governed_tasks: [] as GovernedTaskListEntry[], total: 0 })),
+      governanceClient
+        .getDecisionHistory()
+        .catch(() => ({ decisions: [] as DecisionHistoryEntry[] })),
     ]);
 
     const taskGov = govStatus.task_governance;
@@ -306,12 +339,12 @@ async function fetchGovernanceData(governanceClient: GovernanceClient): Promise<
       in_progress: 'in_progress',
       completed: 'completed',
     };
-    const governedTasks: GovernedTask[] = taskListResult.governed_tasks.map(t => ({
+    const governedTasks: GovernedTask[] = taskListResult.governed_tasks.map((t) => ({
       id: t.id,
       implementationTaskId: t.implementation_task_id,
       subject: t.subject,
       status: statusMap[t.current_status] ?? 'pending_review',
-      reviews: t.reviews.map(r => ({
+      reviews: t.reviews.map((r) => ({
         id: r.id,
         reviewType: r.review_type,
         status: (r.status as GovernedTask['reviews'][0]['status']) ?? 'pending',
@@ -325,7 +358,7 @@ async function fetchGovernanceData(governanceClient: GovernanceClient): Promise<
     }));
 
     // Map decision history
-    const decisionHistory: DecisionHistoryEntry[] = decisionResult.decisions.map(d => ({
+    const decisionHistory: DecisionHistoryEntry[] = decisionResult.decisions.map((d) => ({
       id: d.id,
       taskId: d.task_id,
       agent: d.agent,
@@ -408,14 +441,16 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register tree views
   // Empty provider for the Actions view — viewsWelcome content renders the buttons
   const emptyProvider: vscode.TreeDataProvider<never> = {
-    getTreeItem: () => { throw new Error('unreachable'); },
+    getTreeItem: () => {
+      throw new Error('unreachable');
+    },
     getChildren: () => [],
   };
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('collab.actions', emptyProvider),
     vscode.window.registerTreeDataProvider('collab.findings', findingsProvider),
     vscode.window.registerTreeDataProvider('collab.tasks', tasksProvider),
-    vscode.window.registerTreeDataProvider('collab.memory', memoryProvider)
+    vscode.window.registerTreeDataProvider('collab.memory', memoryProvider),
   );
 
   // Register commands
@@ -442,18 +477,28 @@ export function activate(context: vscode.ExtensionContext): void {
       const agents = enrichAgentStatus(baseAgents, govStatus, pendingReviews);
 
       // Fetch findings from quality server
-      let findings: Array<{ id: string; tool: string; severity: string; component?: string; description: string; created_at: string; status: string }> = [];
+      let findings: Array<{
+        id: string;
+        tool: string;
+        severity: string;
+        component?: string;
+        description: string;
+        created_at: string;
+        status: string;
+      }> = [];
       try {
         const findingsResult = await qualityClient.getAllFindings();
         findings = findingsResult.findings ?? [];
-      } catch { /* quality server may not be running */ }
+      } catch {
+        /* quality server may not be running */
+      }
 
       // Parse hook governance log and session state
       const hookGovernanceStatus = root ? parseHookGovernanceLog(root) : undefined;
       const sessionState = root ? getSessionState(root) : undefined;
 
       // Map findings to dashboard format
-      const dashboardFindings = findings.map(f => ({
+      const dashboardFindings = findings.map((f) => ({
         id: f.id,
         tool: f.tool,
         severity: f.severity,
@@ -519,7 +564,7 @@ export function activate(context: vscode.ExtensionContext): void {
           tasks,
         });
         dashboardProvider.addActivity(
-          makeActivity('orchestrator', 'status', 'Connected to MCP servers')
+          makeActivity('orchestrator', 'status', 'Connected to MCP servers'),
         );
 
         // Fetch governance data and enrich agents
@@ -536,9 +581,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
         if (govStatus && govStatus.total_decisions > 0) {
           dashboardProvider.addActivity(
-            makeActivity('governance-reviewer', 'review',
+            makeActivity(
+              'governance-reviewer',
+              'review',
               `Governance: ${govStatus.approved} approved, ${govStatus.blocked} needs revision, ${govStatus.pending} pending`,
-              { tier: 'architecture' })
+              { tier: 'architecture' },
+            ),
           );
         }
 
@@ -552,12 +600,12 @@ export function activate(context: vscode.ExtensionContext): void {
         stopPolling();
         dashboardProvider.updateData({ connectionStatus: 'error' });
         dashboardProvider.addActivity(
-          makeActivity('orchestrator', 'status', `Connection failed: ${error}`)
+          makeActivity('orchestrator', 'status', `Connection failed: ${error}`),
         );
         vscode.window.showErrorMessage(`Failed to connect to MCP servers: ${error}`);
         outputChannel.appendLine(`Connection failed: ${error}`);
       }
-    })
+    }),
   );
 
   // Refresh commands
@@ -583,7 +631,11 @@ export function activate(context: vscode.ExtensionContext): void {
           tasks,
         });
         dashboardProvider.addActivity(
-          makeActivity('orchestrator', 'status', `Memory refreshed: ${allEntities.length} entities (${vision.length} vision, ${architecture.length} architecture)`)
+          makeActivity(
+            'orchestrator',
+            'status',
+            `Memory refreshed: ${allEntities.length} entities (${vision.length} vision, ${architecture.length} architecture)`,
+          ),
         );
 
         // Also fetch governance decision history
@@ -599,8 +651,8 @@ export function activate(context: vscode.ExtensionContext): void {
                   tier: 'architecture',
                   detail: d.verdict ? `Verdict: ${d.verdict}. ${d.guidance}` : undefined,
                   governanceRef: d.id,
-                }
-              )
+                },
+              ),
             );
           }
         } catch {
@@ -610,7 +662,9 @@ export function activate(context: vscode.ExtensionContext): void {
         // Also force a governance data refresh
         await pollDashboard();
 
-        vscode.window.showInformationMessage(`Memory Browser refreshed: ${allEntities.length} entities.`);
+        vscode.window.showInformationMessage(
+          `Memory Browser refreshed: ${allEntities.length} entities.`,
+        );
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to refresh memory: ${error}`);
       }
@@ -619,7 +673,9 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         const result = await qualityClient.validate();
         dashboardProvider.addActivity(
-          makeActivity('quality-reviewer', 'finding', `Validation: ${result.summary}`, { tier: 'quality' })
+          makeActivity('quality-reviewer', 'finding', `Validation: ${result.summary}`, {
+            tier: 'quality',
+          }),
         );
         vscode.window.showInformationMessage(`Validation: ${result.summary}`);
       } catch (error) {
@@ -632,14 +688,14 @@ export function activate(context: vscode.ExtensionContext): void {
       const tasks = root ? getTaskCounts(root) : { active: 0, total: 0 };
       dashboardProvider.updateData({ tasks });
       vscode.window.showInformationMessage('Tasks refreshed.');
-    })
+    }),
   );
 
   // Dashboard command
   context.subscriptions.push(
     vscode.commands.registerCommand('collab.viewDashboard', () => {
       dashboardProvider.openPanel();
-    })
+    }),
   );
 
   // Open Setup Wizard command — opens dashboard then shows wizard overlay
@@ -648,7 +704,7 @@ export function activate(context: vscode.ExtensionContext): void {
       dashboardProvider.openPanel();
       // Small delay to let webview initialize if panel was just created
       setTimeout(() => dashboardProvider.showSetupWizard(), 300);
-    })
+    }),
   );
 
   // Open Walkthrough command
@@ -657,9 +713,9 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.commands.executeCommand(
         'workbench.action.openWalkthrough',
         'collab-intelligence.avt-getting-started',
-        false
+        false,
       );
-    })
+    }),
   );
 
   // Open Workflow Tutorial command
@@ -667,7 +723,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('collab.openWorkflowTutorial', () => {
       dashboardProvider.openPanel();
       setTimeout(() => dashboardProvider.showTutorial(), 300);
-    })
+    }),
   );
 
   // Run Research stub — fixes silent failure when Research "Run" button is clicked
@@ -675,10 +731,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('collab.runResearch', async (promptId: string) => {
       vscode.window.showInformationMessage(
         `Research execution requires the researcher subagent via Claude Code CLI. ` +
-        `Use: Task tool \u2192 subagent_type: researcher, prompt: "Execute research prompt ${promptId}"`
+          `Use: Task tool \u2192 subagent_type: researcher, prompt: "Execute research prompt ${promptId}"`,
       );
       return { success: true, summary: 'Research prompt queued. Execute via Claude Code CLI.' };
-    })
+    }),
   );
 
   // Validate all gates command
@@ -690,7 +746,7 @@ export function activate(context: vscode.ExtensionContext): void {
           makeActivity('quality-reviewer', 'finding', `Quality gates: ${result.summary}`, {
             tier: 'quality',
             detail: result.summary,
-          })
+          }),
         );
 
         // Push structured gate results to dashboard
@@ -698,11 +754,31 @@ export function activate(context: vscode.ExtensionContext): void {
           const gates = result.gates;
           dashboardProvider.updateData({
             qualityGateResults: {
-              build: { name: 'build', passed: gates.build?.passed ?? false, detail: gates.build?.detail },
-              lint: { name: 'lint', passed: gates.lint?.passed ?? false, detail: gates.lint?.detail },
-              tests: { name: 'tests', passed: gates.tests?.passed ?? false, detail: gates.tests?.detail },
-              coverage: { name: 'coverage', passed: gates.coverage?.passed ?? false, detail: gates.coverage?.detail },
-              findings: { name: 'findings', passed: gates.findings?.passed ?? false, detail: gates.findings?.detail },
+              build: {
+                name: 'build',
+                passed: gates.build?.passed ?? false,
+                detail: gates.build?.detail,
+              },
+              lint: {
+                name: 'lint',
+                passed: gates.lint?.passed ?? false,
+                detail: gates.lint?.detail,
+              },
+              tests: {
+                name: 'tests',
+                passed: gates.tests?.passed ?? false,
+                detail: gates.tests?.detail,
+              },
+              coverage: {
+                name: 'coverage',
+                passed: gates.coverage?.passed ?? false,
+                detail: gates.coverage?.detail,
+              },
+              findings: {
+                name: 'findings',
+                passed: gates.findings?.passed ?? false,
+                detail: gates.findings?.detail,
+              },
               all_passed: result.all_passed,
               timestamp: new Date().toISOString(),
             },
@@ -717,7 +793,7 @@ export function activate(context: vscode.ExtensionContext): void {
       } catch (error) {
         vscode.window.showErrorMessage(`Validation failed: ${error}`);
       }
-    })
+    }),
   );
 
   // Toggle Demo Mode command
@@ -725,30 +801,38 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('collab.toggleDemo', () => {
       dashboardProvider.openPanel();
       setTimeout(() => dashboardProvider.toggleDemo(), 300);
-    })
+    }),
   );
 
   // Ingest documents command (called by dashboard wizard)
   context.subscriptions.push(
-    vscode.commands.registerCommand('collab.ingestDocuments', async (tier: 'vision' | 'architecture') => {
-      try {
-        const result = await kgClient.ingestDocuments(tier);
-        dashboardProvider.addActivity(
-          makeActivity('kg-librarian', 'status', `Ingested ${result.ingested} ${tier} documents into KG`, {
-            tier: tier === 'vision' ? 'vision' : 'architecture',
-          })
-        );
-        return result;
-      } catch (error) {
-        vscode.window.showErrorMessage(`Document ingestion failed: ${error}`);
-        return {
-          ingested: 0,
-          entities: [],
-          errors: [String(error)],
-          skipped: [],
-        };
-      }
-    })
+    vscode.commands.registerCommand(
+      'collab.ingestDocuments',
+      async (tier: 'vision' | 'architecture') => {
+        try {
+          const result = await kgClient.ingestDocuments(tier);
+          dashboardProvider.addActivity(
+            makeActivity(
+              'kg-librarian',
+              'status',
+              `Ingested ${result.ingested} ${tier} documents into KG`,
+              {
+                tier: tier === 'vision' ? 'vision' : 'architecture',
+              },
+            ),
+          );
+          return result;
+        } catch (error) {
+          vscode.window.showErrorMessage(`Document ingestion failed: ${error}`);
+          return {
+            ingested: 0,
+            entities: [],
+            errors: [String(error)],
+            skipped: [],
+          };
+        }
+      },
+    ),
   );
 
   // Initialize file watchers
@@ -777,53 +861,56 @@ export function activate(context: vscode.ExtensionContext): void {
     { dispose: () => fileWatcher.dispose() },
     { dispose: () => statusBar.dispose() },
     { dispose: () => findingsProvider.dispose() },
-    { dispose: () => disposeLoggers() }
+    { dispose: () => disposeLoggers() },
   );
 
   // Auto-start servers and connect on activation
-  serverManager.startAll().then(async () => {
-    try {
-      await mcpClient.connect();
-      statusBar.setHealth('active');
-      statusBar.setSummary(0, 0, 'ready');
+  serverManager
+    .startAll()
+    .then(async () => {
+      try {
+        await mcpClient.connect();
+        statusBar.setHealth('active');
+        statusBar.setSummary(0, 0, 'ready');
 
-      const root = getWorkspaceRoot();
-      const agents = root ? detectAgents(root) : [];
-      const sessionPhase = root ? getSessionPhase(root) : 'inactive';
-      const tasks = root ? getTaskCounts(root) : { active: 0, total: 0 };
+        const root = getWorkspaceRoot();
+        const agents = root ? detectAgents(root) : [];
+        const sessionPhase = root ? getSessionPhase(root) : 'inactive';
+        const tasks = root ? getTaskCounts(root) : { active: 0, total: 0 };
 
-      // Fetch governance data for enrichment
-      const { govStatus, pendingReviews, governanceStats, governedTasks } =
-        await fetchGovernanceData(governanceClient);
+        // Fetch governance data for enrichment
+        const { govStatus, pendingReviews, governanceStats, governedTasks } =
+          await fetchGovernanceData(governanceClient);
 
-      const enrichedAgents = enrichAgentStatus(agents, govStatus, pendingReviews);
+        const enrichedAgents = enrichAgentStatus(agents, govStatus, pendingReviews);
 
-      dashboardProvider.updateData({
-        connectionStatus: 'connected',
-        agents: enrichedAgents,
-        sessionPhase,
-        tasks,
-        governedTasks,
-        governanceStats,
-      });
-      dashboardProvider.addActivity(
-        makeActivity('orchestrator', 'status', 'MCP servers started and connected automatically')
-      );
+        dashboardProvider.updateData({
+          connectionStatus: 'connected',
+          agents: enrichedAgents,
+          sessionPhase,
+          tasks,
+          governedTasks,
+          governanceStats,
+        });
+        dashboardProvider.addActivity(
+          makeActivity('orchestrator', 'status', 'MCP servers started and connected automatically'),
+        );
 
-      // Start periodic polling
-      startPolling();
+        // Start periodic polling
+        startPolling();
 
-      outputChannel.appendLine('Auto-connected to MCP servers on activation.');
-    } catch (error) {
-      outputChannel.appendLine(`Auto-connect failed: ${error}`);
-      statusBar.setHealth('error');
+        outputChannel.appendLine('Auto-connected to MCP servers on activation.');
+      } catch (error) {
+        outputChannel.appendLine(`Auto-connect failed: ${error}`);
+        statusBar.setHealth('error');
+        dashboardProvider.updateData({ connectionStatus: 'error' });
+      }
+    })
+    .catch((error) => {
+      outputChannel.appendLine(`Auto-start servers failed: ${error}`);
+      outputChannel.appendLine('Use "Connect to MCP Servers" command to retry.');
       dashboardProvider.updateData({ connectionStatus: 'error' });
-    }
-  }).catch((error) => {
-    outputChannel.appendLine(`Auto-start servers failed: ${error}`);
-    outputChannel.appendLine('Use "Connect to MCP Servers" command to retry.');
-    dashboardProvider.updateData({ connectionStatus: 'error' });
-  });
+    });
 }
 
 export function deactivate(): void {

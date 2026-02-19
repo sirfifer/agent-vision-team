@@ -2,7 +2,16 @@ import { useState } from 'react';
 import { useProjects } from '../context/ProjectContext';
 
 export function ProjectTabBar() {
-  const { projects, activeProjectId, switchProject, addProject, removeProject, startProject, stopProject, loading } = useProjects();
+  const {
+    projects,
+    activeProjectId,
+    switchProject,
+    addProject,
+    removeProject,
+    startProject,
+    stopProject,
+    loading,
+  } = useProjects();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newPath, setNewPath] = useState('');
   const [newName, setNewName] = useState('');
@@ -33,10 +42,14 @@ export function ProjectTabBar() {
 
   const statusColor = (status: string) => {
     switch (status) {
-      case 'running': return 'bg-green-400';
-      case 'starting': return 'bg-yellow-400';
-      case 'error': return 'bg-red-400';
-      default: return 'bg-gray-500';
+      case 'running':
+        return 'bg-green-400';
+      case 'starting':
+        return 'bg-yellow-400';
+      case 'error':
+        return 'bg-red-400';
+      default:
+        return 'bg-gray-500';
     }
   };
 
@@ -55,10 +68,15 @@ export function ProjectTabBar() {
             onClick={() => switchProject(p.id)}
           >
             {/* Status dot */}
-            <span className={`w-2 h-2 rounded-full ${statusColor(p.status)} shrink-0`} title={p.status} />
+            <span
+              className={`w-2 h-2 rounded-full ${statusColor(p.status)} shrink-0`}
+              title={p.status}
+            />
 
             {/* Project name */}
-            <span className="truncate max-w-[120px]" title={p.path}>{p.name}</span>
+            <span className="truncate max-w-[120px]" title={p.path}>
+              {p.name}
+            </span>
 
             {/* Close button (visible on hover, not for active single project) */}
             {projects.length > 1 && (
@@ -115,7 +133,11 @@ export function ProjectTabBar() {
             {adding ? '...' : 'Add'}
           </button>
           <button
-            onClick={() => { setShowAddDialog(false); setNewPath(''); setNewName(''); }}
+            onClick={() => {
+              setShowAddDialog(false);
+              setNewPath('');
+              setNewName('');
+            }}
             className="px-2 py-1 text-xs text-vscode-muted hover:text-vscode-fg"
           >
             Cancel

@@ -28,10 +28,14 @@ from .models import (
 from .reviewer import GovernanceReviewer
 from .store import GovernanceStore
 from .task_integration import (
-    create_governed_task_pair,
     add_additional_review,
-    release_task as release_task_file,
+    create_governed_task_pair,
+)
+from .task_integration import (
     get_task_governance_status as get_task_status_from_files,
+)
+from .task_integration import (
+    release_task as release_task_file,
 )
 
 mcp = FastMCP("Collab Intelligence Governance")
@@ -128,8 +132,12 @@ def submit_decision(
         )
         store.store_review(review)
         kg.record_decision(
-            decision.id, summary, "needs_human_review", agent,
-            intent=decision.intent, expected_outcome=decision.expected_outcome,
+            decision.id,
+            summary,
+            "needs_human_review",
+            agent,
+            intent=decision.intent,
+            expected_outcome=decision.expected_outcome,
         )
         return {
             "verdict": "needs_human_review",
@@ -141,7 +149,8 @@ def submit_decision(
 
     # 4. Skip AI review if no standards exist (nothing to check against)
     if not vision_standards and not architecture:
-        from .models import ReviewVerdict as RV, Verdict as V
+        from .models import ReviewVerdict as RV
+        from .models import Verdict as V
 
         review = RV(
             decision_id=decision.id,
@@ -152,8 +161,12 @@ def submit_decision(
         )
         store.store_review(review)
         kg.record_decision(
-            decision.id, summary, "approved", agent,
-            intent=decision.intent, expected_outcome=decision.expected_outcome,
+            decision.id,
+            summary,
+            "approved",
+            agent,
+            intent=decision.intent,
+            expected_outcome=decision.expected_outcome,
         )
         return {
             "verdict": "approved",
@@ -174,8 +187,12 @@ def submit_decision(
 
     # 7. Record in KG for institutional memory
     kg.record_decision(
-        decision.id, summary, review.verdict.value, agent,
-        intent=decision.intent, expected_outcome=decision.expected_outcome,
+        decision.id,
+        summary,
+        review.verdict.value,
+        agent,
+        intent=decision.intent,
+        expected_outcome=decision.expected_outcome,
     )
 
     # 8. Return the verdict
@@ -364,9 +381,7 @@ def get_decision_history(
     Returns:
         {decisions: [{id, summary, verdict, timestamp, ...}]}
     """
-    decisions = store.get_all_decisions(
-        task_id=task_id, agent=agent, verdict=verdict
-    )
+    decisions = store.get_all_decisions(task_id=task_id, agent=agent, verdict=verdict)
     return {"decisions": decisions}
 
 
@@ -419,7 +434,6 @@ def create_governed_task(
             message: str
         }
     """
-    from datetime import datetime, timezone
 
     # Validate review type
     try:
@@ -577,18 +591,22 @@ def complete_task_review(
 
     # Parse findings
     review_findings = []
-    for f in (findings or []):
-        review_findings.append(Finding(
-            tier=f.get("tier", "quality"),
-            severity=f.get("severity", "logic"),
-            description=f.get("description", ""),
-            suggestion=f.get("suggestion", ""),
-            strengths=f.get("strengths", []),
-            salvage_guidance=f.get("salvage_guidance", ""),
-        ))
+    for f in findings or []:
+        review_findings.append(
+            Finding(
+                tier=f.get("tier", "quality"),
+                severity=f.get("severity", "logic"),
+                description=f.get("description", ""),
+                suggestion=f.get("suggestion", ""),
+                strengths=f.get("strengths", []),
+                salvage_guidance=f.get("salvage_guidance", ""),
+            )
+        )
 
     # Update the review record
-    task_review.status = TaskReviewStatus(verdict) if verdict in ["approved", "blocked"] else TaskReviewStatus.NEEDS_HUMAN_REVIEW
+    task_review.status = (
+        TaskReviewStatus(verdict) if verdict in ["approved", "blocked"] else TaskReviewStatus.NEEDS_HUMAN_REVIEW
+    )
     task_review.verdict = v
     task_review.guidance = guidance
     task_review.findings = review_findings
@@ -642,7 +660,11 @@ def complete_task_review(
         "task_released": task_released,
         "remaining_blockers": remaining_blockers,
         "message": f"Review completed with verdict '{verdict}'. "
-                   + ("Task is now available for execution." if task_released else f"{remaining_blockers} review(s) still pending."),
+        + (
+            "Task is now available for execution."
+            if task_released
+            else f"{remaining_blockers} review(s) still pending."
+        ),
     }
 
 
@@ -677,16 +699,18 @@ def get_task_review_status(
 
     review_details = []
     for r in reviews:
-        review_details.append({
-            "id": r.id,
-            "review_task_id": r.review_task_id,
-            "type": r.review_type.value,
-            "status": r.status.value,
-            "verdict": r.verdict.value if r.verdict else None,
-            "guidance": r.guidance,
-            "created_at": r.created_at,
-            "completed_at": r.completed_at,
-        })
+        review_details.append(
+            {
+                "id": r.id,
+                "review_task_id": r.review_task_id,
+                "type": r.review_type.value,
+                "status": r.status.value,
+                "verdict": r.verdict.value if r.verdict else None,
+                "guidance": r.guidance,
+                "created_at": r.created_at,
+                "completed_at": r.completed_at,
+            }
+        )
 
     return {
         "task_id": implementation_task_id,
@@ -696,7 +720,9 @@ def get_task_review_status(
         "can_execute": file_status.get("can_execute", False),
         "reviews": review_details,
         "blockers_from_files": file_status.get("blockers", []),
-        "message": "Task is available for execution." if file_status.get("can_execute") else "Task is blocked pending review(s).",
+        "message": "Task is available for execution."
+        if file_status.get("can_execute")
+        else "Task is blocked pending review(s).",
     }
 
 

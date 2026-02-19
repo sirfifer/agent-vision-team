@@ -72,9 +72,7 @@ class ProjectManager:
     def _save_registry(self) -> None:
         """Persist project registry to ~/.avt/projects.json."""
         _REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
-        data = {
-            "projects": [p.model_dump() for p in self._projects.values()]
-        }
+        data = {"projects": [p.model_dump() for p in self._projects.values()]}
         _REGISTRY_PATH.write_text(json.dumps(data, indent=2))
 
     # ── Port allocation ──────────────────────────────────────────────────
@@ -127,8 +125,14 @@ class ProjectManager:
         )
         self._projects[project_id] = project
         self._save_registry()
-        logger.info("Added project '%s' at %s (slot %d, ports %d-%d)",
-                     project_id, path, slot, project.kg_port, project.governance_port)
+        logger.info(
+            "Added project '%s' at %s (slot %d, ports %d-%d)",
+            project_id,
+            path,
+            slot,
+            project.kg_port,
+            project.governance_port,
+        )
         return project
 
     def remove_project(self, project_id: str) -> None:
@@ -181,8 +185,9 @@ class ProjectManager:
                     stderr=subprocess.PIPE,
                 )
                 processes[server_name] = proc
-                logger.info("Started %s MCP server for '%s' on port %d (pid %d)",
-                             server_name, project_id, port, proc.pid)
+                logger.info(
+                    "Started %s MCP server for '%s' on port %d (pid %d)", server_name, project_id, port, proc.pid
+                )
 
             self._processes[project_id] = processes
             project.status = ProjectStatus.RUNNING
@@ -215,8 +220,7 @@ class ProjectManager:
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     proc.wait(timeout=2)
-                logger.info("Stopped %s MCP server for '%s' (pid %d)",
-                             server_name, project_id, proc.pid)
+                logger.info("Stopped %s MCP server for '%s' (pid %d)", server_name, project_id, proc.pid)
             except Exception as exc:
                 logger.warning("Error stopping %s for '%s': %s", server_name, project_id, exc)
 

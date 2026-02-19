@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from .services.project_config import ProjectConfigService
 from .services.file_service import FileService
+from .services.project_config import ProjectConfigService
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +43,14 @@ class ProjectState:
         """Lazily create the per-project job runner."""
         if self._job_runner is None:
             from .services.job_runner import JobRunner
+
             self._job_runner = JobRunner(project_dir=self.project_dir)
         return self._job_runner
 
     async def connect_mcp(self) -> None:
         """Connect to this project's MCP servers."""
         from .services.mcp_client import McpClientService
+
         self.mcp = McpClientService(
             kg_url=self.kg_url,
             quality_url=self.quality_url,
@@ -80,9 +82,7 @@ class ProjectStateRegistry:
         """Get project state by ID, returning None if not found."""
         return self._states.get(project_id)
 
-    def register(
-        self, project_id: str, project_dir: Path, ports: tuple[int, int, int]
-    ) -> ProjectState:
+    def register(self, project_id: str, project_dir: Path, ports: tuple[int, int, int]) -> ProjectState:
         """Register a new project state. Returns existing if already registered."""
         if project_id in self._states:
             return self._states[project_id]

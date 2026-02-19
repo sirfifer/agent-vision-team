@@ -22,7 +22,6 @@ The orchestrator:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import sys
 import time
@@ -46,16 +45,14 @@ if str(_PROJECT_ROOT / "mcp-servers" / "governance") not in sys.path:
 if str(_PROJECT_ROOT / "mcp-servers" / "quality") not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT / "mcp-servers" / "quality"))
 
-from e2e.generator.project_generator import GeneratedProject, generate_project
+from e2e.generator.project_generator import generate_project
 from e2e.parallel.executor import ParallelExecutor
 from e2e.scenarios.base import BaseScenario, ScenarioResult
-from e2e.validation.report_generator import generate_report, print_summary
 
 # ---------------------------------------------------------------------------
 # Scenario imports
 # ---------------------------------------------------------------------------
 # Each scenario module exposes a single class inheriting from BaseScenario.
-
 from e2e.scenarios.s01_kg_tier_protection import KGTierProtectionScenario
 from e2e.scenarios.s02_governance_decision_flow import GovernanceDecisionFlowScenario
 from e2e.scenarios.s03_governed_task_lifecycle import GovernedTaskLifecycleScenario
@@ -66,10 +63,11 @@ from e2e.scenarios.s07_trust_engine import S07TrustEngine
 from e2e.scenarios.s08_multi_blocker_task import S08MultiBlockerTask
 from e2e.scenarios.s09_scope_change_detection import S09ScopeChangeDetection
 from e2e.scenarios.s10_completion_guard import S10CompletionGuard
-from e2e.scenarios.s12_cross_server_integration import S12CrossServerIntegration
 from e2e.scenarios.s11_hook_based_governance import HookBasedGovernanceScenario
+from e2e.scenarios.s12_cross_server_integration import S12CrossServerIntegration
 from e2e.scenarios.s13_hook_pipeline_at_scale import HookPipelineAtScaleScenario
 from e2e.scenarios.s14_persistence_lifecycle import S14PersistenceLifecycle
+from e2e.validation.report_generator import generate_report, print_summary
 
 # Registry of all scenario classes to instantiate.
 ALL_SCENARIO_CLASSES: list[type[BaseScenario]] = [

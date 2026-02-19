@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..auth import require_auth
 from ..app_state import ProjectState
+from ..auth import require_auth
 from ..deps import get_project_state
 
 router = APIRouter(prefix="/governance", tags=["governance"], dependencies=[Depends(require_auth)])

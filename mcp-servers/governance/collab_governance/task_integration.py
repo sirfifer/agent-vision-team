@@ -8,15 +8,15 @@ blocker already in place. This ensures no race condition where a task could be
 picked up before governance review.
 """
 
+import fcntl
 import json
 import os
 import time
-import fcntl
+import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-from dataclasses import dataclass, field, asdict
-import uuid
 
 
 def _get_task_dir() -> Path:
@@ -35,6 +35,7 @@ def _generate_task_id() -> str:
 @dataclass
 class Task:
     """Represents a Claude Code Task."""
+
     id: str
     subject: str
     description: str = ""
@@ -200,12 +201,7 @@ class TaskFileManager:
 
     def get_pending_unblocked_tasks(self) -> list[Task]:
         """Get tasks that are pending and have no blockers (available for work)."""
-        return [
-            t for t in self.list_tasks()
-            if t.status == "pending"
-            and not t.blockedBy
-            and not t.owner
-        ]
+        return [t for t in self.list_tasks() if t.status == "pending" and not t.blockedBy and not t.owner]
 
 
 def create_governed_task_pair(
@@ -249,7 +245,7 @@ def create_governed_task_pair(
             "implementation_task_id": impl_id,
             "context": context,
             "created_at": datetime.now(timezone.utc).isoformat(),
-        }
+        },
     )
 
     # Create implementation task BLOCKED BY review
@@ -262,7 +258,7 @@ def create_governed_task_pair(
         governance_metadata={
             "review_task_id": review_id,
             "created_at": datetime.now(timezone.utc).isoformat(),
-        }
+        },
     )
 
     # Write both atomically (review first, then impl)
@@ -316,7 +312,7 @@ def add_additional_review(
             "implementation_task_id": task_id,
             "context": context,
             "created_at": datetime.now(timezone.utc).isoformat(),
-        }
+        },
     )
 
     # Create review task
@@ -404,12 +400,14 @@ def get_task_governance_status(
     for blocker_id in task.blockedBy:
         blocker = manager.read_task(blocker_id)
         if blocker:
-            blockers.append({
-                "id": blocker.id,
-                "subject": blocker.subject,
-                "status": blocker.status,
-                "review_type": blocker.governance_metadata.get("review_type", "unknown"),
-            })
+            blockers.append(
+                {
+                    "id": blocker.id,
+                    "subject": blocker.subject,
+                    "status": blocker.status,
+                    "review_type": blocker.governance_metadata.get("review_type", "unknown"),
+                }
+            )
 
     return {
         "task_id": task_id,

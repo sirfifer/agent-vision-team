@@ -169,10 +169,7 @@ def main() -> None:
         store.close()
         return
 
-    newest_ts = max(
-        datetime.fromisoformat(t.created_at).timestamp()
-        for t in tasks
-    )
+    newest_ts = max(datetime.fromisoformat(t.created_at).timestamp() for t in tasks)
 
     if newest_ts > my_timestamp + 0.5:  # 0.5s tolerance
         _log(f"Newer tasks exist (newest={newest_ts:.2f} vs mine={my_timestamp:.2f}); deferring")
@@ -188,6 +185,7 @@ def main() -> None:
         # If the existing review was approved, clean up any re-created flag file
         # (subagent tasks can re-create the flag after the main batch was approved)
         from collab_governance.models import Verdict
+
         if existing.verdict == Verdict.APPROVED:
             _remove_flag()
             _log("Cleaned up re-created flag file (session already approved).")

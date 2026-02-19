@@ -20,7 +20,6 @@ Phase 2 (Cleanup):
 Scenario type: positive.
 """
 
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -30,31 +29,30 @@ sys.path.insert(0, str(_PROJECT_ROOT / "mcp-servers" / "knowledge-graph"))
 sys.path.insert(0, str(_PROJECT_ROOT / "mcp-servers" / "governance"))
 sys.path.insert(0, str(_PROJECT_ROOT / "mcp-servers" / "quality"))
 
-from collab_kg.graph import KnowledgeGraph
-from collab_kg.ingestion import parse_document, ingest_folder
+from collab_governance.kg_client import KGClient
+from collab_governance.models import (
+    Confidence,
+    Decision,
+    DecisionCategory,
+    GovernedTaskRecord,
+    ReviewType,
+    ReviewVerdict,
+    TaskReviewRecord,
+    TaskReviewStatus,
+    Verdict,
+)
+from collab_governance.session_state import generate_session_state
+from collab_governance.store import GovernanceStore
+from collab_governance.task_integration import Task, TaskFileManager
+from collab_kg.archival import sync_archival_files
 from collab_kg.curation import (
     consolidate_observations,
     promote_patterns,
     remove_stale_observations,
     validate_tier_consistency,
-    run_full_curation,
 )
-from collab_kg.archival import sync_archival_files
-from collab_governance.kg_client import KGClient
-from collab_governance.models import (
-    Decision,
-    DecisionCategory,
-    Confidence,
-    ReviewVerdict,
-    Verdict,
-    GovernedTaskRecord,
-    TaskReviewRecord,
-    TaskReviewStatus,
-    ReviewType,
-)
-from collab_governance.store import GovernanceStore
-from collab_governance.task_integration import TaskFileManager, Task
-from collab_governance.session_state import generate_session_state
+from collab_kg.graph import KnowledgeGraph
+from collab_kg.ingestion import ingest_folder
 from collab_quality.trust_engine import TrustEngine
 
 from .base import BaseScenario, ScenarioResult
@@ -126,17 +124,12 @@ class S14PersistenceLifecycle(BaseScenario):
         self._step_8_session_state(gov_store, scenario_dir)
 
         # -- Step 9: Cross-Store Validation (Phase 1 complete) -------------
-        self._step_9_cross_store_validation(
-            kg, kg_path, gov_store, trust, memory_dir, scenario_dir
-        )
+        self._step_9_cross_store_validation(kg, kg_path, gov_store, trust, memory_dir, scenario_dir)
 
         # ================================================================
         # PHASE 2: Cleanup and validate clean state
         # ================================================================
-        self._phase_2_cleanup(
-            kg, kg_path, gov_store, gov_db_path, trust, trust_db_path,
-            memory_dir, scenario_dir
-        )
+        self._phase_2_cleanup(kg, kg_path, gov_store, gov_db_path, trust, trust_db_path, memory_dir, scenario_dir)
 
         gov_store.close()
         return self._build_result(scenario_type="positive")
@@ -236,42 +229,46 @@ class S14PersistenceLifecycle(BaseScenario):
     def _step_2_agent_entities(self, kg: KnowledgeGraph):
         """Create entities, relations, and observations as an agent would."""
         # Create component entities
-        created = kg.create_entities([
-            {
-                "name": "AuthService",
-                "entityType": "component",
-                "observations": [
-                    "protection_tier: quality",
-                    "Handles JWT authentication",
-                    "Uses DI pattern",
-                ],
-            },
-            {
-                "name": "UserRepository",
-                "entityType": "component",
-                "observations": [
-                    "protection_tier: quality",
-                    "Manages user data persistence",
-                    "Uses DI pattern",
-                ],
-            },
-            {
-                "name": "ApiGateway",
-                "entityType": "component",
-                "observations": [
-                    "protection_tier: quality",
-                    "Routes API requests",
-                    "Uses DI pattern",
-                ],
-            },
-        ])
+        created = kg.create_entities(
+            [
+                {
+                    "name": "AuthService",
+                    "entityType": "component",
+                    "observations": [
+                        "protection_tier: quality",
+                        "Handles JWT authentication",
+                        "Uses DI pattern",
+                    ],
+                },
+                {
+                    "name": "UserRepository",
+                    "entityType": "component",
+                    "observations": [
+                        "protection_tier: quality",
+                        "Manages user data persistence",
+                        "Uses DI pattern",
+                    ],
+                },
+                {
+                    "name": "ApiGateway",
+                    "entityType": "component",
+                    "observations": [
+                        "protection_tier: quality",
+                        "Routes API requests",
+                        "Uses DI pattern",
+                    ],
+                },
+            ]
+        )
         self.assert_equal("step2: 3 components created", created, 3)
 
         # Create relations
-        rel_count = kg.create_relations([
-            {"from": "AuthService", "to": "UserRepository", "relationType": "depends_on"},
-            {"from": "ApiGateway", "to": "AuthService", "relationType": "uses"},
-        ])
+        rel_count = kg.create_relations(
+            [
+                {"from": "AuthService", "to": "UserRepository", "relationType": "depends_on"},
+                {"from": "ApiGateway", "to": "AuthService", "relationType": "uses"},
+            ]
+        )
         self.assert_equal("step2: 2 relations created", rel_count, 2)
 
         # Add observations
@@ -316,9 +313,7 @@ class S14PersistenceLifecycle(BaseScenario):
             actual=err_v,
         )
 
-    def _step_3_governance_decisions(
-        self, gov_store: GovernanceStore, kg_client: KGClient
-    ):
+    def _step_3_governance_decisions(self, gov_store: GovernanceStore, kg_client: KGClient):
         """Submit decisions, get reviews, record in KG."""
         task_id = "task-s14-auth"
 
@@ -340,24 +335,28 @@ class S14PersistenceLifecycle(BaseScenario):
         )
 
         # Submit a decision
-        decision = gov_store.store_decision(Decision(
-            task_id=task_id,
-            agent="worker-1",
-            category=DecisionCategory.PATTERN_CHOICE,
-            summary="Use JWT for authentication",
-            detail="JWT with refresh tokens, stored in httpOnly cookies",
-            components_affected=["AuthService", "ApiGateway"],
-            confidence=Confidence.HIGH,
-        ))
+        decision = gov_store.store_decision(
+            Decision(
+                task_id=task_id,
+                agent="worker-1",
+                category=DecisionCategory.PATTERN_CHOICE,
+                summary="Use JWT for authentication",
+                detail="JWT with refresh tokens, stored in httpOnly cookies",
+                components_affected=["AuthService", "ApiGateway"],
+                confidence=Confidence.HIGH,
+            )
+        )
         self.assert_true("step3: decision stored", len(decision.id) > 0)
 
         # Store a review
-        review = gov_store.store_review(ReviewVerdict(
-            decision_id=decision.id,
-            verdict=Verdict.APPROVED,
-            guidance="Aligns with security patterns",
-            standards_verified=["Protocol-Based DI", "Authorization Required"],
-        ))
+        review = gov_store.store_review(
+            ReviewVerdict(
+                decision_id=decision.id,
+                verdict=Verdict.APPROVED,
+                guidance="Aligns with security patterns",
+                standards_verified=["Protocol-Based DI", "Authorization Required"],
+            )
+        )
         self.assert_equal("step3: review is approved", review.verdict, Verdict.APPROVED)
 
         # Record decision in KG
@@ -386,31 +385,33 @@ class S14PersistenceLifecycle(BaseScenario):
             )
 
         # Submit a second decision (blocked)
-        decision2 = gov_store.store_decision(Decision(
-            task_id=task_id,
-            agent="worker-1",
-            category=DecisionCategory.DEVIATION,
-            summary="Deviate from DI pattern for performance",
-            detail="Direct instantiation in hot path",
-            components_affected=["AuthService"],
-            confidence=Confidence.LOW,
-        ))
+        decision2 = gov_store.store_decision(
+            Decision(
+                task_id=task_id,
+                agent="worker-1",
+                category=DecisionCategory.DEVIATION,
+                summary="Deviate from DI pattern for performance",
+                detail="Direct instantiation in hot path",
+                components_affected=["AuthService"],
+                confidence=Confidence.LOW,
+            )
+        )
 
-        review2 = gov_store.store_review(ReviewVerdict(
-            decision_id=decision2.id,
-            verdict=Verdict.BLOCKED,
-            guidance="Violates Protocol-Based DI vision standard",
-            standards_verified=[],
-        ))
+        review2 = gov_store.store_review(
+            ReviewVerdict(
+                decision_id=decision2.id,
+                verdict=Verdict.BLOCKED,
+                guidance="Violates Protocol-Based DI vision standard",
+                standards_verified=[],
+            )
+        )
         self.assert_equal("step3: deviation blocked", review2.verdict, Verdict.BLOCKED)
 
         # Verify decision history
         history = gov_store.get_all_decisions(task_id=task_id)
         self.assert_equal("step3: 2 decisions in history", len(history), 2)
 
-    def _step_4_governed_tasks(
-        self, gov_store: GovernanceStore, task_mgr: TaskFileManager
-    ):
+    def _step_4_governed_tasks(self, gov_store: GovernanceStore, task_mgr: TaskFileManager):
         """Create governed task pairs, release on approval."""
         # Create implementation task
         impl_task = Task(
@@ -744,8 +745,12 @@ class S14PersistenceLifecycle(BaseScenario):
         )
 
         # Memory files have content from steps 7
-        for filename in ("architectural-decisions.md", "solution-patterns.md",
-                        "troubleshooting-log.md", "research-findings.md"):
+        for filename in (
+            "architectural-decisions.md",
+            "solution-patterns.md",
+            "troubleshooting-log.md",
+            "research-findings.md",
+        ):
             filepath = memory_dir / filename
             self.assert_true(
                 f"step9: {filename} exists",
@@ -779,16 +784,14 @@ class S14PersistenceLifecycle(BaseScenario):
 
         # Delete promoted pattern entities (also quality tier)
         solution_patterns = [
-            name for name, entity in kg._entities.items()
-            if entity.entity_type.value == "solution_pattern"
+            name for name, entity in kg._entities.items() if entity.entity_type.value == "solution_pattern"
         ]
         for name in solution_patterns:
             kg.delete_entity(name, caller_role="agent")
 
         # Delete governance_decision entities (also quality tier effectively)
         gov_decisions = [
-            name for name, entity in kg._entities.items()
-            if entity.entity_type.value == "governance_decision"
+            name for name, entity in kg._entities.items() if entity.entity_type.value == "governance_decision"
         ]
         for name in gov_decisions:
             kg.delete_entity(name, caller_role="agent")

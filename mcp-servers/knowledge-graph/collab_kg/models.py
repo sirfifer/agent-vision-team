@@ -1,7 +1,6 @@
 """Data models for the Knowledge Graph."""
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 

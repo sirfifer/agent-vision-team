@@ -5,8 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ..auth import require_auth
 from ..app_state import ProjectState
+from ..auth import require_auth
 from ..deps import get_project_state
 
 router = APIRouter(prefix="/documents", tags=["documents"], dependencies=[Depends(require_auth)])
@@ -60,6 +60,7 @@ async def format_doc(tier: str, body: dict, state: ProjectState = Depends(get_pr
 
     # Import here to avoid circular dependency
     from ..services.claude_cli import format_document
+
     try:
         formatted = await format_document(tier, raw_content)
         return {"success": True, "formattedContent": formatted}

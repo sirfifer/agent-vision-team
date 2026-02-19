@@ -36,11 +36,14 @@ const agentColors: Record<string, string> = {
 };
 
 const agentDescriptions: Record<string, string> = {
-  orchestrator: 'Orchestrator: coordinates workers, maintains governance, manages session lifecycle',
+  orchestrator:
+    'Orchestrator: coordinates workers, maintains governance, manages session lifecycle',
   worker: 'Worker: implements scoped task briefs under governance checkpoints',
-  'quality-reviewer': 'Quality Reviewer: runs deterministic quality gates (build, lint, tests, coverage)',
+  'quality-reviewer':
+    'Quality Reviewer: runs deterministic quality gates (build, lint, tests, coverage)',
   'kg-librarian': 'KG Librarian: curates Knowledge Graph entities and observations',
-  'governance-reviewer': 'Governance Reviewer: evaluates decisions against vision and architecture standards',
+  'governance-reviewer':
+    'Governance Reviewer: evaluates decisions against vision and architecture standards',
 };
 
 function getAgentInitials(agent: string): string {
@@ -69,7 +72,9 @@ function getAgentDescription(agent: string): string {
 export function ActivityEntryComponent({ entry }: { entry: ActivityEntryType }) {
   const [expanded, setExpanded] = useState(false);
   const tierBorder = entry.tier ? tierBorderColors[entry.tier] : 'border-l-vscode-border';
-  const time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  const time = entry.timestamp
+    ? new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : '';
 
   const tierLabel = entry.tier ? `Protection tier: ${entry.tier}` : 'No tier assigned';
   const entryTooltip = `${entry.summary}\n\nAgent: ${entry.agent} | Type: ${entry.type} | ${tierLabel}${entry.detail ? '\n\nClick to expand details' : ''}`;
@@ -89,12 +94,21 @@ export function ActivityEntryComponent({ entry }: { entry: ActivityEntryType }) 
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-2xs text-vscode-muted" title={`Timestamp: ${entry.timestamp}`}>{time}</span>
-            <span className="text-2xs" title={typeDescriptions[entry.type] ?? entry.type}>{typeIcons[entry.type] ?? ''}</span>
-            <span className="text-xs truncate" title={entry.summary}>{entry.summary}</span>
+            <span className="text-2xs text-vscode-muted" title={`Timestamp: ${entry.timestamp}`}>
+              {time}
+            </span>
+            <span className="text-2xs" title={typeDescriptions[entry.type] ?? entry.type}>
+              {typeIcons[entry.type] ?? ''}
+            </span>
+            <span className="text-xs truncate" title={entry.summary}>
+              {entry.summary}
+            </span>
           </div>
           {entry.governanceRef && (
-            <span className="text-2xs text-vscode-muted" title={`References governance entity: ${entry.governanceRef}. This activity is linked to a Knowledge Graph entity.`}>
+            <span
+              className="text-2xs text-vscode-muted"
+              title={`References governance entity: ${entry.governanceRef}. This activity is linked to a Knowledge Graph entity.`}
+            >
               re: {entry.governanceRef}
             </span>
           )}
@@ -102,7 +116,10 @@ export function ActivityEntryComponent({ entry }: { entry: ActivityEntryType }) 
       </div>
 
       {expanded && entry.detail && (
-        <div className="mt-2 ml-8 text-xs text-vscode-muted whitespace-pre-wrap border-l-2 border-vscode-border pl-2" title="Full detail for this activity entry">
+        <div
+          className="mt-2 ml-8 text-xs text-vscode-muted whitespace-pre-wrap border-l-2 border-vscode-border pl-2"
+          title="Full detail for this activity entry"
+        >
           {entry.detail}
         </div>
       )}

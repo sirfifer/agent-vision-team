@@ -29,7 +29,7 @@ export class TasksTreeProvider implements vscode.TreeDataProvider<TaskTreeItem> 
   }
 
   getChildren(): TaskTreeItem[] {
-    return this.tasks.map(task => new TaskTreeItem(task));
+    return this.tasks.map((task) => new TaskTreeItem(task));
   }
 }
 
@@ -43,9 +43,9 @@ export class TaskTreeItem extends vscode.TreeItem {
 
     this.tooltip = new vscode.MarkdownString(
       `**${task.title}**\n\n${task.description}\n\n` +
-      `**Status:** ${task.status}\n` +
-      (task.assigned_worker ? `**Worker:** ${task.assigned_worker}\n` : '') +
-      `\n**Acceptance Criteria:**\n${task.acceptance_criteria.map(c => `- ${c}`).join('\n')}`
+        `**Status:** ${task.status}\n` +
+        (task.assigned_worker ? `**Worker:** ${task.assigned_worker}\n` : '') +
+        `\n**Acceptance Criteria:**\n${task.acceptance_criteria.map((c) => `- ${c}`).join('\n')}`,
     );
 
     this.contextValue = 'task';

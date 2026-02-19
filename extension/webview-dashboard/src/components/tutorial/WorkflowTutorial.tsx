@@ -29,7 +29,7 @@ export function WorkflowTutorial() {
   }, [currentStep]);
 
   const handleNext = useCallback(() => {
-    setCompletedSteps(prev => new Set([...prev, currentStep]));
+    setCompletedSteps((prev) => new Set([...prev, currentStep]));
     if (!isLastStep) {
       setCurrentStep(TUTORIAL_STEPS[currentIndex + 1]);
     }
@@ -41,12 +41,15 @@ export function WorkflowTutorial() {
     }
   }, [currentIndex, isFirstStep]);
 
-  const handleStepClick = useCallback((step: TutorialStep) => {
-    const stepIndex = TUTORIAL_STEPS.indexOf(step);
-    if (stepIndex <= currentIndex || completedSteps.has(step)) {
-      setCurrentStep(step);
-    }
-  }, [currentIndex, completedSteps]);
+  const handleStepClick = useCallback(
+    (step: TutorialStep) => {
+      const stepIndex = TUTORIAL_STEPS.indexOf(step);
+      if (stepIndex <= currentIndex || completedSteps.has(step)) {
+        setCurrentStep(step);
+      }
+    },
+    [currentIndex, completedSteps],
+  );
 
   const handleClose = useCallback(() => {
     sessionStorage.setItem('avt-tutorial-dismissed', 'true');
@@ -94,16 +97,19 @@ export function WorkflowTutorial() {
       <div className="bg-vscode-bg border border-vscode-border rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-vscode-border">
-          <h2 className="text-lg font-semibold">
-            Workflow Tutorial
-          </h2>
+          <h2 className="text-lg font-semibold">Workflow Tutorial</h2>
           <button
             onClick={handleClose}
             className="p-1 hover:bg-vscode-widget-bg rounded transition-colors"
             title="Close tutorial"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>

@@ -14,6 +14,7 @@ __pycache__/
 .idea/
 *.swp
 *.swo
+.vscode/settings.json
 
 # OS
 .DS_Store
@@ -26,6 +27,32 @@ extension/webview-dashboard/dist/
 *.db
 *.sqlite
 
-# Environment
+# Environment and secrets
 .env
 .env.local
+.avt/api-key.txt
+server/.avt/api-key.txt
+
+# Debug artifacts
+.avt/debug/
+
+# Coverage output
+coverage/
+htmlcov/
+*.lcov
+.nyc_output/
+
+# Test caches
+.pytest_cache/
+.ruff_cache/
+
+# Logs
+*.log
+.avt/hook-governance.log
+.avt/hook-holistic.log
+
+# Session state (transient, not committed)
+.claude/settings.local.json
+
+# Husky internals
+.husky/_/

@@ -18,20 +18,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "kn
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "governance"))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "quality"))
 
-from collab_kg.graph import KnowledgeGraph
 from collab_governance.kg_client import KGClient
 from collab_governance.models import (
+    Confidence,
     Decision,
     DecisionCategory,
-    Confidence,
-    ReviewVerdict,
-    Verdict,
     GovernedTaskRecord,
+    ReviewType,
+    ReviewVerdict,
     TaskReviewRecord,
     TaskReviewStatus,
-    ReviewType,
+    Verdict,
 )
 from collab_governance.store import GovernanceStore
+from collab_kg.graph import KnowledgeGraph
 
 from .base import BaseScenario, ScenarioResult
 
@@ -117,15 +117,17 @@ class S12CrossServerIntegration(BaseScenario):
         store = GovernanceStore(db_path=db_path)
         task_id = "task-s12-integration"
 
-        decision = store.store_decision(Decision(
-            task_id=task_id,
-            agent="worker-1",
-            category=DecisionCategory.COMPONENT_DESIGN,
-            summary=f"Design {component} following {vision_std['name']}",
-            detail=f"Implementing {component} in compliance with: {vision_std['statement']}",
-            components_affected=[component],
-            confidence=Confidence.HIGH,
-        ))
+        decision = store.store_decision(
+            Decision(
+                task_id=task_id,
+                agent="worker-1",
+                category=DecisionCategory.COMPONENT_DESIGN,
+                summary=f"Design {component} following {vision_std['name']}",
+                detail=f"Implementing {component} in compliance with: {vision_std['statement']}",
+                components_affected=[component],
+                confidence=Confidence.HIGH,
+            )
+        )
 
         self.assert_true(
             "governance decision stored",
@@ -133,11 +135,13 @@ class S12CrossServerIntegration(BaseScenario):
         )
 
         # Store an approved review
-        review = store.store_review(ReviewVerdict(
-            decision_id=decision.id,
-            verdict=Verdict.APPROVED,
-            standards_verified=[vision_std["name"], arch_pattern["name"]],
-        ))
+        review = store.store_review(
+            ReviewVerdict(
+                decision_id=decision.id,
+                verdict=Verdict.APPROVED,
+                standards_verified=[vision_std["name"], arch_pattern["name"]],
+            )
+        )
 
         self.assert_equal(
             "review verdict is approved",

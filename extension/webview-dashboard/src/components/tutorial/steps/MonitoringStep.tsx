@@ -41,10 +41,15 @@ export function MonitoringStep() {
 
       <div className="space-y-3">
         {PANELS.map((panel) => (
-          <div key={panel.name} className={`p-3 rounded-lg border ${panel.color} bg-vscode-widget-bg/30 space-y-1`}>
+          <div
+            key={panel.name}
+            className={`p-3 rounded-lg border ${panel.color} bg-vscode-widget-bg/30 space-y-1`}
+          >
             <div className="flex items-center gap-2">
               <h4 className="font-semibold text-sm">{panel.name}</h4>
-              <span className="text-xs text-vscode-muted px-2 py-0.5 rounded bg-vscode-widget-bg">{panel.location}</span>
+              <span className="text-xs text-vscode-muted px-2 py-0.5 rounded bg-vscode-widget-bg">
+                {panel.location}
+              </span>
             </div>
             <p className="text-xs text-vscode-muted">{panel.desc}</p>
           </div>
@@ -53,8 +58,8 @@ export function MonitoringStep() {
 
       <div className="p-3 rounded-lg border border-blue-500/30 bg-blue-900/10">
         <p className="text-xs text-blue-200">
-          <strong>Tip:</strong> You don't need to manually refresh. The dashboard polls automatically.
-          But you can click Refresh to force an immediate update.
+          <strong>Tip:</strong> You don't need to manually refresh. The dashboard polls
+          automatically. But you can click Refresh to force an immediate update.
         </p>
       </div>
     </div>

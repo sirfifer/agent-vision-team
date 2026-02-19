@@ -8,13 +8,18 @@ const verdictDisplayLabels: Record<string, string> = {
   needs_human_review: 'needs human review',
 };
 
-const statusConfig: Record<GovernedTaskStatus, { label: string; color: string; bgColor: string }> = {
-  pending_review: { label: 'Pending Review', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20' },
-  approved: { label: 'Approved', color: 'text-green-400', bgColor: 'bg-green-500/20' },
-  blocked: { label: 'Needs Revision', color: 'text-red-400', bgColor: 'bg-red-500/20' },
-  in_progress: { label: 'In Progress', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
-  completed: { label: 'Completed', color: 'text-vscode-muted', bgColor: 'bg-vscode-widget-bg' },
-};
+const statusConfig: Record<GovernedTaskStatus, { label: string; color: string; bgColor: string }> =
+  {
+    pending_review: {
+      label: 'Pending Review',
+      color: 'text-yellow-400',
+      bgColor: 'bg-yellow-500/20',
+    },
+    approved: { label: 'Approved', color: 'text-green-400', bgColor: 'bg-green-500/20' },
+    blocked: { label: 'Needs Revision', color: 'text-red-400', bgColor: 'bg-red-500/20' },
+    in_progress: { label: 'In Progress', color: 'text-blue-400', bgColor: 'bg-blue-500/20' },
+    completed: { label: 'Completed', color: 'text-vscode-muted', bgColor: 'bg-vscode-widget-bg' },
+  };
 
 function ReviewBadge({ review }: { review: TaskReviewInfo }) {
   const verdictColors: Record<string, string> = {
@@ -60,7 +65,9 @@ function TaskCard({ task }: { task: GovernedTask }) {
       >
         <div className="flex items-center gap-2">
           <span className="text-xs text-vscode-muted">{expanded ? '\u25BC' : '\u25B6'}</span>
-          <span className={`text-2xs px-1.5 py-0.5 rounded ${config.bgColor} ${config.color} font-medium`}>
+          <span
+            className={`text-2xs px-1.5 py-0.5 rounded ${config.bgColor} ${config.color} font-medium`}
+          >
             {config.label}
           </span>
           <span className="text-xs font-medium flex-1 truncate">{task.subject}</span>
@@ -70,7 +77,7 @@ function TaskCard({ task }: { task: GovernedTask }) {
         </div>
         {task.reviews.length > 0 && (
           <div className="flex gap-1 mt-1.5 ml-5">
-            {task.reviews.map(r => (
+            {task.reviews.map((r) => (
               <ReviewBadge key={r.id} review={r} />
             ))}
           </div>
@@ -82,18 +89,21 @@ function TaskCard({ task }: { task: GovernedTask }) {
           <div className="text-2xs text-vscode-muted">
             <span className="font-medium">Task ID:</span> {task.implementationTaskId}
           </div>
-          {task.reviews.map(r => (
-            <div key={r.id} className="text-2xs p-2 rounded bg-vscode-bg border border-vscode-border">
+          {task.reviews.map((r) => (
+            <div
+              key={r.id}
+              className="text-2xs p-2 rounded bg-vscode-bg border border-vscode-border"
+            >
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-medium">{r.reviewType} review</span>
                 <span className="text-vscode-muted">({r.status})</span>
               </div>
               {r.verdict && (
-                <div className="text-vscode-muted">Verdict: {verdictDisplayLabels[r.verdict] ?? r.verdict}</div>
+                <div className="text-vscode-muted">
+                  Verdict: {verdictDisplayLabels[r.verdict] ?? r.verdict}
+                </div>
               )}
-              {r.guidance && (
-                <div className="mt-1">{r.guidance}</div>
-              )}
+              {r.guidance && <div className="mt-1">{r.guidance}</div>}
               {r.completedAt && (
                 <div className="text-vscode-muted mt-1">
                   Completed: {formatRelativeTime(r.completedAt)}
@@ -122,13 +132,12 @@ export function TaskBoard({ className = '' }: { className?: string }) {
   const { governedTasks, governanceStats } = data;
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
-  const filteredTasks = statusFilter === 'all'
-    ? governedTasks
-    : governedTasks.filter(t => t.status === statusFilter);
+  const filteredTasks =
+    statusFilter === 'all' ? governedTasks : governedTasks.filter((t) => t.status === statusFilter);
 
-  const pendingCount = governedTasks.filter(t => t.status === 'pending_review').length;
-  const blockedCount = governedTasks.filter(t => t.status === 'blocked').length;
-  const approvedCount = governedTasks.filter(t => t.status === 'approved').length;
+  const pendingCount = governedTasks.filter((t) => t.status === 'pending_review').length;
+  const blockedCount = governedTasks.filter((t) => t.status === 'blocked').length;
+  const approvedCount = governedTasks.filter((t) => t.status === 'approved').length;
 
   return (
     <div className={className}>
@@ -146,7 +155,7 @@ export function TaskBoard({ className = '' }: { className?: string }) {
 
         {/* Status filter tabs */}
         <div className="flex gap-1 mt-2 flex-wrap">
-          {filterConfig.map(f => (
+          {filterConfig.map((f) => (
             <button
               key={f.key}
               onClick={() => setStatusFilter(f.key)}
@@ -192,14 +201,17 @@ export function TaskBoard({ className = '' }: { className?: string }) {
       <div className="p-2 space-y-2">
         {filteredTasks.length === 0 ? (
           <div className="px-3 py-8 text-xs text-vscode-muted text-center italic">
-            {governedTasks.length === 0
-              ? <>No governed tasks yet. Tasks created via <code className="text-2xs">create_governed_task()</code> will appear here.</>
-              : 'No tasks match the current filter.'}
+            {governedTasks.length === 0 ? (
+              <>
+                No governed tasks yet. Tasks created via{' '}
+                <code className="text-2xs">create_governed_task()</code> will appear here.
+              </>
+            ) : (
+              'No tasks match the current filter.'
+            )}
           </div>
         ) : (
-          filteredTasks.map(task => (
-            <TaskCard key={task.id} task={task} />
-          ))
+          filteredTasks.map((task) => <TaskCard key={task.id} task={task} />)
         )}
       </div>
     </div>

@@ -21,7 +21,6 @@ All task files are written to an isolated directory inside
 
 from __future__ import annotations
 
-import json
 import sys
 import time
 from pathlib import Path
@@ -38,20 +37,19 @@ _HOOKS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts" / "hooks"
 if str(_HOOKS_DIR) not in sys.path:
     sys.path.insert(0, str(_HOOKS_DIR))
 
-from collab_governance.task_integration import (  # noqa: E402
-    Task,
-    TaskFileManager,
-    _generate_task_id,
-    release_task,
-    get_task_governance_status,
-)
-from collab_governance.store import GovernanceStore  # noqa: E402
 from collab_governance.models import (  # noqa: E402
     GovernedTaskRecord,
     ReviewType,
     TaskReviewRecord,
     TaskReviewStatus,
-    Verdict,
+)
+from collab_governance.store import GovernanceStore  # noqa: E402
+from collab_governance.task_integration import (  # noqa: E402
+    Task,
+    TaskFileManager,
+    _generate_task_id,
+    get_task_governance_status,
+    release_task,
 )
 
 from e2e.scenarios.base import BaseScenario, ScenarioResult  # noqa: E402
@@ -90,9 +88,7 @@ class HookBasedGovernanceScenario(BaseScenario):
         manager.create_task(task)
         return task
 
-    def _simulate_hook_intercept(
-        self, task_dir: Path, db_path: Path, impl_task: Task
-    ) -> dict:
+    def _simulate_hook_intercept(self, task_dir: Path, db_path: Path, impl_task: Task) -> dict:
         """Simulate what governance-task-intercept.py does after TaskCreate.
 
         This replicates the hook's core logic without going through
@@ -333,14 +329,10 @@ class HookBasedGovernanceScenario(BaseScenario):
             task_dir_lifecycle,
             subject=f"Add caching to {component}",
         )
-        review_info_2 = self._simulate_hook_intercept(
-            task_dir_lifecycle, db_path_lifecycle, impl_task_2
-        )
+        review_info_2 = self._simulate_hook_intercept(task_dir_lifecycle, db_path_lifecycle, impl_task_2)
 
         # Verify task is blocked
-        status_before = get_task_governance_status(
-            impl_task_2.id, task_dir=task_dir_lifecycle
-        )
+        status_before = get_task_governance_status(impl_task_2.id, task_dir=task_dir_lifecycle)
         self.assert_true(
             "T9: Task is blocked after hook intercept",
             status_before.get("is_blocked") is True,
@@ -374,9 +366,7 @@ class HookBasedGovernanceScenario(BaseScenario):
         )
 
         # 11. Task is now executable
-        status_after = get_task_governance_status(
-            impl_task_2.id, task_dir=task_dir_lifecycle
-        )
+        status_after = get_task_governance_status(impl_task_2.id, task_dir=task_dir_lifecycle)
         self.assert_true(
             "T11: Task is no longer blocked after approved review",
             status_after.get("is_blocked") is False,

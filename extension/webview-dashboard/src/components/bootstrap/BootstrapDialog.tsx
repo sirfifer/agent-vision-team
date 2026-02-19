@@ -20,11 +20,18 @@ function ScaleBadge({ profile }: { profile: BootstrapScaleProfile }) {
     <div className="rounded border border-vscode-border bg-vscode-bg px-3 py-2">
       <div className="flex items-center gap-4 text-xs">
         <span className={`font-bold ${tierColor}`}>{profile.tier}</span>
-        <span><span className="text-vscode-muted">Files:</span> {profile.sourceFiles.toLocaleString()}</span>
-        <span><span className="text-vscode-muted">LOC:</span> {profile.sourceLoc.toLocaleString()}</span>
-        <span><span className="text-vscode-muted">~</span>{profile.estimatedTimeMinutes} min</span>
+        <span>
+          <span className="text-vscode-muted">Files:</span> {profile.sourceFiles.toLocaleString()}
+        </span>
+        <span>
+          <span className="text-vscode-muted">LOC:</span> {profile.sourceLoc.toLocaleString()}
+        </span>
+        <span>
+          <span className="text-vscode-muted">~</span>
+          {profile.estimatedTimeMinutes} min
+        </span>
         <span className="text-vscode-muted">
-          {topLangs.map(l => `.${l.extension}`).join(', ')}
+          {topLangs.map((l) => `.${l.extension}`).join(', ')}
         </span>
       </div>
     </div>
@@ -43,11 +50,22 @@ const TOOL_COLORS: Record<string, string> = {
 };
 
 function ToolDot({ tool }: { tool: string }) {
-  return <div className={`w-1.5 h-1.5 rounded-full ${TOOL_COLORS[tool] || 'bg-vscode-muted'} flex-shrink-0`} />;
+  return (
+    <div
+      className={`w-1.5 h-1.5 rounded-full ${TOOL_COLORS[tool] || 'bg-vscode-muted'} flex-shrink-0`}
+    />
+  );
 }
 
 function ProgressView() {
-  const { bootstrapProgress, bootstrapResult, bootstrapReviewItems, bootstrapReviewResult, sendMessage, setShowBootstrap } = useDashboard();
+  const {
+    bootstrapProgress,
+    bootstrapResult,
+    bootstrapReviewItems,
+    bootstrapReviewResult,
+    sendMessage,
+    setShowBootstrap,
+  } = useDashboard();
   const [elapsed, setElapsed] = useState(0);
   const [loadingReview, setLoadingReview] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
@@ -74,15 +92,25 @@ function ProgressView() {
         {bootstrapResult.success ? (
           <>
             <div className="w-12 h-12 mx-auto rounded-full bg-green-500/15 flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-6 h-6 text-green-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
             <div>
               <div className="text-sm font-semibold">Bootstrap Complete</div>
               <div className="text-xs text-vscode-muted mt-1">
-                Discoveries are ready for your review. Approve, edit, or reject each item
-                before it becomes permanent in the Knowledge Graph.
+                Discoveries are ready for your review. Approve, edit, or reject each item before it
+                becomes permanent in the Knowledge Graph.
               </div>
               {bootstrapResult.reportPath && (
                 <div className="mt-2 text-xs font-mono text-blue-400">
@@ -109,8 +137,18 @@ function ProgressView() {
         ) : (
           <>
             <div className="w-12 h-12 mx-auto rounded-full bg-red-500/15 flex items-center justify-center">
-              <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-6 h-6 text-red-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </div>
             <div>
@@ -132,20 +170,40 @@ function ProgressView() {
   }
 
   const activities = bootstrapProgress?.activities || [];
-  const elapsedStr = elapsed >= 60 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : `${elapsed}s`;
+  const elapsedStr =
+    elapsed >= 60 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s` : `${elapsed}s`;
 
   return (
     <div className="px-5 py-4 space-y-3">
       {/* Header: Phase + spinner + elapsed */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <svg className="w-5 h-5 animate-spin text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          <svg
+            className="w-5 h-5 animate-spin text-blue-400 flex-shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
           </svg>
           <div className="min-w-0">
-            <div className="text-sm font-semibold truncate">{bootstrapProgress?.phase || 'Starting...'}</div>
-            <div className="text-xs text-vscode-muted truncate">{bootstrapProgress?.detail || 'Initializing bootstrap agent...'}</div>
+            <div className="text-sm font-semibold truncate">
+              {bootstrapProgress?.phase || 'Starting...'}
+            </div>
+            <div className="text-xs text-vscode-muted truncate">
+              {bootstrapProgress?.detail || 'Initializing bootstrap agent...'}
+            </div>
           </div>
         </div>
         <div className="text-xs text-vscode-muted font-mono flex-shrink-0 ml-3">{elapsedStr}</div>
@@ -153,7 +211,10 @@ function ProgressView() {
 
       {/* Pulsing activity indicator */}
       <div className="w-full h-1 bg-vscode-bg rounded-full overflow-hidden">
-        <div className="h-full bg-blue-500/50 rounded-full animate-[pulse_2s_ease-in-out_infinite]" style={{ width: '100%' }} />
+        <div
+          className="h-full bg-blue-500/50 rounded-full animate-[pulse_2s_ease-in-out_infinite]"
+          style={{ width: '100%' }}
+        />
       </div>
 
       {/* Activity log */}
@@ -183,10 +244,15 @@ function ProgressView() {
 
 export function BootstrapDialog() {
   const {
-    showBootstrap, setShowBootstrap, sendMessage,
-    bootstrapScaleProfile, projectConfig,
-    bootstrapRunning, bootstrapResult,
-    bootstrapReviewItems, bootstrapReviewResult,
+    showBootstrap,
+    setShowBootstrap,
+    sendMessage,
+    bootstrapScaleProfile,
+    projectConfig,
+    bootstrapRunning,
+    bootstrapResult,
+    bootstrapReviewItems,
+    bootstrapReviewResult,
   } = useDashboard();
   const [context, setContext] = useState('');
   const [focusAreas, setFocusAreas] = useState<BootstrapFocusAreas>({
@@ -266,7 +332,7 @@ export function BootstrapDialog() {
   };
 
   const toggleFocus = (key: keyof BootstrapFocusAreas) => {
-    setFocusAreas(prev => ({ ...prev, [key]: !prev[key] }));
+    setFocusAreas((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const defaultContext = projectConfig?.metadata?.name
@@ -277,7 +343,9 @@ export function BootstrapDialog() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className={`bg-vscode-widget-bg border border-vscode-border rounded-xl shadow-2xl w-full ${inReviewMode ? 'max-w-3xl' : 'max-w-xl'}`}>
+      <div
+        className={`bg-vscode-widget-bg border border-vscode-border rounded-xl shadow-2xl w-full ${inReviewMode ? 'max-w-3xl' : 'max-w-xl'}`}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-vscode-border">
           <div>
@@ -295,7 +363,12 @@ export function BootstrapDialog() {
             className="p-1 rounded hover:bg-vscode-bg transition-colors text-vscode-muted hover:text-vscode-fg"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -307,11 +380,12 @@ export function BootstrapDialog() {
             <div className="px-5 py-4 space-y-4">
               {/* Compact "What Happens" - single paragraph */}
               <div className="text-xs text-vscode-muted leading-relaxed p-3 rounded-lg bg-vscode-bg border border-vscode-border">
-                <span className="font-semibold text-vscode-fg">How it works:</span>{' '}
-                AI agents analyze your source code, docs, and config to draft vision standards,
-                architecture docs, a style guide, and project rules. A bootstrap report summarizes
-                all discoveries. <span className="font-semibold text-green-400">Nothing is permanent</span>{' '}
-                until you approve each item.
+                <span className="font-semibold text-vscode-fg">How it works:</span> AI agents
+                analyze your source code, docs, and config to draft vision standards, architecture
+                docs, a style guide, and project rules. A bootstrap report summarizes all
+                discoveries.{' '}
+                <span className="font-semibold text-green-400">Nothing is permanent</span> until you
+                approve each item.
               </div>
 
               {/* Context */}
@@ -333,12 +407,12 @@ export function BootstrapDialog() {
                   Focus Areas
                 </label>
                 <div className="flex flex-wrap gap-1.5">
-                  {([
+                  {[
                     { key: 'visionStandards' as const, label: 'Vision Standards' },
                     { key: 'architectureDocs' as const, label: 'Architecture' },
                     { key: 'conventions' as const, label: 'Conventions' },
                     { key: 'projectRules' as const, label: 'Project Rules' },
-                  ]).map(area => (
+                  ].map((area) => (
                     <button
                       key={area.key}
                       onClick={() => toggleFocus(area.key)}
@@ -348,12 +422,26 @@ export function BootstrapDialog() {
                           : 'border-vscode-border bg-vscode-bg text-vscode-muted'
                       }`}
                     >
-                      <div className={`w-3 h-3 rounded-sm border flex items-center justify-center ${
-                        focusAreas[area.key] ? 'bg-blue-500 border-blue-500' : 'border-vscode-border'
-                      }`}>
+                      <div
+                        className={`w-3 h-3 rounded-sm border flex items-center justify-center ${
+                          focusAreas[area.key]
+                            ? 'bg-blue-500 border-blue-500'
+                            : 'border-vscode-border'
+                        }`}
+                      >
                         {focusAreas[area.key] && (
-                          <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          <svg
+                            className="w-2 h-2 text-white"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={3}
+                              d="M5 13l4 4L19 7"
+                            />
                           </svg>
                         )}
                       </div>
@@ -380,8 +468,19 @@ export function BootstrapDialog() {
                   {checkingScale && (
                     <span className="flex items-center gap-1 text-2xs text-vscode-muted">
                       <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
                       </svg>
                       Analyzing...
                     </span>

@@ -3,7 +3,6 @@
 import subprocess
 from typing import Optional
 
-
 TEST_RUNNERS = {
     "swift": ["xcodebuild", "test"],
     "python": ["pytest", "-v", "--tb=short"],

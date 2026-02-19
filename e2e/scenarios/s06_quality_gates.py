@@ -16,9 +16,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "go
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "quality"))
 
 from collab_governance.models import (
+    Confidence,
     Decision,
     DecisionCategory,
-    Confidence,
     ReviewVerdict,
     Verdict,
 )
@@ -59,55 +59,69 @@ class S06QualityGates(BaseScenario):
         # -- Store 3 decisions with different review verdicts -----------------
 
         # Decision 1: approved
-        d1 = store.store_decision(Decision(
-            task_id="task-s06-1",
-            agent="worker-1",
-            category=DecisionCategory.PATTERN_CHOICE,
-            summary="Use repository pattern for data access",
-            confidence=Confidence.HIGH,
-        ))
-        store.store_review(ReviewVerdict(
-            decision_id=d1.id,
-            verdict=Verdict.APPROVED,
-            standards_verified=["vision-std-1"],
-        ))
+        d1 = store.store_decision(
+            Decision(
+                task_id="task-s06-1",
+                agent="worker-1",
+                category=DecisionCategory.PATTERN_CHOICE,
+                summary="Use repository pattern for data access",
+                confidence=Confidence.HIGH,
+            )
+        )
+        store.store_review(
+            ReviewVerdict(
+                decision_id=d1.id,
+                verdict=Verdict.APPROVED,
+                standards_verified=["vision-std-1"],
+            )
+        )
 
         # Decision 2: blocked
-        d2 = store.store_decision(Decision(
-            task_id="task-s06-2",
-            agent="worker-2",
-            category=DecisionCategory.COMPONENT_DESIGN,
-            summary="Use singleton for config manager",
-            confidence=Confidence.MEDIUM,
-        ))
-        store.store_review(ReviewVerdict(
-            decision_id=d2.id,
-            verdict=Verdict.BLOCKED,
-            guidance="Singletons violate vision standard: no singletons in production code",
-        ))
+        d2 = store.store_decision(
+            Decision(
+                task_id="task-s06-2",
+                agent="worker-2",
+                category=DecisionCategory.COMPONENT_DESIGN,
+                summary="Use singleton for config manager",
+                confidence=Confidence.MEDIUM,
+            )
+        )
+        store.store_review(
+            ReviewVerdict(
+                decision_id=d2.id,
+                verdict=Verdict.BLOCKED,
+                guidance="Singletons violate vision standard: no singletons in production code",
+            )
+        )
 
         # Decision 3: needs_human_review
-        d3 = store.store_decision(Decision(
-            task_id="task-s06-3",
-            agent="worker-3",
-            category=DecisionCategory.DEVIATION,
-            summary="Deviate from event-driven to synchronous RPC",
-            confidence=Confidence.LOW,
-        ))
-        store.store_review(ReviewVerdict(
-            decision_id=d3.id,
-            verdict=Verdict.NEEDS_HUMAN_REVIEW,
-            guidance="Deviation requires human assessment of trade-offs",
-        ))
+        d3 = store.store_decision(
+            Decision(
+                task_id="task-s06-3",
+                agent="worker-3",
+                category=DecisionCategory.DEVIATION,
+                summary="Deviate from event-driven to synchronous RPC",
+                confidence=Confidence.LOW,
+            )
+        )
+        store.store_review(
+            ReviewVerdict(
+                decision_id=d3.id,
+                verdict=Verdict.NEEDS_HUMAN_REVIEW,
+                guidance="Deviation requires human assessment of trade-offs",
+            )
+        )
 
         # Decision 4: no review yet (pending)
-        store.store_decision(Decision(
-            task_id="task-s06-4",
-            agent="worker-1",
-            category=DecisionCategory.API_DESIGN,
-            summary="Add pagination to list endpoints",
-            confidence=Confidence.HIGH,
-        ))
+        store.store_decision(
+            Decision(
+                task_id="task-s06-4",
+                agent="worker-1",
+                category=DecisionCategory.API_DESIGN,
+                summary="Add pagination to list endpoints",
+                confidence=Confidence.HIGH,
+            )
+        )
 
         # -- Verify status counts -------------------------------------------
         status = store.get_status()

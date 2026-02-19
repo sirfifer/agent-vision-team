@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import re
 from pathlib import Path
 
 from ..config import config
@@ -69,12 +67,14 @@ class FileService:
             if f.suffix == ".md":
                 name = f.stem
                 role = name  # role matches filename by convention
-                agents.append({
-                    "id": name,
-                    "name": name.replace("-", " ").title(),
-                    "role": role,
-                    "status": "idle",
-                })
+                agents.append(
+                    {
+                        "id": name,
+                        "name": name.replace("-", " ").title(),
+                        "role": role,
+                        "status": "idle",
+                    }
+                )
         return agents
 
     def read_hook_governance_status(self) -> dict | None:
@@ -86,6 +86,7 @@ class FileService:
         # Use sqlite3 to query the hook interception table
         try:
             import sqlite3
+
             conn = sqlite3.connect(str(db_path))
             cursor = conn.cursor()
 

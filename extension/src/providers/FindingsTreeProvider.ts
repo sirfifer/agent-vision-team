@@ -8,17 +8,30 @@ const TIER_ICONS: Record<Tier, string> = {
   quality: 'info',
 };
 
-export class FindingsTreeProvider implements vscode.TreeDataProvider<FindingTreeItem | TierGroupItem> {
-  private _onDidChangeTreeData = new vscode.EventEmitter<FindingTreeItem | TierGroupItem | undefined>();
+export class FindingsTreeProvider implements vscode.TreeDataProvider<
+  FindingTreeItem | TierGroupItem
+> {
+  private _onDidChangeTreeData = new vscode.EventEmitter<
+    FindingTreeItem | TierGroupItem | undefined
+  >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private findings: Finding[] = [];
   private diagnosticCollections: Map<Tier, vscode.DiagnosticCollection> = new Map();
 
   constructor() {
-    this.diagnosticCollections.set('vision', vscode.languages.createDiagnosticCollection('collab-vision'));
-    this.diagnosticCollections.set('architecture', vscode.languages.createDiagnosticCollection('collab-architecture'));
-    this.diagnosticCollections.set('quality', vscode.languages.createDiagnosticCollection('collab-quality'));
+    this.diagnosticCollections.set(
+      'vision',
+      vscode.languages.createDiagnosticCollection('collab-vision'),
+    );
+    this.diagnosticCollections.set(
+      'architecture',
+      vscode.languages.createDiagnosticCollection('collab-architecture'),
+    );
+    this.diagnosticCollections.set(
+      'quality',
+      vscode.languages.createDiagnosticCollection('collab-quality'),
+    );
   }
 
   refresh(): void {
@@ -37,36 +50,34 @@ export class FindingsTreeProvider implements vscode.TreeDataProvider<FindingTree
 
   getChildren(element?: FindingTreeItem | TierGroupItem): (FindingTreeItem | TierGroupItem)[] {
     if (!element) {
-      return TIER_ORDER
-        .map(tier => {
-          const count = this.findings.filter(f => f.tier === tier).length;
-          return new TierGroupItem(tier, count);
-        })
-        .filter(group => group.count > 0);
+      return TIER_ORDER.map((tier) => {
+        const count = this.findings.filter((f) => f.tier === tier).length;
+        return new TierGroupItem(tier, count);
+      }).filter((group) => group.count > 0);
     }
 
     if (element instanceof TierGroupItem) {
       return this.findings
-        .filter(f => f.tier === element.tier)
-        .map(f => new FindingTreeItem(f));
+        .filter((f) => f.tier === element.tier)
+        .map((f) => new FindingTreeItem(f));
     }
 
     return [];
   }
 
   dispose(): void {
-    this.diagnosticCollections.forEach(dc => dc.dispose());
+    this.diagnosticCollections.forEach((dc) => dc.dispose());
   }
 }
 
 export class TierGroupItem extends vscode.TreeItem {
   constructor(
     public readonly tier: Tier,
-    public readonly count: number
+    public readonly count: number,
   ) {
     super(
       `${tier.charAt(0).toUpperCase() + tier.slice(1)} (${count})`,
-      vscode.TreeItemCollapsibleState.Expanded
+      vscode.TreeItemCollapsibleState.Expanded,
     );
     this.iconPath = new vscode.ThemeIcon(TIER_ICONS[tier]);
     this.contextValue = 'tierGroup';
@@ -80,9 +91,9 @@ export class FindingTreeItem extends vscode.TreeItem {
     this.description = finding.payload.component;
     this.tooltip = new vscode.MarkdownString(
       `**${finding.severity}** — ${finding.payload.component}\n\n` +
-      `${finding.payload.finding}\n\n` +
-      `**Rationale:** ${finding.payload.rationale}\n\n` +
-      (finding.payload.suggestion ? `**Suggestion:** ${finding.payload.suggestion}` : '')
+        `${finding.payload.finding}\n\n` +
+        `**Rationale:** ${finding.payload.rationale}\n\n` +
+        (finding.payload.suggestion ? `**Suggestion:** ${finding.payload.suggestion}` : ''),
     );
     this.contextValue = 'finding';
     this.iconPath = new vscode.ThemeIcon(TIER_ICONS[finding.tier]);

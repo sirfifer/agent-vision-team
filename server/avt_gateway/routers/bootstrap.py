@@ -7,8 +7,8 @@ import subprocess
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..auth import require_auth
 from ..app_state import ProjectState
+from ..auth import require_auth
 from ..deps import get_project_state
 
 router = APIRouter(tags=["bootstrap"], dependencies=[Depends(require_auth)])

@@ -4,17 +4,21 @@ import tempfile
 from pathlib import Path
 
 from collab_kg.graph import KnowledgeGraph
-from collab_kg.tier_protection import get_entity_tier, validate_write_access, ProtectionTier
+from collab_kg.tier_protection import ProtectionTier, get_entity_tier, validate_write_access
 
 
 def test_create_entity():
     with tempfile.TemporaryDirectory() as tmpdir:
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
-        created = graph.create_entities([{
-            "name": "TestComponent",
-            "entityType": "component",
-            "observations": ["protection_tier: architecture", "Uses DI pattern"],
-        }])
+        created = graph.create_entities(
+            [
+                {
+                    "name": "TestComponent",
+                    "entityType": "component",
+                    "observations": ["protection_tier: architecture", "Uses DI pattern"],
+                }
+            ]
+        )
         assert created == 1
 
         entity = graph.get_entity("TestComponent")
@@ -26,13 +30,17 @@ def test_create_entity():
 def test_create_relations():
     with tempfile.TemporaryDirectory() as tmpdir:
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
-        graph.create_entities([
-            {"name": "A", "entityType": "component", "observations": []},
-            {"name": "B", "entityType": "pattern", "observations": []},
-        ])
-        created = graph.create_relations([
-            {"from": "A", "to": "B", "relationType": "follows_pattern"},
-        ])
+        graph.create_entities(
+            [
+                {"name": "A", "entityType": "component", "observations": []},
+                {"name": "B", "entityType": "pattern", "observations": []},
+            ]
+        )
+        created = graph.create_relations(
+            [
+                {"from": "A", "to": "B", "relationType": "follows_pattern"},
+            ]
+        )
         assert created == 1
 
         entity = graph.get_entity("A")
@@ -43,24 +51,24 @@ def test_create_relations():
 def test_tier_protection_vision():
     with tempfile.TemporaryDirectory() as tmpdir:
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
-        graph.create_entities([{
-            "name": "VisionStandard",
-            "entityType": "vision_standard",
-            "observations": ["protection_tier: vision", "mutability: human_only"],
-        }])
+        graph.create_entities(
+            [
+                {
+                    "name": "VisionStandard",
+                    "entityType": "vision_standard",
+                    "observations": ["protection_tier: vision", "mutability: human_only"],
+                }
+            ]
+        )
 
         # Agent cannot write to vision-tier entity
-        added, error = graph.add_observations(
-            "VisionStandard", ["new observation"], caller_role="worker"
-        )
+        added, error = graph.add_observations("VisionStandard", ["new observation"], caller_role="worker")
         assert added == 0
         assert error is not None
         assert "immutable" in error.lower()
 
         # Human can write to vision-tier entity
-        added, error = graph.add_observations(
-            "VisionStandard", ["human observation"], caller_role="human"
-        )
+        added, error = graph.add_observations("VisionStandard", ["human observation"], caller_role="human")
         assert added == 1
         assert error is None
 
@@ -68,16 +76,18 @@ def test_tier_protection_vision():
 def test_tier_protection_architecture():
     with tempfile.TemporaryDirectory() as tmpdir:
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
-        graph.create_entities([{
-            "name": "ArchComponent",
-            "entityType": "component",
-            "observations": ["protection_tier: architecture"],
-        }])
+        graph.create_entities(
+            [
+                {
+                    "name": "ArchComponent",
+                    "entityType": "component",
+                    "observations": ["protection_tier: architecture"],
+                }
+            ]
+        )
 
         # Agent without approval cannot write
-        added, error = graph.add_observations(
-            "ArchComponent", ["new obs"], caller_role="worker"
-        )
+        added, error = graph.add_observations("ArchComponent", ["new obs"], caller_role="worker")
         assert added == 0
 
         # Agent with approval can write
@@ -90,10 +100,12 @@ def test_tier_protection_architecture():
 def test_search_nodes():
     with tempfile.TemporaryDirectory() as tmpdir:
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
-        graph.create_entities([
-            {"name": "KBOralSessionView", "entityType": "component", "observations": ["Uses DI"]},
-            {"name": "ServiceRegistry", "entityType": "pattern", "observations": ["Core pattern"]},
-        ])
+        graph.create_entities(
+            [
+                {"name": "KBOralSessionView", "entityType": "component", "observations": ["Uses DI"]},
+                {"name": "ServiceRegistry", "entityType": "pattern", "observations": ["Core pattern"]},
+            ]
+        )
 
         results = graph.search_nodes("Oral")
         assert len(results) == 1
@@ -103,11 +115,13 @@ def test_search_nodes():
 def test_get_entities_by_tier():
     with tempfile.TemporaryDirectory() as tmpdir:
         graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
-        graph.create_entities([
-            {"name": "V1", "entityType": "vision_standard", "observations": ["protection_tier: vision"]},
-            {"name": "A1", "entityType": "component", "observations": ["protection_tier: architecture"]},
-            {"name": "Q1", "entityType": "problem", "observations": ["protection_tier: quality"]},
-        ])
+        graph.create_entities(
+            [
+                {"name": "V1", "entityType": "vision_standard", "observations": ["protection_tier: vision"]},
+                {"name": "A1", "entityType": "component", "observations": ["protection_tier: architecture"]},
+                {"name": "Q1", "entityType": "problem", "observations": ["protection_tier: quality"]},
+            ]
+        )
 
         vision = graph.get_entities_by_tier("vision")
         assert len(vision) == 1

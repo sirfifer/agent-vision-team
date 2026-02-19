@@ -12,7 +12,7 @@ Vision templates always include the five canonical archetypes:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TypeAlias
 
 # ---------------------------------------------------------------------------
@@ -61,8 +61,7 @@ DOMAIN_POOL: tuple[DomainTemplate, ...] = (
         vision_templates=(
             "All {domain} services MUST use protocol-based dependency injection; "
             "no concrete initializers outside composition roots",
-            "No singletons in production {domain} code; "
-            "test doubles for {component} are acceptable",
+            "No singletons in production {domain} code; test doubles for {component} are acceptable",
             "Every public API endpoint in {domain} MUST have at least one "
             "integration test exercising the happy path and one error path",
             "All adoption records MUST be authorized through the shelter's "
@@ -71,8 +70,7 @@ DOMAIN_POOL: tuple[DomainTemplate, ...] = (
             "thrown exceptions are forbidden outside infrastructure adapters",
         ),
         architecture_templates=(
-            "{component} uses the ServiceRegistry pattern to resolve "
-            "all {domain} dependencies at startup",
+            "{component} uses the ServiceRegistry pattern to resolve all {domain} dependencies at startup",
             "Inter-service communication in {domain} uses async event "
             "channels; no direct service-to-service calls in the hot path",
         ),
@@ -87,8 +85,7 @@ DOMAIN_POOL: tuple[DomainTemplate, ...] = (
         vision_templates=(
             "All {domain} services MUST accept dependencies via protocol "
             "conformance; constructor injection is the only allowed form",
-            "No singleton instances in production {domain} modules; "
-            "{component} test mocks are the sole exception",
+            "No singleton instances in production {domain} modules; {component} test mocks are the sole exception",
             "Every public API in the {domain} MUST have integration tests "
             "covering reservation creation, modification, and cancellation",
             "Guest personal data MUST be filtered through the authorization "
@@ -97,12 +94,9 @@ DOMAIN_POOL: tuple[DomainTemplate, ...] = (
             "exceptions are restricted to infrastructure boundaries",
         ),
         architecture_templates=(
-            "{component} registers all {domain} dependencies in a "
-            "centralized ServiceRegistry resolved once at boot",
-            "{domain} components communicate via a command bus; "
-            "synchronous cross-service calls are prohibited",
-            "Table availability in {domain} is computed through a "
-            "read-model projection updated by domain events",
+            "{component} registers all {domain} dependencies in a centralized ServiceRegistry resolved once at boot",
+            "{domain} components communicate via a command bus; synchronous cross-service calls are prohibited",
+            "Table availability in {domain} is computed through a read-model projection updated by domain events",
         ),
     ),
     # ------------------------------------------------------------------
@@ -119,8 +113,7 @@ DOMAIN_POOL: tuple[DomainTemplate, ...] = (
             "in-memory fakes for {component} are permitted in tests only",
             "Every public endpoint exposed by {domain} MUST be covered by "
             "integration tests validating input, output, and auth",
-            "Health data access in {domain} MUST pass through the "
-            "authorization middleware before reaching {component}",
+            "Health data access in {domain} MUST pass through the authorization middleware before reaching {component}",
             "{domain} MUST use Result types for all fallible operations; "
             "throwing exceptions is forbidden outside IO adapters",
         ),
@@ -141,20 +134,17 @@ DOMAIN_POOL: tuple[DomainTemplate, ...] = (
         vision_templates=(
             "All {domain} services MUST use protocol-based dependency "
             "injection; {component} MUST NOT instantiate its own dependencies",
-            "No singletons in production {domain} code; "
-            "stub implementations of {component} are allowed in test suites",
+            "No singletons in production {domain} code; stub implementations of {component} are allowed in test suites",
             "Every public API in {domain} MUST have integration tests "
             "covering enrollment, assessment submission, and grading paths",
-            "Student records in {domain} MUST be gated by role-based "
-            "authorization before {component} exposes any data",
+            "Student records in {domain} MUST be gated by role-based authorization before {component} exposes any data",
             "{domain} error handling MUST use typed Result values; "
             "exceptions are only permitted at the HTTP adapter boundary",
         ),
         architecture_templates=(
             "{component} is resolved through the {domain} ServiceRegistry; "
             "manual construction outside tests is a build error",
-            "Cross-module communication in {domain} uses domain events "
-            "dispatched through an in-process event bus",
+            "Cross-module communication in {domain} uses domain events dispatched through an in-process event bus",
             "{domain} read models for dashboards are maintained as "
             "projections from the event stream, never queried directly",
         ),
@@ -179,8 +169,7 @@ DOMAIN_POOL: tuple[DomainTemplate, ...] = (
             "thrown exceptions are confined to hardware driver adapters",
         ),
         architecture_templates=(
-            "The {domain} ServiceRegistry manages the full lifecycle of "
-            "{component} and all peer services at startup",
+            "The {domain} ServiceRegistry manages the full lifecycle of {component} and all peer services at startup",
             "Device state changes in {domain} are broadcast via an "
             "observable event stream; {component} reacts without polling",
         ),
@@ -221,8 +210,7 @@ DOMAIN_POOL: tuple[DomainTemplate, ...] = (
         vision_templates=(
             "All {domain} services MUST depend on protocols, not "
             "implementations; {component} uses constructor injection only",
-            "Singletons are banned in production {domain} code; "
-            "mock {component} instances are allowed in tests",
+            "Singletons are banned in production {domain} code; mock {component} instances are allowed in tests",
             "Every public API in {domain} MUST have integration tests "
             "for ticket purchase, refund, and capacity enforcement",
             "Payment and PII data in {domain} MUST be authorized via "
@@ -247,8 +235,7 @@ DOMAIN_POOL: tuple[DomainTemplate, ...] = (
         vision_templates=(
             "All {domain} services MUST accept dependencies via protocol "
             "types; {component} MUST NOT create its own collaborators",
-            "No singletons in production {domain} code; "
-            "test-only doubles of {component} are acceptable",
+            "No singletons in production {domain} code; test-only doubles of {component} are acceptable",
             "Every public API in {domain} MUST have integration tests "
             "covering vehicle tracking, route planning, and maintenance ops",
             "GPS and driver data in {domain} MUST be authorized through "
@@ -261,8 +248,7 @@ DOMAIN_POOL: tuple[DomainTemplate, ...] = (
             "all services are fully resolved before the first request",
             "Real-time telemetry in {domain} flows through an event "
             "stream; {component} processes events without direct coupling",
-            "Route computations in {domain} are offloaded to a background "
-            "worker pool coordinated by {component}",
+            "Route computations in {domain} are offloaded to a background worker pool coordinated by {component}",
         ),
     ),
 )

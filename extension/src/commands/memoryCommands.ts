@@ -4,7 +4,7 @@ import { logMemory } from '../utils/logger';
 
 export function registerMemoryCommands(
   context: vscode.ExtensionContext,
-  kgClient: KnowledgeGraphClient
+  kgClient: KnowledgeGraphClient,
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('collab.searchMemory', async () => {
@@ -20,10 +20,12 @@ export function registerMemoryCommands(
         const results = await kgClient.searchNodes(query);
         logMemory(`Search for '${query}' returned ${results.length} results`);
         // TODO: Display results in Memory Browser or quick pick
-        vscode.window.showInformationMessage(`Found ${results.length} entities matching '${query}'.`);
+        vscode.window.showInformationMessage(
+          `Found ${results.length} entities matching '${query}'.`,
+        );
       } catch (error) {
         vscode.window.showErrorMessage(`Memory search failed: ${error}`);
       }
-    })
+    }),
   );
 }

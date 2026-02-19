@@ -9,7 +9,10 @@ class McpSseConnection {
   private baseUrl: string;
   private messagesUrl: string | null = null;
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-  private pendingRequests: Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }> = new Map();
+  private pendingRequests: Map<
+    number,
+    { resolve: (v: unknown) => void; reject: (e: Error) => void }
+  > = new Map();
   private nextId = 1;
   private initialized = false;
   private sseController: AbortController | null = null;
@@ -118,7 +121,11 @@ class McpSseConnection {
     read();
   }
 
-  private handleResponse(data: { id?: number; result?: unknown; error?: { message: string } }): void {
+  private handleResponse(data: {
+    id?: number;
+    result?: unknown;
+    error?: { message: string };
+  }): void {
     if (data.id !== undefined && this.pendingRequests.has(data.id)) {
       const pending = this.pendingRequests.get(data.id)!;
       this.pendingRequests.delete(data.id);
@@ -168,8 +175,14 @@ class McpSseConnection {
       }, 10000);
 
       this.pendingRequests.set(id, {
-        resolve: (v) => { clearTimeout(timeout); resolve(v); },
-        reject: (e) => { clearTimeout(timeout); reject(e); },
+        resolve: (v) => {
+          clearTimeout(timeout);
+          resolve(v);
+        },
+        reject: (e) => {
+          clearTimeout(timeout);
+          reject(e);
+        },
       });
 
       // POST the request
@@ -182,17 +195,19 @@ class McpSseConnection {
           method,
           params,
         }),
-      }).then(r => {
-        if (r.status !== 202 && r.status !== 200) {
+      })
+        .then((r) => {
+          if (r.status !== 202 && r.status !== 200) {
+            this.pendingRequests.delete(id);
+            clearTimeout(timeout);
+            reject(new Error(`POST failed with status ${r.status}`));
+          }
+        })
+        .catch((err) => {
           this.pendingRequests.delete(id);
           clearTimeout(timeout);
-          reject(new Error(`POST failed with status ${r.status}`));
-        }
-      }).catch(err => {
-        this.pendingRequests.delete(id);
-        clearTimeout(timeout);
-        reject(err);
-      });
+          reject(err);
+        });
     });
   }
 
@@ -201,7 +216,7 @@ class McpSseConnection {
       throw new Error('Connection not initialized');
     }
 
-    const result = await this.sendRequest('tools/call', { name, arguments: args }) as {
+    const result = (await this.sendRequest('tools/call', { name, arguments: args })) as {
       content?: Array<{ type: string; text?: string }>;
       structuredContent?: unknown;
     };
@@ -218,7 +233,7 @@ class McpSseConnection {
 
     // Fall back to parsing text content
     if (result.content) {
-      const textContent = result.content.find(c => c.type === 'text');
+      const textContent = result.content.find((c) => c.type === 'text');
       if (textContent?.text) {
         try {
           return JSON.parse(textContent.text);
@@ -253,9 +268,27 @@ export class McpClientService {
     logSystem('Connecting to MCP servers...');
 
     const servers: { name: string; url: string; connect: (conn: McpSseConnection) => void }[] = [
-      { name: 'Knowledge Graph', url: this.kgUrl, connect: (c) => { this.kgConnection = c; } },
-      { name: 'Quality', url: this.qualityUrl, connect: (c) => { this.qualityConnection = c; } },
-      { name: 'Governance', url: this.governanceUrl, connect: (c) => { this.governanceConnection = c; } },
+      {
+        name: 'Knowledge Graph',
+        url: this.kgUrl,
+        connect: (c) => {
+          this.kgConnection = c;
+        },
+      },
+      {
+        name: 'Quality',
+        url: this.qualityUrl,
+        connect: (c) => {
+          this.qualityConnection = c;
+        },
+      },
+      {
+        name: 'Governance',
+        url: this.governanceUrl,
+        connect: (c) => {
+          this.governanceConnection = c;
+        },
+      },
     ];
 
     const failed: string[] = [];
@@ -273,7 +306,9 @@ export class McpClientService {
 
     if (failed.length === servers.length) {
       this.disconnect();
-      throw new Error(`No MCP servers available. Failed: ${failed.join(', ')}. Start servers first.`);
+      throw new Error(
+        `No MCP servers available. Failed: ${failed.join(', ')}. Start servers first.`,
+      );
     }
 
     if (failed.length > 0) {
@@ -312,7 +347,11 @@ export class McpClientService {
     return this.governanceUrl;
   }
 
-  async callTool(server: 'knowledge-graph' | 'quality' | 'governance', tool: string, args: Record<string, unknown>): Promise<unknown> {
+  async callTool(
+    server: 'knowledge-graph' | 'quality' | 'governance',
+    tool: string,
+    args: Record<string, unknown>,
+  ): Promise<unknown> {
     const connectionMap: Record<string, McpSseConnection | null> = {
       'knowledge-graph': this.kgConnection,
       quality: this.qualityConnection,

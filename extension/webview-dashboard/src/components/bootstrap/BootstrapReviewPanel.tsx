@@ -19,7 +19,8 @@ const TIER_COLORS: Record<TierTab, string> = {
 };
 
 export function BootstrapReviewPanel() {
-  const { bootstrapReviewItems, bootstrapReviewResult, sendMessage, setShowBootstrap } = useDashboard();
+  const { bootstrapReviewItems, bootstrapReviewResult, sendMessage, setShowBootstrap } =
+    useDashboard();
   const [items, setItems] = useState<BootstrapReviewItem[]>(bootstrapReviewItems || []);
   const [activeTab, setActiveTab] = useState<TierTab>('vision');
   const [finalizing, setFinalizing] = useState(false);
@@ -60,7 +61,7 @@ export function BootstrapReviewPanel() {
   }, [items]);
 
   const updateItem = (id: string, updates: Partial<BootstrapReviewItem>) => {
-    setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
   };
 
   const handleApprove = (id: string) => {
@@ -76,23 +77,27 @@ export function BootstrapReviewPanel() {
   };
 
   const handleApproveAll = () => {
-    setItems(prev => prev.map(item =>
-      item.tier === activeTab && item.status === 'pending'
-        ? { ...item, status: 'approved' as const }
-        : item
-    ));
+    setItems((prev) =>
+      prev.map((item) =>
+        item.tier === activeTab && item.status === 'pending'
+          ? { ...item, status: 'approved' as const }
+          : item,
+      ),
+    );
   };
 
   const handleRejectAll = () => {
-    setItems(prev => prev.map(item =>
-      item.tier === activeTab && item.status === 'pending'
-        ? { ...item, status: 'rejected' as const }
-        : item
-    ));
+    setItems((prev) =>
+      prev.map((item) =>
+        item.tier === activeTab && item.status === 'pending'
+          ? { ...item, status: 'rejected' as const }
+          : item,
+      ),
+    );
   };
 
   const handleAddItem = (item: BootstrapReviewItem) => {
-    setItems(prev => [...prev, item]);
+    setItems((prev) => [...prev, item]);
     setIsAddingItem(false);
   };
 
@@ -108,19 +113,44 @@ export function BootstrapReviewPanel() {
         {bootstrapReviewResult.success ? (
           <>
             <div className="w-12 h-12 mx-auto rounded-full bg-green-500/15 flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-6 h-6 text-green-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
             <div>
               <div className="text-sm font-semibold">Review Finalized</div>
               <div className="text-xs text-vscode-muted mt-2 space-y-1">
-                <div><span className="text-green-400 font-medium">{bootstrapReviewResult.approved}</span> approved</div>
+                <div>
+                  <span className="text-green-400 font-medium">
+                    {bootstrapReviewResult.approved}
+                  </span>{' '}
+                  approved
+                </div>
                 {bootstrapReviewResult.edited > 0 && (
-                  <div><span className="text-blue-400 font-medium">{bootstrapReviewResult.edited}</span> edited</div>
+                  <div>
+                    <span className="text-blue-400 font-medium">
+                      {bootstrapReviewResult.edited}
+                    </span>{' '}
+                    edited
+                  </div>
                 )}
                 {bootstrapReviewResult.rejected > 0 && (
-                  <div><span className="text-red-400 font-medium">{bootstrapReviewResult.rejected}</span> removed from Knowledge Graph</div>
+                  <div>
+                    <span className="text-red-400 font-medium">
+                      {bootstrapReviewResult.rejected}
+                    </span>{' '}
+                    removed from Knowledge Graph
+                  </div>
                 )}
               </div>
             </div>
@@ -128,8 +158,18 @@ export function BootstrapReviewPanel() {
         ) : (
           <>
             <div className="w-12 h-12 mx-auto rounded-full bg-red-500/15 flex items-center justify-center">
-              <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-6 h-6 text-red-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </div>
             <div>
@@ -153,7 +193,7 @@ export function BootstrapReviewPanel() {
   }
 
   const currentItems = grouped[activeTab];
-  const currentPending = currentItems.filter(i => i.status === 'pending').length;
+  const currentPending = currentItems.filter((i) => i.status === 'pending').length;
   const totalActionable = stats.approved + stats.edited + stats.rejected;
 
   return (
@@ -161,26 +201,29 @@ export function BootstrapReviewPanel() {
       {/* Header */}
       <div className="px-5 py-3 border-b border-vscode-border">
         <div className="text-xs text-vscode-muted mb-2">
-          Review each discovery before it becomes permanent in the Knowledge Graph.
-          You can also add items manually.
+          Review each discovery before it becomes permanent in the Knowledge Graph. You can also add
+          items manually.
         </div>
 
         {/* Tab bar - always show all three tiers */}
         <div className="flex items-center gap-1">
-          {(Object.keys(TIER_LABELS) as TierTab[]).map(tier => {
+          {(Object.keys(TIER_LABELS) as TierTab[]).map((tier) => {
             const count = grouped[tier].length;
             const isActive = activeTab === tier;
             return (
               <button
                 key={tier}
-                onClick={() => { setActiveTab(tier); setIsAddingItem(false); }}
+                onClick={() => {
+                  setActiveTab(tier);
+                  setIsAddingItem(false);
+                }}
                 className={`px-3 py-1.5 text-xs rounded-t transition-colors ${
                   isActive
                     ? 'bg-vscode-bg border border-vscode-border border-b-transparent font-semibold text-vscode-fg -mb-px'
                     : 'text-vscode-muted hover:text-vscode-fg'
                 }`}
               >
-                <span className={isActive ? (TIER_COLORS[tier] || '') : ''}>{TIER_LABELS[tier]}</span>
+                <span className={isActive ? TIER_COLORS[tier] || '' : ''}>{TIER_LABELS[tier]}</span>
                 <span className="ml-1.5 text-2xs opacity-70">({count})</span>
               </button>
             );
@@ -254,7 +297,7 @@ export function BootstrapReviewPanel() {
             </button>
           </div>
         ) : (
-          currentItems.map(item => (
+          currentItems.map((item) => (
             <ReviewItemCard
               key={item.id}
               item={item}
@@ -282,9 +325,11 @@ export function BootstrapReviewPanel() {
             </span>
           )}
           <button
-            onClick={stats.total === 0 && totalActionable === 0
-              ? () => setShowBootstrap(false)
-              : handleFinalize}
+            onClick={
+              stats.total === 0 && totalActionable === 0
+                ? () => setShowBootstrap(false)
+                : handleFinalize
+            }
             disabled={finalizing}
             className="px-4 py-1.5 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >

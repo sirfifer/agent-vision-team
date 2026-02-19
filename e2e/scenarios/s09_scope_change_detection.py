@@ -15,9 +15,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "go
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "quality"))
 
 from collab_governance.models import (
+    Confidence,
     Decision,
     DecisionCategory,
-    Confidence,
     ReviewVerdict,
     Verdict,
 )

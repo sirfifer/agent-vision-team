@@ -7,9 +7,9 @@ from typing import Optional
 
 from .models import (
     Alternative,
+    Confidence,
     Decision,
     DecisionCategory,
-    Confidence,
     Finding,
     GovernedTaskRecord,
     HolisticReviewRecord,
@@ -20,7 +20,6 @@ from .models import (
     UsageRecord,
     Verdict,
 )
-
 
 DEFAULT_DB_PATH = Path(".avt/governance.db")
 
@@ -321,15 +320,11 @@ class GovernanceStore:
     def get_status(self) -> dict:
         conn = self._get_conn()
         total = conn.execute("SELECT COUNT(*) as c FROM decisions").fetchone()["c"]
-        approved = conn.execute(
-            "SELECT COUNT(*) as c FROM reviews WHERE verdict = 'approved'"
-        ).fetchone()["c"]
-        blocked = conn.execute(
-            "SELECT COUNT(*) as c FROM reviews WHERE verdict = 'blocked'"
-        ).fetchone()["c"]
-        needs_human = conn.execute(
-            "SELECT COUNT(*) as c FROM reviews WHERE verdict = 'needs_human_review'"
-        ).fetchone()["c"]
+        approved = conn.execute("SELECT COUNT(*) as c FROM reviews WHERE verdict = 'approved'").fetchone()["c"]
+        blocked = conn.execute("SELECT COUNT(*) as c FROM reviews WHERE verdict = 'blocked'").fetchone()["c"]
+        needs_human = conn.execute("SELECT COUNT(*) as c FROM reviews WHERE verdict = 'needs_human_review'").fetchone()[
+            "c"
+        ]
 
         recent = conn.execute(
             """SELECT d.summary, d.agent, d.category, r.verdict
@@ -593,48 +588,50 @@ class GovernanceStore:
             review_list = []
             for r in reviews:
                 findings_raw = json.loads(r["findings"] or "[]")
-                review_list.append({
-                    "id": r["id"],
-                    "review_task_id": r["review_task_id"],
-                    "review_type": r["review_type"],
-                    "status": r["status"],
-                    "verdict": r["verdict"],
-                    "guidance": r["guidance"] or "",
-                    "findings": findings_raw,
-                    "created_at": r["created_at"],
-                    "completed_at": r["completed_at"],
-                })
-            result.append({
-                "id": row["id"],
-                "implementation_task_id": impl_id,
-                "subject": row["subject"],
-                "description": row["description"] or "",
-                "current_status": row["current_status"],
-                "created_at": row["created_at"],
-                "released_at": row["released_at"],
-                "reviews": review_list,
-            })
+                review_list.append(
+                    {
+                        "id": r["id"],
+                        "review_task_id": r["review_task_id"],
+                        "review_type": r["review_type"],
+                        "status": r["status"],
+                        "verdict": r["verdict"],
+                        "guidance": r["guidance"] or "",
+                        "findings": findings_raw,
+                        "created_at": r["created_at"],
+                        "completed_at": r["completed_at"],
+                    }
+                )
+            result.append(
+                {
+                    "id": row["id"],
+                    "implementation_task_id": impl_id,
+                    "subject": row["subject"],
+                    "description": row["description"] or "",
+                    "current_status": row["current_status"],
+                    "created_at": row["created_at"],
+                    "released_at": row["released_at"],
+                    "reviews": review_list,
+                }
+            )
         return result
 
     def get_task_governance_stats(self) -> dict:
         """Get statistics about task governance."""
         conn = self._get_conn()
-        total_tasks = conn.execute(
-            "SELECT COUNT(*) as c FROM governed_tasks"
-        ).fetchone()["c"]
+        total_tasks = conn.execute("SELECT COUNT(*) as c FROM governed_tasks").fetchone()["c"]
         pending = conn.execute(
             "SELECT COUNT(*) as c FROM governed_tasks WHERE current_status = 'pending_review'"
         ).fetchone()["c"]
         approved = conn.execute(
             "SELECT COUNT(*) as c FROM governed_tasks WHERE current_status = 'approved'"
         ).fetchone()["c"]
-        blocked = conn.execute(
-            "SELECT COUNT(*) as c FROM governed_tasks WHERE current_status = 'blocked'"
-        ).fetchone()["c"]
+        blocked = conn.execute("SELECT COUNT(*) as c FROM governed_tasks WHERE current_status = 'blocked'").fetchone()[
+            "c"
+        ]
 
-        pending_reviews = conn.execute(
-            "SELECT COUNT(*) as c FROM task_reviews WHERE status = 'pending'"
-        ).fetchone()["c"]
+        pending_reviews = conn.execute("SELECT COUNT(*) as c FROM task_reviews WHERE status = 'pending'").fetchone()[
+            "c"
+        ]
 
         return {
             "total_governed_tasks": total_tasks,
@@ -904,9 +901,7 @@ class GovernanceStore:
             for r in rows
         ]
 
-    def _usage_period_filter(
-        self, period: str, session_id: Optional[str] = None
-    ) -> tuple[str, list]:
+    def _usage_period_filter(self, period: str, session_id: Optional[str] = None) -> tuple[str, list]:
         """Build WHERE clause for usage queries based on period."""
         if period == "session" and session_id:
             return "session_id = ?", [session_id]

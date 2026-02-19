@@ -16,10 +16,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "go
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "quality"))
 
 from collab_governance.task_integration import (
-    create_governed_task_pair,
     add_additional_review,
-    release_task,
+    create_governed_task_pair,
     get_task_governance_status,
+    release_task,
 )
 
 from .base import BaseScenario, ScenarioResult

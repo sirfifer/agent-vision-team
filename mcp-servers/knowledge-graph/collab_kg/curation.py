@@ -6,6 +6,7 @@ by the librarian agent.
 """
 
 from collections import Counter
+
 from .graph import KnowledgeGraph
 from .models import EntityType
 from .tier_protection import get_entity_tier
@@ -36,9 +37,7 @@ def consolidate_observations(kg: KnowledgeGraph, entity_name: str) -> dict:
             seen[key] = obs
 
     if duplicates:
-        removed, err = kg.delete_observations(
-            entity_name, duplicates, caller_role="agent"
-        )
+        removed, err = kg.delete_observations(entity_name, duplicates, caller_role="agent")
         if err:
             return {"entity": entity_name, "removed": 0, "kept": len(seen), "error": err}
         return {"entity": entity_name, "removed": removed, "kept": len(seen)}
@@ -97,15 +96,19 @@ def promote_patterns(kg: KnowledgeGraph, min_occurrences: int = 3) -> dict:
             continue
 
         entities_list = obs_entities[obs_key]
-        kg.create_entities([{
-            "name": pattern_name,
-            "entityType": EntityType.SOLUTION_PATTERN.value,
-            "observations": [
-                "protection_tier: quality",
-                f"Promoted from {count} occurrences across: {', '.join(entities_list[:5])}",
-                f"Pattern: {obs_key}",
-            ],
-        }])
+        kg.create_entities(
+            [
+                {
+                    "name": pattern_name,
+                    "entityType": EntityType.SOLUTION_PATTERN.value,
+                    "observations": [
+                        "protection_tier: quality",
+                        f"Promoted from {count} occurrences across: {', '.join(entities_list[:5])}",
+                        f"Pattern: {obs_key}",
+                    ],
+                }
+            ]
+        )
         promoted.append(pattern_name)
 
     return {"promoted": promoted, "skipped": skipped}
@@ -132,9 +135,9 @@ def remove_stale_observations(
         return {"entity": entity_name, "removed": 0, "error": f"entity is {tier.value}-tier, skipping"}
 
     to_remove = [
-        obs for obs in entity.observations
-        if any(kw.lower() in obs.lower() for kw in stale_keywords)
-        and not obs.startswith("protection_tier:")
+        obs
+        for obs in entity.observations
+        if any(kw.lower() in obs.lower() for kw in stale_keywords) and not obs.startswith("protection_tier:")
     ]
 
     if not to_remove:
@@ -164,17 +167,13 @@ def validate_tier_consistency(kg: KnowledgeGraph) -> dict:
     for ewr in kg.get_entities_by_tier("vision"):
         checked += 1
         if ewr.entity_type.value not in ("vision_standard",):
-            violations.append(
-                f"Vision-tier entity '{ewr.name}' has unexpected type '{ewr.entity_type.value}'"
-            )
+            violations.append(f"Vision-tier entity '{ewr.name}' has unexpected type '{ewr.entity_type.value}'")
 
     # Check architecture entities
     for ewr in kg.get_entities_by_tier("architecture"):
         checked += 1
         if ewr.entity_type.value not in ("architectural_standard", "pattern", "component"):
-            violations.append(
-                f"Architecture-tier entity '{ewr.name}' has unexpected type '{ewr.entity_type.value}'"
-            )
+            violations.append(f"Architecture-tier entity '{ewr.name}' has unexpected type '{ewr.entity_type.value}'")
 
     return {"violations": violations, "checked": checked}
 

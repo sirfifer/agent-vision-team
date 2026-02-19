@@ -1,12 +1,12 @@
 """Quality gate aggregation — checks all gates and returns combined result."""
 
 import subprocess
+
 from .config import get_enabled_gates, load_project_config
 from .models import GateResult, GateResults
-from .tools.formatting import auto_format
+from .tools.coverage import check_coverage
 from .tools.linting import run_lint
 from .tools.testing import run_tests
-from .tools.coverage import check_coverage
 from .trust_engine import TrustEngine
 
 
@@ -109,7 +109,9 @@ def check_all_gates() -> GateResults:
         tests = GateResult(
             name="tests",
             passed=test_passed,
-            detail=test_result.get("error", f"{test_result.get('passed', 0)} passed, {test_result.get('failed', 0)} failed"),
+            detail=test_result.get(
+                "error", f"{test_result.get('passed', 0)} passed, {test_result.get('failed', 0)} failed"
+            ),
         )
     else:
         tests = GateResult(name="tests", passed=True, detail="Skipped (disabled)")
@@ -121,7 +123,9 @@ def check_all_gates() -> GateResults:
         coverage = GateResult(
             name="coverage",
             passed=cov_passed,
-            detail=cov_result.get("error", f"{cov_result.get('percentage', 0)}% (target: {cov_result.get('target', 80)}%)"),
+            detail=cov_result.get(
+                "error", f"{cov_result.get('percentage', 0)}% (target: {cov_result.get('target', 80)}%)"
+            ),
         )
     else:
         coverage = GateResult(name="coverage", passed=True, detail="Skipped (disabled)")

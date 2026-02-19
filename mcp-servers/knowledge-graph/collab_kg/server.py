@@ -39,9 +39,7 @@ def add_observations(
     change_approved: bool = False,
 ) -> dict:
     """Add observations to an entity. Respects tier protection."""
-    added, error = graph.add_observations(
-        entity_name, observations, caller_role, change_approved
-    )
+    added, error = graph.add_observations(entity_name, observations, caller_role, change_approved)
     if error:
         return {"added": 0, "error": error}
     return {"added": added}
@@ -78,9 +76,7 @@ def delete_observations(
     change_approved: bool = False,
 ) -> dict:
     """Delete specific observations from an entity. Respects tier protection."""
-    deleted, error = graph.delete_observations(
-        entity_name, observations, caller_role, change_approved
-    )
+    deleted, error = graph.delete_observations(entity_name, observations, caller_role, change_approved)
     if error:
         return {"deleted": 0, "error": error}
     return {"deleted": deleted}

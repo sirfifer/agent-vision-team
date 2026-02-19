@@ -16,5 +16,5 @@ if (typeof (window as any).acquireVsCodeApi === 'undefined') {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

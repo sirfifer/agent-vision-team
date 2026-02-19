@@ -40,13 +40,11 @@ export function DocEditorCard({
       <div className="space-y-3">
         {/* Document Name Field */}
         <div>
-          <label className="block text-sm font-medium mb-1">
-            Document Name
-          </label>
+          <label className="block text-sm font-medium mb-1">Document Name</label>
           <input
             type="text"
             value={docName}
-            onChange={e => setDocName(e.target.value)}
+            onChange={(e) => setDocName(e.target.value)}
             disabled={isNameLocked}
             className={`w-full px-3 py-2 rounded border text-vscode-fg focus:outline-none focus:border-vscode-btn-bg ${
               isNameLocked
@@ -56,7 +54,10 @@ export function DocEditorCard({
           />
           <div className="flex items-center justify-between mt-1">
             <p className="text-xs text-vscode-muted">
-              Will be saved as <code>{dirPath}/{docName || '[name]'}.md</code>
+              Will be saved as{' '}
+              <code>
+                {dirPath}/{docName || '[name]'}.md
+              </code>
             </p>
             <button
               type="button"
@@ -70,9 +71,7 @@ export function DocEditorCard({
 
         {/* Content Textarea */}
         <div className="relative">
-          <label className="block text-sm font-medium mb-1">
-            Content
-          </label>
+          <label className="block text-sm font-medium mb-1">Content</label>
 
           {/* Review banner */}
           {phase === 'reviewing' && (
@@ -83,14 +82,12 @@ export function DocEditorCard({
 
           <textarea
             value={content}
-            onChange={e => setContent(e.target.value)}
+            onChange={(e) => setContent(e.target.value)}
             disabled={phase === 'formatting' || phase === 'saving'}
             placeholder={phase === 'formatting' ? '' : placeholderText}
             rows={12}
             className={`w-full px-3 py-2 rounded bg-vscode-input-bg border border-vscode-border text-vscode-fg font-mono text-sm focus:outline-none focus:border-vscode-btn-bg ${
-              (phase === 'formatting' || phase === 'saving')
-                ? 'opacity-50 cursor-not-allowed'
-                : ''
+              phase === 'formatting' || phase === 'saving' ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           />
 
@@ -99,8 +96,19 @@ export function DocEditorCard({
             <div className="absolute inset-0 top-6 flex items-center justify-center rounded bg-black/30">
               <div className="flex items-center gap-2 px-4 py-2 rounded bg-vscode-widget-bg border border-vscode-border shadow-lg">
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
                 <span className="text-sm">Formatting with Claude...</span>
               </div>
@@ -138,8 +146,19 @@ export function DocEditorCard({
             >
               <span className="flex items-center gap-2">
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
                 Formatting...
               </span>
@@ -223,8 +242,19 @@ export function DocEditorCard({
             >
               <span className="flex items-center gap-2">
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
                 Saving...
               </span>

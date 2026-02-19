@@ -9,11 +9,11 @@ export type ResearchStatus = 'pending' | 'scheduled' | 'in_progress' | 'complete
 
 export interface ResearchSchedule {
   type: 'once' | 'daily' | 'weekly' | 'monthly';
-  dayOfWeek?: number;  // 0-6 for weekly
+  dayOfWeek?: number; // 0-6 for weekly
   dayOfMonth?: number; // 1-31 for monthly
-  time?: string;       // HH:MM format
-  lastRun?: string;    // ISO timestamp
-  nextRun?: string;    // ISO timestamp
+  time?: string; // HH:MM format
+  lastRun?: string; // ISO timestamp
+  nextRun?: string; // ISO timestamp
 }
 
 export interface ResearchResult {

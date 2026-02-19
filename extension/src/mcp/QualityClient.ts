@@ -85,7 +85,7 @@ export class QualityClient {
   async recordDismissal(
     findingId: string,
     justification: string,
-    dismissedBy: string
+    dismissedBy: string,
   ): Promise<{ recorded: boolean }> {
     return (await this.mcp.callTool('quality', 'record_dismissal', {
       finding_id: findingId,
@@ -107,7 +107,17 @@ export class QualityClient {
   }> {
     return (await this.mcp.callTool('quality', 'get_all_findings', {
       ...(status ? { status } : {}),
-    })) as { findings: Array<{ id: string; tool: string; severity: string; component: string | null; description: string; created_at: string; status: string }> };
+    })) as {
+      findings: Array<{
+        id: string;
+        tool: string;
+        severity: string;
+        component: string | null;
+        description: string;
+        created_at: string;
+        status: string;
+      }>;
+    };
   }
 
   async getDismissalHistory(findingId: string): Promise<{
@@ -119,6 +129,8 @@ export class QualityClient {
   }> {
     return (await this.mcp.callTool('quality', 'get_dismissal_history', {
       finding_id: findingId,
-    })) as { history: Array<{ dismissed_by: string; justification: string; dismissed_at: string }> };
+    })) as {
+      history: Array<{ dismissed_by: string; justification: string; dismissed_at: string }>;
+    };
   }
 }

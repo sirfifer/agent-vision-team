@@ -97,14 +97,14 @@ app.include_router(health_router)
 app.include_router(projects_router)
 
 # -- Per-project routes (mounted under /api/projects/{project_id}) --
-from .routers.dashboard import router as dashboard_router
+from .routers.bootstrap import router as bootstrap_router
 from .routers.config_router import router as config_router
+from .routers.dashboard import router as dashboard_router
 from .routers.documents import router as documents_router
 from .routers.governance import router as governance_router
+from .routers.jobs import router as jobs_router
 from .routers.quality import router as quality_router
 from .routers.research import router as research_router
-from .routers.jobs import router as jobs_router
-from .routers.bootstrap import router as bootstrap_router
 
 project_api = APIRouter(prefix="/api/projects/{project_id}")
 project_api.include_router(dashboard_router)
@@ -131,6 +131,7 @@ if _static_dir.is_dir():
         inject = f'<script>window.__AVT_API_KEY__="{config.api_key}";</script>'
         html = html.replace("</head>", f"{inject}</head>", 1)
         from fastapi.responses import HTMLResponse
+
         return HTMLResponse(html)
 
     @app.get("/{path:path}", include_in_schema=False)

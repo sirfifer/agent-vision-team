@@ -1,5 +1,26 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, ResearchBriefInfo, BootstrapScaleProfile, BootstrapActivity, BootstrapReviewItem, BootstrapFinalizationResult } from '../types';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from 'react';
+import type {
+  DashboardData,
+  WebviewMessage,
+  ProjectConfig,
+  SetupReadiness,
+  DocumentInfo,
+  IngestionResult,
+  ResearchPrompt,
+  ResearchBriefInfo,
+  BootstrapScaleProfile,
+  BootstrapActivity,
+  BootstrapReviewItem,
+  BootstrapFinalizationResult,
+} from '../types';
 import { useTransport } from '../hooks/useTransport';
 import { DEMO_DATA } from '../data/demoData';
 
@@ -13,7 +34,15 @@ const defaultData: DashboardData = {
   tasks: { active: 0, total: 0 },
   sessionPhase: 'inactive',
   governedTasks: [],
-  governanceStats: { totalDecisions: 0, approved: 0, blocked: 0, pending: 0, pendingReviews: 0, totalGovernedTasks: 0, needsHumanReview: 0 },
+  governanceStats: {
+    totalDecisions: 0,
+    approved: 0,
+    blocked: 0,
+    pending: 0,
+    pendingReviews: 0,
+    totalGovernedTasks: 0,
+    needsHumanReview: 0,
+  },
 };
 
 interface DashboardContextValue {
@@ -53,7 +82,12 @@ interface DashboardContextValue {
   setShowBootstrap: (show: boolean) => void;
   bootstrapScaleProfile: BootstrapScaleProfile | null;
   bootstrapRunning: boolean;
-  bootstrapProgress: { phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] } | null;
+  bootstrapProgress: {
+    phase: string;
+    detail: string;
+    percent?: number;
+    activities?: BootstrapActivity[];
+  } | null;
   bootstrapResult: { success: boolean; reportPath?: string; error?: string } | null;
   // Bootstrap review
   bootstrapReviewItems: BootstrapReviewItem[] | null;
@@ -79,9 +113,7 @@ declare global {
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const vscodeApi = useTransport();
-  const [data, setData] = useState<DashboardData>(
-    () => window.__INITIAL_DATA__ ?? defaultData
-  );
+  const [data, setData] = useState<DashboardData>(() => window.__INITIAL_DATA__ ?? defaultData);
   const [agentFilter, setAgentFilter] = useState<string | null>(null);
   const [governanceFilter, setGovernanceFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
@@ -102,21 +134,39 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   // Research briefs state
   const [researchBriefs, setResearchBriefs] = useState<ResearchBriefInfo[]>([]);
-  const [researchBriefContent, setResearchBriefContent] = useState<{ briefPath: string; content: string; error?: string } | null>(null);
+  const [researchBriefContent, setResearchBriefContent] = useState<{
+    briefPath: string;
+    content: string;
+    error?: string;
+  } | null>(null);
 
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
 
   // Bootstrap state
   const [showBootstrap, setShowBootstrap] = useState(false);
-  const [bootstrapScaleProfile, setBootstrapScaleProfile] = useState<BootstrapScaleProfile | null>(null);
+  const [bootstrapScaleProfile, setBootstrapScaleProfile] = useState<BootstrapScaleProfile | null>(
+    null,
+  );
   const [bootstrapRunning, setBootstrapRunning] = useState(false);
-  const [bootstrapProgress, setBootstrapProgress] = useState<{ phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] } | null>(null);
-  const [bootstrapResult, setBootstrapResult] = useState<{ success: boolean; reportPath?: string; error?: string } | null>(null);
+  const [bootstrapProgress, setBootstrapProgress] = useState<{
+    phase: string;
+    detail: string;
+    percent?: number;
+    activities?: BootstrapActivity[];
+  } | null>(null);
+  const [bootstrapResult, setBootstrapResult] = useState<{
+    success: boolean;
+    reportPath?: string;
+    error?: string;
+  } | null>(null);
 
   // Bootstrap review state
-  const [bootstrapReviewItems, setBootstrapReviewItems] = useState<BootstrapReviewItem[] | null>(null);
-  const [bootstrapReviewResult, setBootstrapReviewResult] = useState<BootstrapFinalizationResult | null>(null);
+  const [bootstrapReviewItems, setBootstrapReviewItems] = useState<BootstrapReviewItem[] | null>(
+    null,
+  );
+  const [bootstrapReviewResult, setBootstrapReviewResult] =
+    useState<BootstrapFinalizationResult | null>(null);
 
   // Demo mode state
   const [demoMode, setDemoMode] = useState(false);
@@ -130,7 +180,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         case 'toggleDemo':
           if (!demoModeRef.current) {
             // Entering demo mode: save current data, swap in demo
-            setData(prev => {
+            setData((prev) => {
               savedDataRef.current = prev;
               return DEMO_DATA;
             });
@@ -169,7 +219,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           break;
         case 'activityAdd':
           if (demoModeRef.current) break;
-          setData(prev => ({
+          setData((prev) => ({
             ...prev,
             activities: [msg.entry, ...prev.activities],
           }));
@@ -191,17 +241,17 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           break;
         case 'documentCreated':
           if (msg.docType === 'vision') {
-            setVisionDocs(prev => [...prev, msg.doc]);
+            setVisionDocs((prev) => [...prev, msg.doc]);
           } else {
-            setArchitectureDocs(prev => [...prev, msg.doc]);
+            setArchitectureDocs((prev) => [...prev, msg.doc]);
           }
           break;
         case 'researchPrompts':
           setResearchPrompts(msg.prompts);
           break;
         case 'researchPromptUpdated':
-          setResearchPrompts(prev => {
-            const idx = prev.findIndex(p => p.id === msg.prompt.id);
+          setResearchPrompts((prev) => {
+            const idx = prev.findIndex((p) => p.id === msg.prompt.id);
             if (idx >= 0) {
               const updated = [...prev];
               updated[idx] = msg.prompt;
@@ -211,13 +261,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           });
           break;
         case 'researchPromptDeleted':
-          setResearchPrompts(prev => prev.filter(p => p.id !== msg.id));
+          setResearchPrompts((prev) => prev.filter((p) => p.id !== msg.id));
           break;
         case 'governedTasks':
-          setData(prev => ({ ...prev, governedTasks: msg.tasks }));
+          setData((prev) => ({ ...prev, governedTasks: msg.tasks }));
           break;
         case 'governanceStats':
-          setData(prev => ({ ...prev, governanceStats: msg.stats }));
+          setData((prev) => ({ ...prev, governanceStats: msg.stats }));
           break;
         case 'formatDocContentResult':
           setLastFormatResult({
@@ -228,14 +278,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           });
           break;
         case 'findingsUpdate':
-          setData(prev => ({ ...prev, findings: msg.findings }));
+          setData((prev) => ({ ...prev, findings: msg.findings }));
           break;
         case 'findingDismissed':
           if (msg.success) {
-            setData(prev => ({
+            setData((prev) => ({
               ...prev,
-              findings: (prev.findings ?? []).map(f =>
-                f.id === msg.findingId ? { ...f, status: 'dismissed' as const } : f
+              findings: (prev.findings ?? []).map((f) =>
+                f.id === msg.findingId ? { ...f, status: 'dismissed' as const } : f,
               ),
             }));
           }
@@ -265,11 +315,20 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           setBootstrapProgress({ phase: 'Starting', detail: 'Initializing bootstrap agent...' });
           break;
         case 'bootstrapProgress':
-          setBootstrapProgress({ phase: msg.phase, detail: msg.detail, percent: msg.percent, activities: msg.activities });
+          setBootstrapProgress({
+            phase: msg.phase,
+            detail: msg.detail,
+            percent: msg.percent,
+            activities: msg.activities,
+          });
           break;
         case 'bootstrapComplete':
           setBootstrapRunning(false);
-          setBootstrapResult({ success: msg.success, reportPath: msg.reportPath, error: msg.error });
+          setBootstrapResult({
+            success: msg.success,
+            reportPath: msg.reportPath,
+            error: msg.error,
+          });
           setBootstrapProgress(null);
           break;
         case 'bootstrapReviewLoaded':
@@ -291,44 +350,60 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   // - SessionBar lightning bolt icon
   // - Extension sends 'showWizard' message
 
-  const sendCommand = useCallback((type: WebviewMessage['type']) => {
-    vscodeApi.postMessage({ type });
-  }, [vscodeApi]);
+  const sendCommand = useCallback(
+    (type: WebviewMessage['type']) => {
+      vscodeApi.postMessage({ type });
+    },
+    [vscodeApi],
+  );
 
-  const sendMessage = useCallback((msg: WebviewMessage) => {
-    vscodeApi.postMessage(msg);
-  }, [vscodeApi]);
+  const sendMessage = useCallback(
+    (msg: WebviewMessage) => {
+      vscodeApi.postMessage(msg);
+    },
+    [vscodeApi],
+  );
 
   return (
-    <DashboardContext.Provider value={{
-      data,
-      sendCommand,
-      sendMessage,
-      agentFilter, setAgentFilter,
-      governanceFilter, setGovernanceFilter,
-      typeFilter, setTypeFilter,
-      showWizard, setShowWizard,
-      showSettings, setShowSettings,
-      projectConfig,
-      setupReadiness,
-      visionDocs,
-      architectureDocs,
-      lastIngestionResult,
-      lastFormatResult,
-      showResearchPrompts, setShowResearchPrompts,
-      researchPrompts,
-      researchBriefs,
-      researchBriefContent,
-      showTutorial, setShowTutorial,
-      showBootstrap, setShowBootstrap,
-      bootstrapScaleProfile,
-      bootstrapRunning,
-      bootstrapProgress,
-      bootstrapResult,
-      bootstrapReviewItems,
-      bootstrapReviewResult,
-      demoMode,
-    }}>
+    <DashboardContext.Provider
+      value={{
+        data,
+        sendCommand,
+        sendMessage,
+        agentFilter,
+        setAgentFilter,
+        governanceFilter,
+        setGovernanceFilter,
+        typeFilter,
+        setTypeFilter,
+        showWizard,
+        setShowWizard,
+        showSettings,
+        setShowSettings,
+        projectConfig,
+        setupReadiness,
+        visionDocs,
+        architectureDocs,
+        lastIngestionResult,
+        lastFormatResult,
+        showResearchPrompts,
+        setShowResearchPrompts,
+        researchPrompts,
+        researchBriefs,
+        researchBriefContent,
+        showTutorial,
+        setShowTutorial,
+        showBootstrap,
+        setShowBootstrap,
+        bootstrapScaleProfile,
+        bootstrapRunning,
+        bootstrapProgress,
+        bootstrapResult,
+        bootstrapReviewItems,
+        bootstrapReviewResult,
+        demoMode,
+      }}
+    >
       {children}
     </DashboardContext.Provider>
   );

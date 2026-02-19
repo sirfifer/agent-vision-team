@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from .models import TrustDecision, DismissalRecord
+from .models import TrustDecision
 
 
 class TrustEngine:
@@ -56,11 +56,14 @@ class TrustEngine:
         cursor = conn.cursor()
 
         # Check if this finding has been dismissed before
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT status, dismissed_by, dismissal_justification
             FROM findings
             WHERE id = ?
-        """, (finding_id,))
+        """,
+            (finding_id,),
+        )
 
         result = cursor.fetchone()
         conn.close()
@@ -92,10 +95,13 @@ class TrustEngine:
         cursor = conn.cursor()
 
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO findings (id, tool, severity, component, description, created_at, status)
                 VALUES (?, ?, ?, ?, ?, ?, 'open')
-            """, (finding_id, tool, severity, component, description, datetime.utcnow().isoformat()))
+            """,
+                (finding_id, tool, severity, component, description, datetime.utcnow().isoformat()),
+            )
 
             conn.commit()
             return True
@@ -122,20 +128,26 @@ class TrustEngine:
 
         try:
             # Update finding status
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE findings
                 SET status = 'dismissed',
                     dismissed_by = ?,
                     dismissal_justification = ?,
                     dismissed_at = ?
                 WHERE id = ?
-            """, (dismissed_by, justification, dismissed_at, finding_id))
+            """,
+                (dismissed_by, justification, dismissed_at, finding_id),
+            )
 
             # Add to dismissal history
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO dismissal_history (finding_id, dismissed_by, justification, dismissed_at)
                 VALUES (?, ?, ?, ?)
-            """, (finding_id, dismissed_by, justification, dismissed_at))
+            """,
+                (finding_id, dismissed_by, justification, dismissed_at),
+            )
 
             conn.commit()
             return True
@@ -147,12 +159,15 @@ class TrustEngine:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT dismissed_by, justification, dismissed_at
             FROM dismissal_history
             WHERE finding_id = ?
             ORDER BY dismissed_at DESC
-        """, (finding_id,))
+        """,
+            (finding_id,),
+        )
 
         results = cursor.fetchall()
         conn.close()
@@ -208,12 +223,15 @@ class TrustEngine:
         cursor = conn.cursor()
 
         if status:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, tool, severity, component, description, created_at, status
                 FROM findings
                 WHERE status = ?
                 ORDER BY created_at DESC
-            """, (status,))
+            """,
+                (status,),
+            )
         else:
             cursor.execute("""
                 SELECT id, tool, severity, component, description, created_at, status

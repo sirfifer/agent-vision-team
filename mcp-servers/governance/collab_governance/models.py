@@ -1,10 +1,11 @@
 """Pydantic models for governance decisions, reviews, and verdicts."""
 
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
+
 from pydantic import BaseModel, Field
-import uuid
 
 
 class DecisionCategory(str, Enum):
@@ -46,9 +47,7 @@ class Decision(BaseModel):
     components_affected: list[str] = Field(default_factory=list)
     alternatives_considered: list[Alternative] = Field(default_factory=list)
     confidence: Confidence = Confidence.HIGH
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class Finding(BaseModel):
@@ -70,9 +69,7 @@ class ReviewVerdict(BaseModel):
     strengths_summary: str = ""
     standards_verified: list[str] = Field(default_factory=list)
     reviewer: str = "governance-reviewer"
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class GovernanceRecord(BaseModel):
@@ -89,16 +86,18 @@ class GovernanceRecord(BaseModel):
 
 class ReviewType(str, Enum):
     """Types of governance reviews."""
+
     GOVERNANCE = "governance"  # Standard governance review
-    SECURITY = "security"      # Security-focused review
+    SECURITY = "security"  # Security-focused review
     ARCHITECTURE = "architecture"  # Architecture review
-    MEMORY = "memory"          # Check against past failures/patterns
-    VISION = "vision"          # Vision alignment check
-    CUSTOM = "custom"          # Custom review type
+    MEMORY = "memory"  # Check against past failures/patterns
+    VISION = "vision"  # Vision alignment check
+    CUSTOM = "custom"  # Custom review type
 
 
 class TaskReviewStatus(str, Enum):
     """Status of a task governance review."""
+
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     APPROVED = "approved"
@@ -108,6 +107,7 @@ class TaskReviewStatus(str, Enum):
 
 class TaskReviewRecord(BaseModel):
     """Record of a governance review for a Claude Code task."""
+
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     review_task_id: str  # The review task in Claude Code's task system
     implementation_task_id: str  # The implementation task being reviewed
@@ -118,15 +118,14 @@ class TaskReviewRecord(BaseModel):
     guidance: str = ""
     findings: list[Finding] = Field(default_factory=list)
     standards_verified: list[str] = Field(default_factory=list)
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     completed_at: Optional[str] = None
     reviewer: str = "governance-reviewer"
 
 
 class GovernedTaskRecord(BaseModel):
     """Record tracking a governed task and its reviews."""
+
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     implementation_task_id: str  # Claude Code task ID
     subject: str
@@ -135,18 +134,15 @@ class GovernedTaskRecord(BaseModel):
     reviews: list[str] = Field(default_factory=list)  # List of TaskReviewRecord IDs
     current_status: str = "pending_review"  # pending_review, approved, blocked
     session_id: str = ""  # Links tasks created in the same session
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     released_at: Optional[str] = None
 
 
 class UsageRecord(BaseModel):
     """Token usage tracking for AI review invocations."""
+
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
-    timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     session_id: str = ""
     agent: str = "governance-reviewer"
     operation: str = ""  # review_decision, review_plan, review_completion, review_task_group, hook_review
@@ -162,6 +158,7 @@ class UsageRecord(BaseModel):
 
 class HolisticReviewRecord(BaseModel):
     """Record of a holistic review evaluating multiple tasks collectively."""
+
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     session_id: str
     task_ids: list[str] = Field(default_factory=list)
@@ -173,6 +170,4 @@ class HolisticReviewRecord(BaseModel):
     strengths_summary: str = ""
     standards_verified: list[str] = Field(default_factory=list)
     reviewer: str = "governance-reviewer"
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

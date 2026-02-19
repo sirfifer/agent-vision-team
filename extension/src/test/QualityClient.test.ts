@@ -107,7 +107,7 @@ suite('QualityClient Test Suite', () => {
       const result = await qualityClient.recordDismissal(
         'test-finding-1',
         'False positive - test file',
-        'human'
+        'human',
       );
 
       assert.ok(typeof result.recorded === 'boolean');

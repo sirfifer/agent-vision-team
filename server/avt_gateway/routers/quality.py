@@ -5,8 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ..auth import require_auth
 from ..app_state import ProjectState
+from ..auth import require_auth
 from ..deps import get_project_state
 
 router = APIRouter(prefix="/quality", tags=["quality"], dependencies=[Depends(require_auth)])
@@ -49,17 +49,23 @@ async def get_findings(status: str | None = None, state: ProjectState = Depends(
 
 
 @router.post("/findings/{finding_id}/dismiss")
-async def dismiss_finding(finding_id: str, body: DismissRequest, state: ProjectState = Depends(get_project_state)) -> dict:
+async def dismiss_finding(
+    finding_id: str, body: DismissRequest, state: ProjectState = Depends(get_project_state)
+) -> dict:
     """Dismiss a quality finding with justification."""
     if not state.mcp or not state.mcp.is_connected:
         raise HTTPException(status_code=503, detail="MCP servers not connected")
 
     try:
-        result = await state.mcp.call_tool("quality", "record_dismissal", {
-            "finding_id": finding_id,
-            "justification": body.justification,
-            "dismissed_by": body.dismissedBy,
-        })
+        await state.mcp.call_tool(
+            "quality",
+            "record_dismissal",
+            {
+                "finding_id": finding_id,
+                "justification": body.justification,
+                "dismissed_by": body.dismissedBy,
+            },
+        )
         return {"success": True, "findingId": finding_id}
     except Exception as exc:
         return {"success": False, "findingId": finding_id, "error": str(exc)}

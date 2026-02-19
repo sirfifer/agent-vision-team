@@ -52,9 +52,7 @@ export function SetupWizard() {
   const { showWizard, setShowWizard, projectConfig, sendMessage } = useDashboard();
   const [currentStep, setCurrentStep] = useState<WizardStep>('welcome');
   const [completedSteps, setCompletedSteps] = useState<Set<WizardStep>>(new Set());
-  const [draftConfig, setDraftConfig] = useState<ProjectConfig>(
-    projectConfig ?? DEFAULT_CONFIG
-  );
+  const [draftConfig, setDraftConfig] = useState<ProjectConfig>(projectConfig ?? DEFAULT_CONFIG);
   const contentRef = useRef<HTMLDivElement>(null);
 
   const currentIndex = WIZARD_STEPS.indexOf(currentStep);
@@ -68,7 +66,7 @@ export function SetupWizard() {
 
   const handleNext = useCallback(() => {
     // Mark current step as completed
-    setCompletedSteps(prev => new Set([...prev, currentStep]));
+    setCompletedSteps((prev) => new Set([...prev, currentStep]));
 
     if (!isLastStep) {
       setCurrentStep(WIZARD_STEPS[currentIndex + 1]);
@@ -87,12 +85,15 @@ export function SetupWizard() {
     }
   }, [currentIndex, isLastStep]);
 
-  const handleStepClick = useCallback((step: WizardStep) => {
-    const stepIndex = WIZARD_STEPS.indexOf(step);
-    if (stepIndex <= currentIndex || completedSteps.has(step)) {
-      setCurrentStep(step);
-    }
-  }, [currentIndex, completedSteps]);
+  const handleStepClick = useCallback(
+    (step: WizardStep) => {
+      const stepIndex = WIZARD_STEPS.indexOf(step);
+      if (stepIndex <= currentIndex || completedSteps.has(step)) {
+        setCurrentStep(step);
+      }
+    },
+    [currentIndex, completedSteps],
+  );
 
   const handleClose = useCallback(() => {
     sessionStorage.setItem('avt-wizard-dismissed', 'true');
@@ -111,18 +112,18 @@ export function SetupWizard() {
   }, [draftConfig, sendMessage, setShowWizard]);
 
   const updateConfig = useCallback((updates: Partial<ProjectConfig>) => {
-    setDraftConfig(prev => ({ ...prev, ...updates }));
+    setDraftConfig((prev) => ({ ...prev, ...updates }));
   }, []);
 
   const updateSettings = useCallback((updates: Partial<ProjectConfig['settings']>) => {
-    setDraftConfig(prev => ({
+    setDraftConfig((prev) => ({
       ...prev,
       settings: { ...prev.settings, ...updates },
     }));
   }, []);
 
   const updateQuality = useCallback((updates: Partial<ProjectConfig['quality']>) => {
-    setDraftConfig(prev => ({
+    setDraftConfig((prev) => ({
       ...prev,
       quality: { ...prev.quality, ...updates },
     }));
@@ -172,16 +173,19 @@ export function SetupWizard() {
       <div className="bg-vscode-bg border border-vscode-border rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-vscode-border">
-          <h2 className="text-lg font-semibold">
-            AVT Setup Wizard
-          </h2>
+          <h2 className="text-lg font-semibold">AVT Setup Wizard</h2>
           <button
             onClick={handleClose}
             className="p-1 hover:bg-vscode-widget-bg rounded transition-colors"
             title="Close wizard (you can reopen it later)"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>

@@ -32,9 +32,9 @@ function getApiBase(): string {
 }
 
 function getApiKey(): string {
-  return (window as any).__AVT_API_KEY__
-    || new URLSearchParams(window.location.search).get('key')
-    || '';
+  return (
+    (window as any).__AVT_API_KEY__ || new URLSearchParams(window.location.search).get('key') || ''
+  );
 }
 
 async function apiFetch(path: string, init?: RequestInit): Promise<any> {
@@ -42,7 +42,7 @@ async function apiFetch(path: string, init?: RequestInit): Promise<any> {
   const apiKey = getApiKey();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(init?.headers as Record<string, string> || {}),
+    ...((init?.headers as Record<string, string>) || {}),
   };
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
@@ -84,65 +84,79 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setTransportProject(id);
   }, []);
 
-  const addProject = useCallback(async (path: string, name?: string) => {
-    const data = await apiFetch('/api/projects', {
-      method: 'POST',
-      body: JSON.stringify({ path, name }),
-    });
-    const project: ProjectInfo = data.project;
-
-    // Start the project automatically
-    try {
-      await apiFetch(`/api/projects/${project.id}/start`, { method: 'POST' });
-    } catch {
-      // May fail if MCP servers aren't ready yet
-    }
-
-    await refreshProjects();
-    switchProject(project.id);
-  }, [refreshProjects, switchProject]);
-
-  const removeProject = useCallback(async (id: string) => {
-    await apiFetch(`/api/projects/${id}`, { method: 'DELETE' });
-    await refreshProjects();
-
-    // If we removed the active project, switch to another
-    if (activeProjectId === id) {
-      setProjects(prev => {
-        const remaining = prev.filter(p => p.id !== id);
-        if (remaining.length > 0) {
-          switchProject(remaining[0].id);
-        } else {
-          setActiveProjectId(null);
-          setTransportProject(undefined);
-        }
-        return remaining;
+  const addProject = useCallback(
+    async (path: string, name?: string) => {
+      const data = await apiFetch('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({ path, name }),
       });
-    }
-  }, [activeProjectId, refreshProjects, switchProject]);
+      const project: ProjectInfo = data.project;
 
-  const startProject = useCallback(async (id: string) => {
-    await apiFetch(`/api/projects/${id}/start`, { method: 'POST' });
-    await refreshProjects();
-  }, [refreshProjects]);
+      // Start the project automatically
+      try {
+        await apiFetch(`/api/projects/${project.id}/start`, { method: 'POST' });
+      } catch {
+        // May fail if MCP servers aren't ready yet
+      }
 
-  const stopProject = useCallback(async (id: string) => {
-    await apiFetch(`/api/projects/${id}/stop`, { method: 'POST' });
-    await refreshProjects();
-  }, [refreshProjects]);
+      await refreshProjects();
+      switchProject(project.id);
+    },
+    [refreshProjects, switchProject],
+  );
+
+  const removeProject = useCallback(
+    async (id: string) => {
+      await apiFetch(`/api/projects/${id}`, { method: 'DELETE' });
+      await refreshProjects();
+
+      // If we removed the active project, switch to another
+      if (activeProjectId === id) {
+        setProjects((prev) => {
+          const remaining = prev.filter((p) => p.id !== id);
+          if (remaining.length > 0) {
+            switchProject(remaining[0].id);
+          } else {
+            setActiveProjectId(null);
+            setTransportProject(undefined);
+          }
+          return remaining;
+        });
+      }
+    },
+    [activeProjectId, refreshProjects, switchProject],
+  );
+
+  const startProject = useCallback(
+    async (id: string) => {
+      await apiFetch(`/api/projects/${id}/start`, { method: 'POST' });
+      await refreshProjects();
+    },
+    [refreshProjects],
+  );
+
+  const stopProject = useCallback(
+    async (id: string) => {
+      await apiFetch(`/api/projects/${id}/stop`, { method: 'POST' });
+      await refreshProjects();
+    },
+    [refreshProjects],
+  );
 
   return (
-    <ProjectContext.Provider value={{
-      projects,
-      activeProjectId,
-      loading,
-      switchProject,
-      addProject,
-      removeProject,
-      startProject,
-      stopProject,
-      refreshProjects,
-    }}>
+    <ProjectContext.Provider
+      value={{
+        projects,
+        activeProjectId,
+        loading,
+        switchProject,
+        addProject,
+        removeProject,
+        startProject,
+        stopProject,
+        refreshProjects,
+      }}
+    >
       {children}
     </ProjectContext.Provider>
   );

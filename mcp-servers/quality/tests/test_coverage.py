@@ -3,10 +3,11 @@
 import tempfile
 from pathlib import Path
 
-from collab_quality.tools.formatting import auto_format, detect_language as detect_lang_format
+from collab_quality.tools.coverage import check_coverage
+from collab_quality.tools.formatting import auto_format
+from collab_quality.tools.formatting import detect_language as detect_lang_format
 from collab_quality.tools.linting import run_lint
 from collab_quality.tools.testing import run_tests
-from collab_quality.tools.coverage import check_coverage
 from collab_quality.trust_engine import TrustEngine
 
 

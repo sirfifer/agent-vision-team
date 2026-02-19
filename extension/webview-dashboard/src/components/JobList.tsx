@@ -75,13 +75,16 @@ export function JobList() {
             className="flex items-center gap-2 cursor-pointer"
             onClick={() => setExpandedId(expandedId === job.id ? null : job.id)}
           >
-            <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[job.status] || ''}`}>
+            <span
+              className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[job.status] || ''}`}
+            >
               {job.status}
             </span>
             <span className="text-xs text-vscode-muted font-mono">{job.id}</span>
             <span className="flex-1 text-sm truncate">{job.prompt.slice(0, 80)}</span>
             <span className="text-xs text-vscode-muted">
-              {job.model}{job.agent_type ? ` / ${job.agent_type}` : ''}
+              {job.model}
+              {job.agent_type ? ` / ${job.agent_type}` : ''}
             </span>
           </div>
 
@@ -90,13 +93,13 @@ export function JobList() {
               <div className="text-xs text-vscode-muted">
                 Submitted: {new Date(job.submitted_at).toLocaleString()}
                 {job.started_at && <> | Started: {new Date(job.started_at).toLocaleString()}</>}
-                {job.completed_at && <> | Completed: {new Date(job.completed_at).toLocaleString()}</>}
+                {job.completed_at && (
+                  <> | Completed: {new Date(job.completed_at).toLocaleString()}</>
+                )}
               </div>
 
               {job.error && (
-                <div className="p-2 rounded bg-red-900/20 text-red-300 text-xs">
-                  {job.error}
-                </div>
+                <div className="p-2 rounded bg-red-900/20 text-red-300 text-xs">{job.error}</div>
               )}
 
               {job.output && (

@@ -10,9 +10,7 @@ export class FileWatcherService {
   readonly onDidChangeSessionState = this.onSessionStateChange.event;
 
   initialize(): void {
-    const taskBriefWatcher = vscode.workspace.createFileSystemWatcher(
-      '**/.avt/task-briefs/**'
-    );
+    const taskBriefWatcher = vscode.workspace.createFileSystemWatcher('**/.avt/task-briefs/**');
     taskBriefWatcher.onDidChange(() => {
       logSystem('Task brief changed');
       this.onTaskBriefChange.fire();
@@ -28,7 +26,7 @@ export class FileWatcherService {
     this.watchers.push(taskBriefWatcher);
 
     const sessionStateWatcher = vscode.workspace.createFileSystemWatcher(
-      '**/.avt/session-state.md'
+      '**/.avt/session-state.md',
     );
     sessionStateWatcher.onDidChange(() => {
       logSystem('Session state changed');
@@ -38,7 +36,7 @@ export class FileWatcherService {
   }
 
   dispose(): void {
-    this.watchers.forEach(w => w.dispose());
+    this.watchers.forEach((w) => w.dispose());
     this.onTaskBriefChange.dispose();
     this.onSessionStateChange.dispose();
   }

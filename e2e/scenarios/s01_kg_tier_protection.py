@@ -64,29 +64,27 @@ class KGTierProtectionScenario(BaseScenario):
             if hasattr(project, "architecture_patterns") and project.architecture_patterns
             else "ServiceRegistry pattern"
         )
-        component = (
-            project.components[0]
-            if hasattr(project, "components") and project.components
-            else "AuthService"
-        )
+        component = project.components[0] if hasattr(project, "components") and project.components else "AuthService"
 
-        kg.create_entities([
-            {
-                "name": "VisionStandard_DI",
-                "entityType": "vision_standard",
-                "observations": [vision_obs, vision_detail],
-            },
-            {
-                "name": "ArchPattern_ServiceRegistry",
-                "entityType": "pattern",
-                "observations": [arch_obs, arch_detail],
-            },
-            {
-                "name": f"QualityNote_{component}",
-                "entityType": "component",
-                "observations": [quality_obs, f"{component} needs error handling review"],
-            },
-        ])
+        kg.create_entities(
+            [
+                {
+                    "name": "VisionStandard_DI",
+                    "entityType": "vision_standard",
+                    "observations": [vision_obs, vision_detail],
+                },
+                {
+                    "name": "ArchPattern_ServiceRegistry",
+                    "entityType": "pattern",
+                    "observations": [arch_obs, arch_detail],
+                },
+                {
+                    "name": f"QualityNote_{component}",
+                    "entityType": "component",
+                    "observations": [quality_obs, f"{component} needs error handling review"],
+                },
+            ]
+        )
 
     # ------------------------------------------------------------------
     # Scenario entry point

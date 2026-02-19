@@ -57,8 +57,10 @@ async def start_project(project_id: str) -> dict:
         raise HTTPException(status_code=503, detail=str(exc))
 
     # Register project state and connect MCP client
-    from ..app_state import registry
     from pathlib import Path
+
+    from ..app_state import registry
+
     state = registry.register(
         project_id,
         Path(project.path),
@@ -67,7 +69,7 @@ async def start_project(project_id: str) -> dict:
 
     try:
         await state.connect_mcp()
-    except ConnectionError as exc:
+    except ConnectionError:
         # MCP servers may need a moment to start; return partial success
         pass
 
@@ -84,6 +86,7 @@ async def stop_project(project_id: str) -> dict:
 
     # Disconnect MCP and remove state
     from ..app_state import registry
+
     state = registry.get_or_none(project_id)
     if state:
         await state.disconnect_mcp()

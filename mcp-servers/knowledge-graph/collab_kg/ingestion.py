@@ -18,12 +18,12 @@ def parse_document(filepath: Path, tier: str) -> Optional[dict]:
         Entity dict with name, entityType, observations, or None if parsing fails
     """
     try:
-        content = filepath.read_text(encoding='utf-8')
+        content = filepath.read_text(encoding="utf-8")
     except Exception:
         return None
 
     # Extract title from first H1
-    title_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+    title_match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
     if not title_match:
         return None
 
@@ -31,15 +31,15 @@ def parse_document(filepath: Path, tier: str) -> Optional[dict]:
 
     # Clean up title - remove common prefixes
     name = raw_title
-    for prefix in ['Vision Standard:', 'Architectural Standard:', 'Pattern:', 'Component:']:
+    for prefix in ["Vision Standard:", "Architectural Standard:", "Pattern:", "Component:"]:
         if name.lower().startswith(prefix.lower()):
-            name = name[len(prefix):].strip()
+            name = name[len(prefix) :].strip()
             break
 
     # Convert to snake_case for entity name
-    entity_name = re.sub(r'[^a-zA-Z0-9]+', '_', name).strip('_').lower()
+    entity_name = re.sub(r"[^a-zA-Z0-9]+", "_", name).strip("_").lower()
     if not entity_name:
-        entity_name = filepath.stem.replace('-', '_')
+        entity_name = filepath.stem.replace("-", "_")
 
     # Determine entity type based on tier and document content
     entity_type = _determine_entity_type(content, tier)
@@ -48,37 +48,37 @@ def parse_document(filepath: Path, tier: str) -> Optional[dict]:
     observations = [f"protection_tier: {tier}"]
 
     # Extract Statement section
-    statement = _extract_section(content, 'Statement')
+    statement = _extract_section(content, "Statement")
     if statement:
         observations.append(f"statement: {statement}")
 
     # Extract Description section (for architecture docs)
-    description = _extract_section(content, 'Description')
+    description = _extract_section(content, "Description")
     if description:
         observations.append(f"description: {description}")
 
     # Extract Rationale section
-    rationale = _extract_section(content, 'Rationale')
+    rationale = _extract_section(content, "Rationale")
     if rationale:
         observations.append(f"rationale: {rationale}")
 
     # Extract Type section (for architecture docs)
-    type_section = _extract_section(content, 'Type')
+    type_section = _extract_section(content, "Type")
     if type_section:
         observations.append(f"document_type: {type_section}")
 
     # Extract Usage section
-    usage = _extract_section(content, 'Usage')
+    usage = _extract_section(content, "Usage")
     if usage:
         observations.append(f"usage: {usage}")
 
     # Extract Examples section
-    examples = _extract_section(content, 'Examples')
+    examples = _extract_section(content, "Examples")
     if examples:
         observations.append(f"examples: {examples}")
 
     # Extract Dependencies section (for architecture component docs)
-    dependencies = _extract_section(content, 'Dependencies')
+    dependencies = _extract_section(content, "Dependencies")
     if dependencies:
         observations.append(f"dependencies: {dependencies}")
 
@@ -99,24 +99,24 @@ def _determine_entity_type(content: str, tier: str) -> EntityType:
     """Determine the appropriate entity type based on document content and tier."""
     content_lower = content.lower()
 
-    if tier == 'vision':
+    if tier == "vision":
         return EntityType.VISION_STANDARD
 
     # For architecture tier, check the Type section or keywords
-    type_section = _extract_section(content, 'Type')
+    type_section = _extract_section(content, "Type")
     if type_section:
         type_lower = type_section.lower()
-        if 'pattern' in type_lower:
+        if "pattern" in type_lower:
             return EntityType.PATTERN
-        if 'component' in type_lower:
+        if "component" in type_lower:
             return EntityType.COMPONENT
-        if 'standard' in type_lower:
+        if "standard" in type_lower:
             return EntityType.ARCHITECTURAL_STANDARD
 
     # Fallback to keywords in content
-    if 'pattern' in content_lower:
+    if "pattern" in content_lower:
         return EntityType.PATTERN
-    if 'component' in content_lower:
+    if "component" in content_lower:
         return EntityType.COMPONENT
 
     return EntityType.ARCHITECTURAL_STANDARD
@@ -129,15 +129,15 @@ def _extract_section(content: str, section_name: str) -> Optional[str]:
     Strips fenced code blocks (e.g. Mermaid diagrams) before collapsing
     whitespace so they don't get mangled into the observation text.
     """
-    pattern = rf'^##\s+{re.escape(section_name)}\s*\n(.*?)(?=^##|\Z)'
+    pattern = rf"^##\s+{re.escape(section_name)}\s*\n(.*?)(?=^##|\Z)"
     match = re.search(pattern, content, re.MULTILINE | re.DOTALL | re.IGNORECASE)
     if match:
         text = match.group(1).strip()
         # Remove fenced code blocks (```...```) so Mermaid diagrams
         # and other code blocks don't get collapsed into gibberish
-        text = re.sub(r'```[^`]*```', '', text, flags=re.DOTALL)
+        text = re.sub(r"```[^`]*```", "", text, flags=re.DOTALL)
         # Collapse multiple whitespace
-        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r"\s+", " ", text)
         return text.strip() if text.strip() else None
     return None
 
@@ -176,10 +176,7 @@ def ingest_folder(
     skipped = []
 
     # Find all .md files recursively (excluding README.md)
-    md_files = [
-        f for f in folder.rglob('*.md')
-        if f.name.lower() != 'readme.md'
-    ]
+    md_files = [f for f in folder.rglob("*.md") if f.name.lower() != "readme.md"]
 
     for md_file in md_files:
         entity = parse_document(md_file, tier)

@@ -126,7 +126,14 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     tasks: { active: 0, total: 0 },
     sessionPhase: 'inactive',
     governedTasks: [],
-    governanceStats: { totalDecisions: 0, approved: 0, blocked: 0, pending: 0, pendingReviews: 0, totalGovernedTasks: 0 },
+    governanceStats: {
+      totalDecisions: 0,
+      approved: 0,
+      blocked: 0,
+      pending: 0,
+      pendingReviews: 0,
+      totalGovernedTasks: 0,
+    },
   };
 
   // Bootstrap streaming state
@@ -166,12 +173,13 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   private getDocumentInfoList(tier: 'vision' | 'architecture'): DocumentInfo[] {
     if (!this.configService) return [];
 
-    const docs = tier === 'vision'
-      ? this.configService.listVisionDocs()
-      : this.configService.listArchitectureDocs();
+    const docs =
+      tier === 'vision'
+        ? this.configService.listVisionDocs()
+        : this.configService.listArchitectureDocs();
 
     const docsRoot = this.configService.getDocsRoot();
-    return docs.map(name => ({
+    return docs.map((name) => ({
       name,
       path: path.join(docsRoot, tier, name),
     }));
@@ -203,12 +211,14 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         enableScripts: true,
         localResourceRoots: [distUri],
         retainContextWhenHidden: true,
-      }
+      },
     );
 
     this.panel.webview.html = this.getHtmlContent(this.panel.webview);
     this.registerMessageHandler(this.panel.webview);
-    this.panel.onDidDispose(() => { this.panel = undefined; });
+    this.panel.onDidDispose(() => {
+      this.panel = undefined;
+    });
   }
 
   public updateData(update: Partial<DashboardData>): void {
@@ -570,11 +580,10 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
       const timestamp = new Date().toISOString();
       if (result) {
-        this.configService.updateResearchPromptStatus(
-          id,
-          result.success ? 'completed' : 'failed',
-          { timestamp, ...result }
-        );
+        this.configService.updateResearchPromptStatus(id, result.success ? 'completed' : 'failed', {
+          timestamp,
+          ...result,
+        });
       } else {
         this.configService.updateResearchPromptStatus(id, 'completed', {
           timestamp,
@@ -627,7 +636,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   private async handleFormatDocContent(
     tier: 'vision' | 'architecture',
     rawContent: string,
-    requestId: string
+    requestId: string,
   ): Promise<void> {
     try {
       const formatted = await this.invokeClaudeFormat(tier, rawContent);
@@ -647,19 +656,20 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async invokeClaudeFormat(tier: 'vision' | 'architecture', rawContent: string): Promise<string> {
+  private async invokeClaudeFormat(
+    tier: 'vision' | 'architecture',
+    rawContent: string,
+  ): Promise<string> {
     // Size gate — catch unreasonably large content before sending to model
     const MAX_CONTENT_BYTES = 100 * 1024; // 100KB
     if (Buffer.byteLength(rawContent, 'utf-8') > MAX_CONTENT_BYTES) {
       throw new Error(
         `Content too large (${Math.round(Buffer.byteLength(rawContent, 'utf-8') / 1024)}KB). ` +
-        'Please reduce to under 100KB.'
+          'Please reduce to under 100KB.',
       );
     }
 
-    const prompt = tier === 'vision'
-      ? VISION_FORMAT_PROMPT
-      : ARCHITECTURE_FORMAT_PROMPT;
+    const prompt = tier === 'vision' ? VISION_FORMAT_PROMPT : ARCHITECTURE_FORMAT_PROMPT;
     const fullPrompt = `${prompt}\n\n---\n\nHere is the raw content to format:\n\n${rawContent}`;
 
     // Use temp files for input/output — avoids CLI arg limits and pipe buffering issues
@@ -686,11 +696,15 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         fs.closeSync(outputFd);
 
         let stderr = '';
-        proc.stderr!.on('data', (data: Buffer) => { stderr += data.toString(); });
+        proc.stderr!.on('data', (data: Buffer) => {
+          stderr += data.toString();
+        });
 
         proc.on('error', (err: NodeJS.ErrnoException) => {
           if (err.code === 'ENOENT') {
-            reject(new Error('Claude CLI not found. Ensure "claude" is installed and on your PATH.'));
+            reject(
+              new Error('Claude CLI not found. Ensure "claude" is installed and on your PATH.'),
+            );
           } else {
             reject(new Error(`Claude CLI failed to start: ${err.message}`));
           }
@@ -698,9 +712,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         proc.on('close', (code: number | null) => {
           if (code !== 0) {
-            reject(new Error(
-              `Claude CLI exited with code ${code}${stderr ? `: ${stderr.trim().slice(0, 500)}` : ''}`
-            ));
+            reject(
+              new Error(
+                `Claude CLI exited with code ${code}${stderr ? `: ${stderr.trim().slice(0, 500)}` : ''}`,
+              ),
+            );
           } else {
             resolve();
           }
@@ -715,12 +731,24 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       return output;
     } finally {
       // Clean up temp files
-      try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
-      try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
+      try {
+        fs.unlinkSync(inputPath);
+      } catch {
+        /* ignore */
+      }
+      try {
+        fs.unlinkSync(outputPath);
+      } catch {
+        /* ignore */
+      }
     }
   }
 
-  private async handleDismissFinding(findingId: string, justification: string, dismissedBy: string): Promise<void> {
+  private async handleDismissFinding(
+    findingId: string,
+    justification: string,
+    dismissedBy: string,
+  ): Promise<void> {
     try {
       // Call quality server's record_dismissal via MCP
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -751,7 +779,12 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       const content = fs.readFileSync(briefPath, 'utf-8');
       this.postMessage({ type: 'researchBriefContent', briefPath, content });
     } catch (err) {
-      this.postMessage({ type: 'researchBriefContent', briefPath, content: '', error: String(err) });
+      this.postMessage({
+        type: 'researchBriefContent',
+        briefPath,
+        content: '',
+        error: String(err),
+      });
     }
   }
 
@@ -769,9 +802,10 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      const files = fs.readdirSync(briefsDir)
-        .filter(f => f.endsWith('.md'))
-        .map(f => {
+      const files = fs
+        .readdirSync(briefsDir)
+        .filter((f) => f.endsWith('.md'))
+        .map((f) => {
           const fullPath = path.join(briefsDir, f);
           const stat = fs.statSync(fullPath);
           return {
@@ -811,8 +845,12 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         let stdout = '';
         let stderr = '';
-        proc.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
-        proc.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+        proc.stdout.on('data', (data: Buffer) => {
+          stdout += data.toString();
+        });
+        proc.stderr.on('data', (data: Buffer) => {
+          stderr += data.toString();
+        });
 
         proc.on('error', (err: NodeJS.ErrnoException) => {
           reject(new Error(`Failed to run scale check: ${err.message}`));
@@ -834,7 +872,10 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async handleRunBootstrap(context: string, focusAreas: Record<string, boolean>): Promise<void> {
+  private async handleRunBootstrap(
+    context: string,
+    focusAreas: Record<string, boolean>,
+  ): Promise<void> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) return;
 
@@ -871,7 +912,12 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       detail: areas.length < 4 ? `Focus: ${areas.join(', ')}` : 'Full bootstrap (all focus areas)',
     });
 
-    this.postMessage({ type: 'bootstrapProgress', phase: 'Initializing', detail: 'Preparing bootstrap agent...', activities: [] });
+    this.postMessage({
+      type: 'bootstrapProgress',
+      phase: 'Initializing',
+      detail: 'Preparing bootstrap agent...',
+      activities: [],
+    });
 
     // Write prompt to temp file for stdin
     const stamp = `avt-bootstrap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -889,18 +935,25 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         const env = { ...process.env };
         delete env.CLAUDECODE;
 
-        const proc = spawn('claude', [
-          '--print',
-          '--output-format', 'stream-json',
-          '--verbose',
-          '--model', 'opus',
-          '--agent', 'project-bootstrapper',
-        ], {
-          stdio: [inputFd, 'pipe', 'pipe'],
-          cwd: root,
-          env,
-          timeout: 3600000, // 1 hour timeout for large projects
-        });
+        const proc = spawn(
+          'claude',
+          [
+            '--print',
+            '--output-format',
+            'stream-json',
+            '--verbose',
+            '--model',
+            'opus',
+            '--agent',
+            'project-bootstrapper',
+          ],
+          {
+            stdio: [inputFd, 'pipe', 'pipe'],
+            cwd: root,
+            env,
+            timeout: 3600000, // 1 hour timeout for large projects
+          },
+        );
 
         fs.closeSync(inputFd);
 
@@ -954,7 +1007,9 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
           clearInterval(heartbeat);
           this.handleBootstrapStreamEvent = origHandler; // restore
           if (err.code === 'ENOENT') {
-            reject(new Error('Claude CLI not found. Ensure "claude" is installed and on your PATH.'));
+            reject(
+              new Error('Claude CLI not found. Ensure "claude" is installed and on your PATH.'),
+            );
           } else {
             reject(new Error(`Bootstrap failed to start: ${err.message}`));
           }
@@ -964,7 +1019,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
           clearInterval(heartbeat);
           this.handleBootstrapStreamEvent = origHandler; // restore
           if (code !== 0) {
-            reject(new Error(`Bootstrap exited with code ${code}${stderr ? `: ${stderr.trim().slice(0, 500)}` : ''}`));
+            reject(
+              new Error(
+                `Bootstrap exited with code ${code}${stderr ? `: ${stderr.trim().slice(0, 500)}` : ''}`,
+              ),
+            );
           } else {
             resolve();
           }
@@ -1010,7 +1069,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       });
     } finally {
       // Clean up temp files
-      try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
+      try {
+        fs.unlinkSync(inputPath);
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -1069,14 +1132,22 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   private summarizeToolCall(tool: string, input: any): string {
     try {
       switch (tool) {
-        case 'Read': return `Reading ${this.shortenPath(input?.file_path)}`;
-        case 'Glob': return `Searching for ${input?.pattern || 'files'}`;
-        case 'Grep': return `Searching for "${(input?.pattern || '').slice(0, 40)}"`;
-        case 'Bash': return `Running: ${(input?.command || '').slice(0, 60)}`;
-        case 'Write': return `Writing ${this.shortenPath(input?.file_path)}`;
-        case 'Edit': return `Editing ${this.shortenPath(input?.file_path)}`;
-        case 'Task': return `Sub-agent: ${input?.description || 'analysis task'}`;
-        case 'TodoWrite': return 'Updating task list';
+        case 'Read':
+          return `Reading ${this.shortenPath(input?.file_path)}`;
+        case 'Glob':
+          return `Searching for ${input?.pattern || 'files'}`;
+        case 'Grep':
+          return `Searching for "${(input?.pattern || '').slice(0, 40)}"`;
+        case 'Bash':
+          return `Running: ${(input?.command || '').slice(0, 60)}`;
+        case 'Write':
+          return `Writing ${this.shortenPath(input?.file_path)}`;
+        case 'Edit':
+          return `Editing ${this.shortenPath(input?.file_path)}`;
+        case 'Task':
+          return `Sub-agent: ${input?.description || 'analysis task'}`;
+        case 'TodoWrite':
+          return 'Updating task list';
         default:
           if (tool.startsWith('mcp__')) {
             const parts = tool.split('__');
@@ -1104,14 +1175,21 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       }
       if (tool === 'Write') {
         const fp = input?.file_path || '';
-        if (fp.includes('docs/architecture') || fp.includes('docs/vision') || fp.includes('docs/style')) return 'Writing Docs';
+        if (
+          fp.includes('docs/architecture') ||
+          fp.includes('docs/vision') ||
+          fp.includes('docs/style')
+        )
+          return 'Writing Docs';
         if (fp.includes('bootstrap-report')) return 'Writing Report';
         return 'Writing';
       }
       if (tool === 'Glob' || tool === 'Grep') return 'Analyzing';
       if (tool === 'Read') return 'Reading';
       if (tool.startsWith('mcp__')) return 'Recording';
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return this.currentBootstrapPhase || 'Working';
   }
 
@@ -1148,7 +1226,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         const items = (data.discoveries || []).map((d: any) => ({
           id: d.id || '',
           name: d.name || d.id || '',
-          description: d.description || (d.observations?.[0]?.slice(0, 120)) || d.entityType || '',
+          description: d.description || d.observations?.[0]?.slice(0, 120) || d.entityType || '',
           tier: d.tier || 'quality',
           entityType: d.entityType || 'observation',
           observations: d.observations || [],
@@ -1171,7 +1249,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       const content = fs.readFileSync(jsonlPath, 'utf-8');
-      const lines = content.split('\n').filter(l => l.trim());
+      const lines = content.split('\n').filter((l) => l.trim());
 
       const items: Array<{
         id: string;
@@ -1225,22 +1303,30 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
    * Finalize bootstrap review: write approved/edited items to the Knowledge Graph.
    * Rejected items are simply not written. This is the moment items become permanent.
    */
-  private async handleFinalizeBootstrapReview(items: Array<{
-    id: string;
-    name: string;
-    tier: string;
-    entityType: string;
-    observations: string[];
-    status: string;
-    editedObservations?: string[];
-    isUserCreated?: boolean;
-  }>): Promise<void> {
+  private async handleFinalizeBootstrapReview(
+    items: Array<{
+      id: string;
+      name: string;
+      tier: string;
+      entityType: string;
+      observations: string[];
+      status: string;
+      editedObservations?: string[];
+      isUserCreated?: boolean;
+    }>,
+  ): Promise<void> {
     try {
       const projectDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!projectDir) {
         this.postMessage({
           type: 'bootstrapReviewFinalized',
-          result: { success: false, approved: 0, rejected: 0, edited: 0, errors: ['No workspace folder'] },
+          result: {
+            success: false,
+            approved: 0,
+            rejected: 0,
+            edited: 0,
+            errors: ['No workspace folder'],
+          },
         });
         return;
       }
@@ -1264,7 +1350,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
           const observations = item.editedObservations || item.observations;
 
           // Ensure protection_tier observation exists
-          if (!observations.some(o => o.startsWith('protection_tier:'))) {
+          if (!observations.some((o) => o.startsWith('protection_tier:'))) {
             observations.unshift(`protection_tier: ${item.tier}`);
           }
 
@@ -1338,9 +1424,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       if (response.ok) {
         const result = await response.json();
         // FastMCP wraps tool results in content array
-        const report = result?.content?.[0]?.text
-          ? JSON.parse(result.content[0].text)
-          : result;
+        const report = result?.content?.[0]?.text ? JSON.parse(result.content[0].text) : result;
         this.postMessage({ type: 'usageReport', report });
       } else {
         this.postMessage({ type: 'usageReport', report: null });
@@ -1352,12 +1436,8 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
   private getHtmlContent(webview: vscode.Webview): string {
     const distPath = vscode.Uri.joinPath(this.extensionUri, 'webview-dashboard', 'dist');
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(distPath, 'assets', 'index.js')
-    );
-    const styleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(distPath, 'assets', 'index.css')
-    );
+    const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(distPath, 'assets', 'index.js'));
+    const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(distPath, 'assets', 'index.css'));
     const nonce = getNonce();
 
     return `<!DOCTYPE html>

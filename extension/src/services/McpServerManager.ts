@@ -6,14 +6,24 @@ import { logSystem } from '../utils/logger';
 interface ServerDef {
   name: string;
   module: string;
-  cwd: string;       // relative to workspace root
+  cwd: string; // relative to workspace root
   port: number;
 }
 
 const SERVERS: ServerDef[] = [
-  { name: 'Knowledge Graph', module: 'collab_kg.server', cwd: 'mcp-servers/knowledge-graph', port: 3101 },
-  { name: 'Quality',         module: 'collab_quality.server', cwd: 'mcp-servers/quality',    port: 3102 },
-  { name: 'Governance',      module: 'collab_governance.server', cwd: 'mcp-servers/governance', port: 3103 },
+  {
+    name: 'Knowledge Graph',
+    module: 'collab_kg.server',
+    cwd: 'mcp-servers/knowledge-graph',
+    port: 3101,
+  },
+  { name: 'Quality', module: 'collab_quality.server', cwd: 'mcp-servers/quality', port: 3102 },
+  {
+    name: 'Governance',
+    module: 'collab_governance.server',
+    cwd: 'mcp-servers/governance',
+    port: 3103,
+  },
 ];
 
 const READY_POLL_INTERVAL = 500;
@@ -36,7 +46,7 @@ export class McpServerManager {
     logSystem('Starting all MCP servers...');
     this.outputChannel.appendLine('Starting MCP servers...');
 
-    const startPromises = SERVERS.map(server => this.startServer(server, workspaceRoot));
+    const startPromises = SERVERS.map((server) => this.startServer(server, workspaceRoot));
     const results = await Promise.allSettled(startPromises);
 
     const failed: string[] = [];
@@ -106,7 +116,7 @@ export class McpServerManager {
         this.outputChannel.appendLine(`${name} ready on port ${port}.`);
         return;
       }
-      await new Promise(r => setTimeout(r, READY_POLL_INTERVAL));
+      await new Promise((r) => setTimeout(r, READY_POLL_INTERVAL));
     }
     throw new Error(`${name} did not become ready on port ${port} within ${READY_TIMEOUT / 1000}s`);
   }

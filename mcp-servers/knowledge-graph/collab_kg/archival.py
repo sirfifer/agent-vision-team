@@ -7,7 +7,6 @@ into callable functions.
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 from .graph import KnowledgeGraph
 
@@ -46,8 +45,7 @@ def _write_architectural_decisions(kg: KnowledgeGraph, memory_dir: Path) -> int:
     decisions = kg.search_nodes("governance decision")
     # Also include entities explicitly typed as governance_decision
     gov_entities = [
-        ewr for ewr in _all_entities_by_type(kg, "governance_decision")
-        if ewr.name not in {d.name for d in decisions}
+        ewr for ewr in _all_entities_by_type(kg, "governance_decision") if ewr.name not in {d.name for d in decisions}
     ]
     all_entries = list(decisions) + list(gov_entities)
 
@@ -75,9 +73,7 @@ def _write_architectural_decisions(kg: KnowledgeGraph, memory_dir: Path) -> int:
                     lines.append(f"- {obs}")
             lines.append("")
 
-    (memory_dir / "architectural-decisions.md").write_text(
-        "\n".join(lines) + "\n", encoding="utf-8"
-    )
+    (memory_dir / "architectural-decisions.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return len(all_entries)
 
 
@@ -104,9 +100,7 @@ def _write_troubleshooting_log(kg: KnowledgeGraph, memory_dir: Path) -> int:
                 lines.append(f"- {obs}")
             lines.append("")
 
-    (memory_dir / "troubleshooting-log.md").write_text(
-        "\n".join(lines) + "\n", encoding="utf-8"
-    )
+    (memory_dir / "troubleshooting-log.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return len(problems)
 
 
@@ -133,9 +127,7 @@ def _write_solution_patterns(kg: KnowledgeGraph, memory_dir: Path) -> int:
                 lines.append(f"- {obs}")
             lines.append("")
 
-    (memory_dir / "solution-patterns.md").write_text(
-        "\n".join(lines) + "\n", encoding="utf-8"
-    )
+    (memory_dir / "solution-patterns.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return len(patterns)
 
 
@@ -169,9 +161,7 @@ def _write_research_findings(kg: KnowledgeGraph, memory_dir: Path) -> int:
                 lines.append(f"- {obs}")
             lines.append("")
 
-    (memory_dir / "research-findings.md").write_text(
-        "\n".join(lines) + "\n", encoding="utf-8"
-    )
+    (memory_dir / "research-findings.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return len(unique)
 
 
@@ -180,17 +170,17 @@ def _all_entities_by_type(kg: KnowledgeGraph, entity_type: str):
     results = []
     for name, entity in kg._entities.items():
         if entity.entity_type.value == entity_type:
-            relations = [
-                r for r in kg._relations
-                if r.from_entity == name or r.to == name
-            ]
+            relations = [r for r in kg._relations if r.from_entity == name or r.to == name]
             from .models import EntityWithRelations
-            results.append(EntityWithRelations(
-                name=entity.name,
-                entityType=entity.entity_type,
-                observations=entity.observations,
-                relations=relations,
-            ))
+
+            results.append(
+                EntityWithRelations(
+                    name=entity.name,
+                    entityType=entity.entity_type,
+                    observations=entity.observations,
+                    relations=relations,
+                )
+            )
     return results
 
 

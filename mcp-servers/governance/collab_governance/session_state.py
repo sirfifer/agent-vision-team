@@ -43,21 +43,21 @@ def generate_session_state(
         "# Session State",
         "",
         f"**Last Updated**: {now}",
-        f"**Phase**: Active development",
+        "**Phase**: Active development",
         f"**Active Tasks**: {task_stats.get('pending_review', 0)}",
         "",
         "## System Status",
         "",
         "| Component | Status | Notes |",
         "|-----------|--------|-------|",
-        f"| Knowledge Graph Server | Ready | Persistence active |",
-        f"| Quality Server | Ready | Trust engine active |",
+        "| Knowledge Graph Server | Ready | Persistence active |",
+        "| Quality Server | Ready | Trust engine active |",
         f"| Governance Server | Ready | {task_stats.get('total_governed_tasks', 0)} governed tasks |",
         "",
         "## Task Governance",
         "",
-        f"| Metric | Count |",
-        f"|--------|-------|",
+        "| Metric | Count |",
+        "|--------|-------|",
         f"| Total governed tasks | {task_stats.get('total_governed_tasks', 0)} |",
         f"| Pending review | {task_stats.get('pending_review', 0)} |",
         f"| Approved | {task_stats.get('approved', 0)} |",
@@ -66,8 +66,8 @@ def generate_session_state(
         "",
         "## Decision History",
         "",
-        f"| Metric | Count |",
-        f"|--------|-------|",
+        "| Metric | Count |",
+        "|--------|-------|",
         f"| Total decisions | {decision_status.get('total_decisions', 0)} |",
         f"| Approved | {decision_status.get('approved', 0)} |",
         f"| Blocked | {decision_status.get('blocked', 0)} |",
@@ -79,24 +79,27 @@ def generate_session_state(
     # Recent activity
     recent = decision_status.get("recent_activity", [])
     if recent:
-        lines.extend([
-            "## Recent Activity",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Recent Activity",
+                "",
+            ]
+        )
         for item in recent:
             verdict = item.get("verdict", "pending")
             lines.append(
-                f"- [{item.get('category', '?')}] {item.get('summary', '?')} "
-                f"by {item.get('agent', '?')} -- {verdict}"
+                f"- [{item.get('category', '?')}] {item.get('summary', '?')} by {item.get('agent', '?')} -- {verdict}"
             )
         lines.append("")
 
     # Extra notes
     if extra_notes:
-        lines.extend([
-            "## Notes",
-            "",
-        ])
+        lines.extend(
+            [
+                "## Notes",
+                "",
+            ]
+        )
         for note in extra_notes:
             lines.append(f"- {note}")
         lines.append("")

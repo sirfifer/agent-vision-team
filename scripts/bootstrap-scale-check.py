@@ -41,30 +41,73 @@ EXCLUDED_DIRS = [
 
 # Source file extensions to count
 SOURCE_EXTENSIONS = [
-    "py", "ts", "tsx", "js", "jsx", "swift", "rs", "go", "java",
-    "rb", "kt", "cs", "cpp", "c", "h", "hpp", "m", "mm",
-    "vue", "svelte", "scala", "clj", "ex", "exs", "hs",
+    "py",
+    "ts",
+    "tsx",
+    "js",
+    "jsx",
+    "swift",
+    "rs",
+    "go",
+    "java",
+    "rb",
+    "kt",
+    "cs",
+    "cpp",
+    "c",
+    "h",
+    "hpp",
+    "m",
+    "mm",
+    "vue",
+    "svelte",
+    "scala",
+    "clj",
+    "ex",
+    "exs",
+    "hs",
 ]
 
 # Package boundary files (indicate a self-contained package/module)
 PACKAGE_FILES = [
-    "package.json", "pyproject.toml", "setup.py", "Cargo.toml",
-    "go.mod", "pom.xml", "build.gradle", "Package.swift",
-    "Gemfile", "mix.exs", "build.sbt",
+    "package.json",
+    "pyproject.toml",
+    "setup.py",
+    "Cargo.toml",
+    "go.mod",
+    "pom.xml",
+    "build.gradle",
+    "Package.swift",
+    "Gemfile",
+    "mix.exs",
+    "build.sbt",
 ]
 
 # Monorepo indicator files
 MONOREPO_FILES = [
-    "pnpm-workspace.yaml", "lerna.json", "turbo.json", "nx.json",
+    "pnpm-workspace.yaml",
+    "lerna.json",
+    "turbo.json",
+    "nx.json",
     "rush.json",
 ]
 
 # Config files for convention detection
 CONFIG_FILES = [
-    ".eslintrc*", ".prettierrc*", "ruff.toml", "pyproject.toml",
-    "tsconfig.json", ".editorconfig", ".swiftformat", ".swiftlint.yml",
-    ".clang-format", "Makefile", "Justfile", ".rubocop.yml",
-    "biome.json", "deno.json",
+    ".eslintrc*",
+    ".prettierrc*",
+    "ruff.toml",
+    "pyproject.toml",
+    "tsconfig.json",
+    ".editorconfig",
+    ".swiftformat",
+    ".swiftlint.yml",
+    ".clang-format",
+    "Makefile",
+    "Justfile",
+    ".rubocop.yml",
+    "biome.json",
+    "deno.json",
 ]
 
 # Scale tier thresholds
@@ -230,7 +273,9 @@ def assess_scale(project_path: str) -> dict:
         "topLevelDirs": top_level_dirs,
         "languages": languages,
         "packages": [str(Path(p).relative_to(root)) for p in packages],
-        "monorepoIndicators": [str(Path(m).relative_to(root)) for m in monorepo_indicators if Path(m).is_relative_to(root)],
+        "monorepoIndicators": [
+            str(Path(m).relative_to(root)) for m in monorepo_indicators if Path(m).is_relative_to(root)
+        ],
         "configFiles": [str(Path(c).relative_to(root)) for c in config_results if Path(c).is_relative_to(root)],
         "tier": tier,
         "estimatedTimeMinutes": estimated_time,

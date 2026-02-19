@@ -12,11 +12,11 @@ from typing import Optional
 
 from fastmcp import FastMCP
 
+from .gates import check_all_gates as _check_all_gates
+from .tools.coverage import check_coverage as _check_coverage
 from .tools.formatting import auto_format as _auto_format
 from .tools.linting import run_lint as _run_lint
 from .tools.testing import run_tests as _run_tests
-from .tools.coverage import check_coverage as _check_coverage
-from .gates import check_all_gates as _check_all_gates
 from .trust_engine import TrustEngine
 
 mcp = FastMCP("Collab Intelligence Quality")
@@ -69,10 +69,7 @@ def validate() -> dict:
     """Comprehensive validation — all gates plus summary."""
     results = _check_all_gates()
     gate_names = ["build", "lint", "tests", "coverage", "findings"]
-    failed = [
-        name for name in gate_names
-        if not getattr(results, name).passed
-    ]
+    failed = [name for name in gate_names if not getattr(results, name).passed]
 
     if results.all_passed:
         summary = "All quality gates passed."

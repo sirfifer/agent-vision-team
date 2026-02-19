@@ -64,8 +64,7 @@ class AssertionEngine:
         if not tier_referenced:
             return (
                 False,
-                f"Write was blocked, but the error does not reference tier {tier!r}. "
-                f"Error text: {error_text[:200]}",
+                f"Write was blocked, but the error does not reference tier {tier!r}. Error text: {error_text[:200]}",
             )
 
         return (
@@ -94,8 +93,7 @@ class AssertionEngine:
         if actual is None:
             return (
                 False,
-                f"No verdict found in result. Expected {expected_verdict!r}. "
-                f"Keys present: {list(result.keys())}",
+                f"No verdict found in result. Expected {expected_verdict!r}. Keys present: {list(result.keys())}",
             )
 
         if actual.lower() == expected_verdict.lower():

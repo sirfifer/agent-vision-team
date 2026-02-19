@@ -4,9 +4,7 @@ import type { BootstrapReviewItem } from '../../types';
 type TierTab = 'vision' | 'architecture' | 'quality';
 
 const ENTITY_TYPE_OPTIONS: Record<TierTab, Array<{ value: string; label: string }>> = {
-  vision: [
-    { value: 'vision_standard', label: 'Vision Standard' },
-  ],
+  vision: [{ value: 'vision_standard', label: 'Vision Standard' }],
   architecture: [
     { value: 'architectural_standard', label: 'Arch Standard' },
     { value: 'pattern', label: 'Pattern' },
@@ -35,7 +33,11 @@ export function AddItemForm({
   const handleSubmit = () => {
     if (!name.trim() || !statement.trim()) return;
 
-    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    const id = name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '');
 
     onAdd({
       id,
@@ -61,8 +63,12 @@ export function AddItemForm({
           <input
             type="text"
             value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder={tier === 'vision' ? 'e.g. Protocol-Based Dependency Injection' : 'e.g. Repository Pattern'}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={
+              tier === 'vision'
+                ? 'e.g. Protocol-Based Dependency Injection'
+                : 'e.g. Repository Pattern'
+            }
             className="w-full text-xs p-2 rounded bg-vscode-bg border border-vscode-border text-vscode-fg placeholder:text-vscode-muted/50"
             autoFocus
           />
@@ -72,10 +78,12 @@ export function AddItemForm({
           <label className="text-2xs text-vscode-muted block mb-1">Statement</label>
           <textarea
             value={statement}
-            onChange={e => setStatement(e.target.value)}
-            placeholder={tier === 'vision'
-              ? 'e.g. All services must use protocol-based dependency injection'
-              : 'Describe the standard, pattern, or component'}
+            onChange={(e) => setStatement(e.target.value)}
+            placeholder={
+              tier === 'vision'
+                ? 'e.g. All services must use protocol-based dependency injection'
+                : 'Describe the standard, pattern, or component'
+            }
             className="w-full h-20 text-xs p-2 rounded bg-vscode-bg border border-vscode-border text-vscode-fg resize-y placeholder:text-vscode-muted/50"
           />
         </div>
@@ -85,11 +93,13 @@ export function AddItemForm({
             <label className="text-2xs text-vscode-muted block mb-1">Type</label>
             <select
               value={entityType}
-              onChange={e => setEntityType(e.target.value)}
+              onChange={(e) => setEntityType(e.target.value)}
               className="text-xs p-1.5 rounded bg-vscode-bg border border-vscode-border text-vscode-fg"
             >
-              {typeOptions.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              {typeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
               ))}
             </select>
           </div>

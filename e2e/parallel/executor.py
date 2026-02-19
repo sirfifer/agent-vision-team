@@ -165,9 +165,7 @@ class ParallelExecutor:
     # Internal: library-mode parallel execution
     # ------------------------------------------------------------------
 
-    def _run_library_parallel(
-        self, scenarios: list[BaseScenario]
-    ) -> list[ScenarioResult]:
+    def _run_library_parallel(self, scenarios: list[BaseScenario]) -> list[ScenarioResult]:
         """Run library scenarios concurrently, each with isolated storage."""
         from e2e.scenarios.base import AssertionResult, ScenarioResult
 
@@ -215,9 +213,7 @@ class ParallelExecutor:
     # Internal: HTTP-mode serial execution
     # ------------------------------------------------------------------
 
-    def _run_http_serial(
-        self, scenarios: list[BaseScenario]
-    ) -> list[ScenarioResult]:
+    def _run_http_serial(self, scenarios: list[BaseScenario]) -> list[ScenarioResult]:
         """Run HTTP scenarios one at a time (they share MCP servers)."""
         from e2e.scenarios.base import AssertionResult, ScenarioResult
 
@@ -258,9 +254,7 @@ class ParallelExecutor:
     # Internal: isolated execution of a single library scenario
     # ------------------------------------------------------------------
 
-    def _run_isolated(
-        self, scenario: BaseScenario, scenario_dir: Path
-    ) -> ScenarioResult:
+    def _run_isolated(self, scenario: BaseScenario, scenario_dir: Path) -> ScenarioResult:
         """Create isolated storage instances and execute *scenario*.
 
         Each scenario receives:

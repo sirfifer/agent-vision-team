@@ -76,9 +76,7 @@ class GovernanceReviewer:
         Returns:
             ReviewVerdict with holistic assessment
         """
-        prompt = self._build_group_review_prompt(
-            tasks, transcript_excerpt, vision_standards, architecture
-        )
+        prompt = self._build_group_review_prompt(tasks, transcript_excerpt, vision_standards, architecture)
         raw = self._run_claude(prompt, timeout=120, operation="review_task_group")
         return self._parse_verdict(raw)
 
@@ -92,9 +90,7 @@ class GovernanceReviewer:
         vision_standards: list[dict],
     ) -> ReviewVerdict:
         """Review completed work for final governance check."""
-        prompt = self._build_completion_prompt(
-            summary_of_work, files_changed, decisions, reviews, vision_standards
-        )
+        prompt = self._build_completion_prompt(summary_of_work, files_changed, decisions, reviews, vision_standards)
         raw = self._run_claude(prompt, timeout=90, operation="review_completion", related_id=task_id)
         return self._parse_verdict(raw, plan_id=task_id)
 
@@ -118,12 +114,14 @@ class GovernanceReviewer:
         start_time = time.monotonic()
 
         if os.environ.get("GOVERNANCE_MOCK_REVIEW"):
-            mock_output = json.dumps({
-                "verdict": "approved",
-                "findings": [],
-                "guidance": "Mock review: auto-approved for E2E testing.",
-                "standards_verified": ["mock"],
-            })
+            mock_output = json.dumps(
+                {
+                    "verdict": "approved",
+                    "findings": [],
+                    "guidance": "Mock review: auto-approved for E2E testing.",
+                    "standards_verified": ["mock"],
+                }
+            )
             elapsed_ms = int((time.monotonic() - start_time) * 1000)
             self._last_usage = UsageRecord(
                 agent="governance-reviewer",
@@ -337,8 +335,7 @@ class GovernanceReviewer:
         standards_text = self._format_standards(vision_standards)
         arch_text = self._format_architecture(architecture)
         alts_text = "\n".join(
-            f"  - {a.option}: rejected because {a.reason_rejected}"
-            for a in decision.alternatives_considered
+            f"  - {a.option}: rejected because {a.reason_rejected}" for a in decision.alternatives_considered
         )
 
         intent_text = decision.intent or "(not provided)"
@@ -361,9 +358,9 @@ class GovernanceReviewer:
 - **Intent**: {intent_text}
 - **Expected Outcome**: {outcome_text}
 - **Vision References**: {vrefs_text}
-- **Components affected**: {', '.join(decision.components_affected)}
+- **Components affected**: {", ".join(decision.components_affected)}
 - **Alternatives considered**:
-{alts_text or '  (none provided)'}
+{alts_text or "  (none provided)"}
 - **Confidence**: {decision.confidence.value}
 
 ## Instructions
@@ -430,8 +427,7 @@ Respond with ONLY a JSON object (no markdown, no explanation outside the JSON):
             for d in decisions
         )
         reviews_text = "\n".join(
-            f"  - Decision {r.decision_id}: {r.verdict.value} — {r.guidance[:100]}"
-            for r in reviews
+            f"  - Decision {r.decision_id}: {r.verdict.value} — {r.guidance[:100]}" for r in reviews
         )
 
         return f"""You are a governance reviewer. Evaluate this complete plan against vision and architecture standards.
@@ -443,10 +439,10 @@ Respond with ONLY a JSON object (no markdown, no explanation outside the JSON):
 {arch_text}
 
 ## Prior Decisions for This Task
-{decisions_text or '(none)'}
+{decisions_text or "(none)"}
 
 ## Prior Reviews
-{reviews_text or '(none)'}
+{reviews_text or "(none)"}
 
 ## Plan to Review
 **Summary**: {plan_summary}
@@ -508,9 +504,7 @@ Respond with ONLY a JSON object:
             + (f"\n    Expected Outcome: {d.expected_outcome}" if d.expected_outcome else "")
             for d in decisions
         )
-        reviews_text = "\n".join(
-            f"  - Decision {r.decision_id}: {r.verdict.value}" for r in reviews
-        )
+        reviews_text = "\n".join(f"  - Decision {r.decision_id}: {r.verdict.value}" for r in reviews)
 
         return f"""You are a governance reviewer. Evaluate this completed work.
 
@@ -518,14 +512,14 @@ Respond with ONLY a JSON object:
 {standards_text}
 
 ## Decisions Made During This Task
-{decisions_text or '(none)'}
+{decisions_text or "(none)"}
 
 ## Review Verdicts
-{reviews_text or '(none)'}
+{reviews_text or "(none)"}
 
 ## Completed Work
 **Summary**: {summary_of_work}
-**Files changed**: {', '.join(files_changed)}
+**Files changed**: {", ".join(files_changed)}
 
 ## Instructions
 
@@ -565,8 +559,7 @@ Respond with ONLY a JSON object:
         arch_text = self._format_architecture(architecture)
 
         tasks_text = "\n".join(
-            f"  {i+1}. **{t['subject']}**: {t.get('description', '')[:200]}"
-            for i, t in enumerate(tasks)
+            f"  {i + 1}. **{t['subject']}**: {t.get('description', '')[:200]}" for i, t in enumerate(tasks)
         )
 
         return f"""You are a governance reviewer performing a HOLISTIC review. You are evaluating multiple tasks as a GROUP, not individually.

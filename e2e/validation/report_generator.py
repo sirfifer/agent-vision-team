@@ -10,17 +10,16 @@ from __future__ import annotations
 
 import json
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TextIO
 
-from e2e.scenarios.base import AssertionResult, ScenarioResult
-
+from e2e.scenarios.base import ScenarioResult
 
 # ------------------------------------------------------------------
 # ANSI helpers (gracefully degrade when output is not a terminal)
 # ------------------------------------------------------------------
+
 
 class _Colors:
     """ANSI color codes, disabled when output is not a TTY."""
@@ -39,6 +38,7 @@ class _Colors:
 # ------------------------------------------------------------------
 # Public API
 # ------------------------------------------------------------------
+
 
 class ReportGenerator:
     """Generates reports from a collection of ``ScenarioResult`` objects."""
@@ -107,9 +107,7 @@ class ReportGenerator:
             counts = f"{result.passed} passed, {result.failed} failed"
             type_tag = f"{c.DIM}[{result.scenario_type}]{c.RESET}"
 
-            out.write(
-                f"  {status_icon}  {result.name:<40s} {counts:<22s} {duration_str}  {type_tag}\n"
-            )
+            out.write(f"  {status_icon}  {result.name:<40s} {counts:<22s} {duration_str}  {type_tag}\n")
 
         # ---- Totals ----
         out.write(f"\n{c.BOLD}{'-' * 70}{c.RESET}\n")
@@ -156,22 +154,26 @@ class ReportGenerator:
         details: list[dict[str, Any]] = []
         for result in self.results:
             if result.error:
-                details.append({
-                    "scenario": result.name,
-                    "assertion": "execution",
-                    "expected": "no error",
-                    "actual": result.error,
-                    "error": result.error,
-                })
+                details.append(
+                    {
+                        "scenario": result.name,
+                        "assertion": "execution",
+                        "expected": "no error",
+                        "actual": result.error,
+                        "error": result.error,
+                    }
+                )
             for assertion in result.assertions:
                 if not assertion.passed:
-                    details.append({
-                        "scenario": result.name,
-                        "assertion": assertion.name,
-                        "expected": assertion.expected,
-                        "actual": assertion.actual,
-                        "error": assertion.error,
-                    })
+                    details.append(
+                        {
+                            "scenario": result.name,
+                            "assertion": assertion.name,
+                            "expected": assertion.expected,
+                            "actual": assertion.actual,
+                            "error": assertion.error,
+                        }
+                    )
         return details
 
     # ------------------------------------------------------------------
@@ -228,6 +230,7 @@ class ReportGenerator:
 # ------------------------------------------------------------------
 # Convenience function
 # ------------------------------------------------------------------
+
 
 def generate_report(
     results: list[ScenarioResult],

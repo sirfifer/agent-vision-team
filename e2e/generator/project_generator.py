@@ -20,17 +20,16 @@ from __future__ import annotations
 
 import json
 import random
-import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from e2e.generator.domain_templates import DomainTemplate, get_domain_pool
 
-
 # ---------------------------------------------------------------------------
 # Public data structures
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class VisionStandard:
@@ -80,6 +79,7 @@ class GeneratedProject:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _pick_domain(rng: random.Random) -> DomainTemplate:
     """Select a random domain from the pool."""
     pool = get_domain_pool()
@@ -94,12 +94,7 @@ def _fill_template(
     component: str,
 ) -> str:
     """Replace ``{domain}``, ``{prefix}``, and ``{component}`` placeholders."""
-    return (
-        template
-        .replace("{domain}", domain)
-        .replace("{prefix}", prefix)
-        .replace("{component}", component)
-    )
+    return template.replace("{domain}", domain).replace("{prefix}", prefix).replace("{component}", component)
 
 
 def _materialise_vision_standards(
@@ -153,6 +148,7 @@ def _materialise_architecture_patterns(
 # ---------------------------------------------------------------------------
 # Filesystem writers
 # ---------------------------------------------------------------------------
+
 
 def _write_directory_structure(workspace: Path) -> dict[str, Path]:
     """Create the ``.avt/`` and ``docs/`` directory trees.
@@ -210,7 +206,7 @@ def _write_knowledge_graph(
             "entityType": "vision_standard",
             "observations": [
                 f"protection_tier: {vs.tier}",
-                f"mutability: human_only",
+                "mutability: human_only",
                 vs.statement,
             ],
         }
@@ -322,6 +318,7 @@ def _ensure_governance_db(workspace: Path) -> Path:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def generate_project(
     workspace: Path,
     *,
@@ -355,8 +352,7 @@ def generate_project(
     # Guard against overwriting real projects
     if (workspace / ".avt").exists():
         msg = (
-            f"Workspace already contains an .avt/ directory: {workspace}. "
-            "Refusing to overwrite. Use a clean directory."
+            f"Workspace already contains an .avt/ directory: {workspace}. Refusing to overwrite. Use a clean directory."
         )
         raise FileExistsError(msg)
 
@@ -391,13 +387,9 @@ def generate_project(
         domain_name=domain.name,
         domain_prefix=domain.prefix,
         components=list(domain.components),
-        vision_standards=[
-            {"name": vs.name, "statement": vs.statement, "tier": vs.tier}
-            for vs in vision_standards
-        ],
+        vision_standards=[{"name": vs.name, "statement": vs.statement, "tier": vs.tier} for vs in vision_standards],
         architecture_patterns=[
-            {"name": ap.name, "description": ap.description, "tier": ap.tier}
-            for ap in architecture_patterns
+            {"name": ap.name, "description": ap.description, "tier": ap.tier} for ap in architecture_patterns
         ],
         workspace_path=workspace,
         kg_path=kg_path,

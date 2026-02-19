@@ -8,7 +8,6 @@ from pathlib import Path
 
 from ..config import config
 
-
 # Default project configuration (mirrors extension/src/models/ProjectConfig.ts)
 DEFAULT_QUALITY_CONFIG = {
     "testCommands": {
@@ -232,11 +231,13 @@ class ProjectConfigService:
         for f in sorted(self._briefs_dir.iterdir(), key=lambda x: x.stat().st_mtime, reverse=True):
             if f.suffix == ".md" and f.name.lower() != "readme.md":
                 stat = f.stat()
-                briefs.append({
-                    "name": f.name,
-                    "path": str(f.relative_to(self.project_dir)),
-                    "modifiedAt": str(stat.st_mtime),
-                })
+                briefs.append(
+                    {
+                        "name": f.name,
+                        "path": str(f.relative_to(self.project_dir)),
+                        "modifiedAt": str(stat.st_mtime),
+                    }
+                )
         return briefs
 
     def read_research_brief(self, brief_path: str) -> str:
@@ -268,18 +269,12 @@ class ProjectConfigService:
     def _has_docs(self, folder: Path) -> bool:
         if not folder.exists():
             return False
-        return any(
-            f.suffix == ".md" and f.name.lower() != "readme.md"
-            for f in folder.iterdir()
-        )
+        return any(f.suffix == ".md" and f.name.lower() != "readme.md" for f in folder.iterdir())
 
     def _count_docs(self, folder: Path) -> int:
         if not folder.exists():
             return 0
-        return sum(
-            1 for f in folder.iterdir()
-            if f.suffix == ".md" and f.name.lower() != "readme.md"
-        )
+        return sum(1 for f in folder.iterdir() if f.suffix == ".md" and f.name.lower() != "readme.md")
 
     @staticmethod
     def _sanitize_filename(name: str) -> str:

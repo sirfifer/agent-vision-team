@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..auth import require_auth
 from ..app_state import ProjectState
+from ..auth import require_auth
 from ..deps import get_project_state
 
 router = APIRouter(tags=["research"], dependencies=[Depends(require_auth)])
 
 
 # -- Research Prompts --
+
 
 @router.get("/research-prompts")
 async def list_research_prompts(state: ProjectState = Depends(get_project_state)) -> dict:
@@ -60,6 +61,7 @@ async def run_research_prompt(prompt_id: str, state: ProjectState = Depends(get_
 
 
 # -- Research Briefs --
+
 
 @router.get("/research-briefs")
 async def list_research_briefs(state: ProjectState = Depends(get_project_state)) -> dict:

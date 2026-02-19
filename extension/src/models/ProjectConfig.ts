@@ -48,7 +48,14 @@ export interface ProjectMetadata {
   license?: string;
 }
 
-export type RuleCategory = 'testing' | 'code-quality' | 'security' | 'performance' | 'patterns' | 'workflow' | 'custom';
+export type RuleCategory =
+  | 'testing'
+  | 'code-quality'
+  | 'security'
+  | 'performance'
+  | 'patterns'
+  | 'workflow'
+  | 'custom';
 export type RuleEnforcement = 'enforce' | 'prefer' | 'guide';
 export type RuleScope = 'all' | 'worker' | 'quality-reviewer' | 'researcher' | 'steward';
 
@@ -159,38 +166,158 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
  */
 export const RECOMMENDED_PERMISSIONS: PermissionEntry[] = [
   // Build
-  { pattern: 'Bash(npm run build:*)', description: 'Build TypeScript/JavaScript projects', recommended: true, category: 'build' },
-  { pattern: 'Bash(npx tsc:*)', description: 'Run TypeScript compiler directly', recommended: true, category: 'build' },
+  {
+    pattern: 'Bash(npm run build:*)',
+    description: 'Build TypeScript/JavaScript projects',
+    recommended: true,
+    category: 'build',
+  },
+  {
+    pattern: 'Bash(npx tsc:*)',
+    description: 'Run TypeScript compiler directly',
+    recommended: true,
+    category: 'build',
+  },
   // Test
-  { pattern: 'Bash(npm run test:*)', description: 'Run JavaScript/TypeScript tests', recommended: true, category: 'test' },
-  { pattern: 'Bash(uv run pytest:*)', description: 'Run Python tests', recommended: true, category: 'test' },
-  { pattern: 'Bash(./e2e/run-e2e.sh:*)', description: 'Run the E2E testing harness', recommended: true, category: 'test' },
+  {
+    pattern: 'Bash(npm run test:*)',
+    description: 'Run JavaScript/TypeScript tests',
+    recommended: true,
+    category: 'test',
+  },
+  {
+    pattern: 'Bash(uv run pytest:*)',
+    description: 'Run Python tests',
+    recommended: true,
+    category: 'test',
+  },
+  {
+    pattern: 'Bash(./e2e/run-e2e.sh:*)',
+    description: 'Run the E2E testing harness',
+    recommended: true,
+    category: 'test',
+  },
   // Lint & Format
-  { pattern: 'Bash(npm run lint:*)', description: 'Run ESLint', recommended: true, category: 'lint' },
-  { pattern: 'Bash(npx eslint:*)', description: 'Run ESLint directly', recommended: true, category: 'lint' },
-  { pattern: 'Bash(uv run ruff:*)', description: 'Run Python linter/formatter', recommended: true, category: 'lint' },
-  { pattern: 'Bash(npx prettier:*)', description: 'Run Prettier code formatter', recommended: true, category: 'lint' },
+  {
+    pattern: 'Bash(npm run lint:*)',
+    description: 'Run ESLint',
+    recommended: true,
+    category: 'lint',
+  },
+  {
+    pattern: 'Bash(npx eslint:*)',
+    description: 'Run ESLint directly',
+    recommended: true,
+    category: 'lint',
+  },
+  {
+    pattern: 'Bash(uv run ruff:*)',
+    description: 'Run Python linter/formatter',
+    recommended: true,
+    category: 'lint',
+  },
+  {
+    pattern: 'Bash(npx prettier:*)',
+    description: 'Run Prettier code formatter',
+    recommended: true,
+    category: 'lint',
+  },
   // Dependencies
-  { pattern: 'Bash(uv sync:*)', description: 'Sync Python dependencies', recommended: true, category: 'deps' },
-  { pattern: 'Bash(npm ci:*)', description: 'Clean install npm dependencies', recommended: true, category: 'deps' },
+  {
+    pattern: 'Bash(uv sync:*)',
+    description: 'Sync Python dependencies',
+    recommended: true,
+    category: 'deps',
+  },
+  {
+    pattern: 'Bash(npm ci:*)',
+    description: 'Clean install npm dependencies',
+    recommended: true,
+    category: 'deps',
+  },
   // MCP Servers
-  { pattern: 'mcp__collab-kg__*', description: 'Knowledge Graph: entities, relations, observations, search', recommended: true, category: 'mcp' },
-  { pattern: 'mcp__collab-quality__*', description: 'Quality: lint, test, format, coverage, gates, trust engine', recommended: true, category: 'mcp' },
-  { pattern: 'mcp__collab-governance__*', description: 'Governance: decisions, reviews, governed tasks, status', recommended: true, category: 'mcp' },
+  {
+    pattern: 'mcp__collab-kg__*',
+    description: 'Knowledge Graph: entities, relations, observations, search',
+    recommended: true,
+    category: 'mcp',
+  },
+  {
+    pattern: 'mcp__collab-quality__*',
+    description: 'Quality: lint, test, format, coverage, gates, trust engine',
+    recommended: true,
+    category: 'mcp',
+  },
+  {
+    pattern: 'mcp__collab-governance__*',
+    description: 'Governance: decisions, reviews, governed tasks, status',
+    recommended: true,
+    category: 'mcp',
+  },
   // Git (core operations)
-  { pattern: 'Bash(git status:*)', description: 'Check git status', recommended: true, category: 'git' },
-  { pattern: 'Bash(git diff:*)', description: 'View git diffs', recommended: true, category: 'git' },
+  {
+    pattern: 'Bash(git status:*)',
+    description: 'Check git status',
+    recommended: true,
+    category: 'git',
+  },
+  {
+    pattern: 'Bash(git diff:*)',
+    description: 'View git diffs',
+    recommended: true,
+    category: 'git',
+  },
   { pattern: 'Bash(git add:*)', description: 'Stage files', recommended: true, category: 'git' },
-  { pattern: 'Bash(git commit:*)', description: 'Create commits', recommended: true, category: 'git' },
-  { pattern: 'Bash(git log:*)', description: 'View git history', recommended: true, category: 'git' },
-  { pattern: 'Bash(git branch:*)', description: 'List and manage branches', recommended: true, category: 'git' },
+  {
+    pattern: 'Bash(git commit:*)',
+    description: 'Create commits',
+    recommended: true,
+    category: 'git',
+  },
+  {
+    pattern: 'Bash(git log:*)',
+    description: 'View git history',
+    recommended: true,
+    category: 'git',
+  },
+  {
+    pattern: 'Bash(git branch:*)',
+    description: 'List and manage branches',
+    recommended: true,
+    category: 'git',
+  },
   // Git (worker isolation & checkpoints)
-  { pattern: 'Bash(git worktree:*)', description: 'Create/remove worktrees for parallel worker isolation', recommended: true, category: 'git' },
-  { pattern: 'Bash(git tag:*)', description: 'Create checkpoint tags for recovery', recommended: true, category: 'git' },
-  { pattern: 'Bash(git merge:*)', description: 'Merge worker branches after review', recommended: true, category: 'git' },
+  {
+    pattern: 'Bash(git worktree:*)',
+    description: 'Create/remove worktrees for parallel worker isolation',
+    recommended: true,
+    category: 'git',
+  },
+  {
+    pattern: 'Bash(git tag:*)',
+    description: 'Create checkpoint tags for recovery',
+    recommended: true,
+    category: 'git',
+  },
+  {
+    pattern: 'Bash(git merge:*)',
+    description: 'Merge worker branches after review',
+    recommended: true,
+    category: 'git',
+  },
   // Other (required by governance hooks)
-  { pattern: 'Bash(sqlite3:*)', description: 'Query governance DB (used by verification hooks)', recommended: true, category: 'other' },
-  { pattern: 'Bash(uv run python:*)', description: 'Run Python scripts and MCP servers', recommended: true, category: 'other' },
+  {
+    pattern: 'Bash(sqlite3:*)',
+    description: 'Query governance DB (used by verification hooks)',
+    recommended: true,
+    category: 'other',
+  },
+  {
+    pattern: 'Bash(uv run python:*)',
+    description: 'Run Python scripts and MCP servers',
+    recommended: true,
+    category: 'other',
+  },
 ];
 
 /**
@@ -200,16 +327,54 @@ export const RECOMMENDED_PERMISSIONS: PermissionEntry[] = [
  * warrant explicit opt-in by the user.
  */
 export const OPTIONAL_PERMISSIONS: PermissionEntry[] = [
-  { pattern: 'Bash(git push:*)', description: 'Push to remote (requires review)', recommended: false, category: 'git' },
-  { pattern: 'Bash(git checkout:*)', description: 'Switch branches', recommended: false, category: 'git' },
-  { pattern: 'Bash(npm install:*)', description: 'Install npm packages (modifies lockfile)', recommended: false, category: 'deps' },
-  { pattern: 'Bash(pip install:*)', description: 'Install Python packages', recommended: false, category: 'deps' },
-  { pattern: 'Bash(docker:*)', description: 'Run Docker commands', recommended: false, category: 'other' },
-  { pattern: 'Bash(curl:*)', description: 'Make HTTP requests', recommended: false, category: 'other' },
-  { pattern: 'Bash(pkill:*)', description: 'Kill processes (e.g., stop MCP servers)', recommended: false, category: 'other' },
+  {
+    pattern: 'Bash(git push:*)',
+    description: 'Push to remote (requires review)',
+    recommended: false,
+    category: 'git',
+  },
+  {
+    pattern: 'Bash(git checkout:*)',
+    description: 'Switch branches',
+    recommended: false,
+    category: 'git',
+  },
+  {
+    pattern: 'Bash(npm install:*)',
+    description: 'Install npm packages (modifies lockfile)',
+    recommended: false,
+    category: 'deps',
+  },
+  {
+    pattern: 'Bash(pip install:*)',
+    description: 'Install Python packages',
+    recommended: false,
+    category: 'deps',
+  },
+  {
+    pattern: 'Bash(docker:*)',
+    description: 'Run Docker commands',
+    recommended: false,
+    category: 'other',
+  },
+  {
+    pattern: 'Bash(curl:*)',
+    description: 'Make HTTP requests',
+    recommended: false,
+    category: 'other',
+  },
+  {
+    pattern: 'Bash(pkill:*)',
+    description: 'Kill processes (e.g., stop MCP servers)',
+    recommended: false,
+    category: 'other',
+  },
 ];
 
-export const ALL_PERMISSIONS: PermissionEntry[] = [...RECOMMENDED_PERMISSIONS, ...OPTIONAL_PERMISSIONS];
+export const ALL_PERMISSIONS: PermissionEntry[] = [
+  ...RECOMMENDED_PERMISSIONS,
+  ...OPTIONAL_PERMISSIONS,
+];
 
 /**
  * Default rules - checked by default in the wizard.
@@ -227,7 +392,8 @@ export const ALL_PERMISSIONS: PermissionEntry[] = [...RECOMMENDED_PERMISSIONS, .
 export const DEFAULT_RULES: RuleEntry[] = [
   {
     id: 'no-mocks',
-    statement: 'Write real integration and unit tests — never use mocks or stubs unless testing external service boundaries',
+    statement:
+      'Write real integration and unit tests — never use mocks or stubs unless testing external service boundaries',
     rationale: 'Mocks hide integration bugs and create false confidence in test suites',
     category: 'testing',
     enforcement: 'enforce',
@@ -257,7 +423,8 @@ export const DEFAULT_RULES: RuleEntry[] = [
   },
   {
     id: 'follow-patterns',
-    statement: 'Follow existing patterns in the codebase. Search for similar implementations before creating new patterns',
+    statement:
+      'Follow existing patterns in the codebase. Search for similar implementations before creating new patterns',
     rationale: 'Consistency reduces cognitive load; new patterns require justification',
     category: 'code-quality',
     enforcement: 'enforce',
@@ -277,7 +444,7 @@ export const DEFAULT_RULES: RuleEntry[] = [
   },
   {
     id: 'focused-changes',
-    statement: 'Keep changes focused. Don\'t refactor surrounding code unless it\'s part of the task',
+    statement: "Keep changes focused. Don't refactor surrounding code unless it's part of the task",
     rationale: 'Scope creep makes reviews harder and introduces unrelated risk',
     category: 'workflow',
     enforcement: 'prefer',
@@ -287,7 +454,8 @@ export const DEFAULT_RULES: RuleEntry[] = [
   },
   {
     id: 'read-before-modify',
-    statement: 'Read relevant code before modifying it. Never propose changes to code you haven\'t read',
+    statement:
+      "Read relevant code before modifying it. Never propose changes to code you haven't read",
     rationale: 'Blind modifications break assumptions and miss existing constraints',
     category: 'workflow',
     enforcement: 'enforce',
@@ -297,8 +465,10 @@ export const DEFAULT_RULES: RuleEntry[] = [
   },
   {
     id: 'reassess-on-failure',
-    statement: 'When encountering repeated failures (3+ attempts), stop and reassess the approach rather than continuing to iterate',
-    rationale: 'Repeated failures signal a wrong approach — iteration without reflection wastes resources',
+    statement:
+      'When encountering repeated failures (3+ attempts), stop and reassess the approach rather than continuing to iterate',
+    rationale:
+      'Repeated failures signal a wrong approach — iteration without reflection wastes resources',
     category: 'workflow',
     enforcement: 'prefer',
     scope: ['worker'],

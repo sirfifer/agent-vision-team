@@ -15,12 +15,12 @@ class ProjectStatus(str, Enum):
 
 
 class ProjectInfo(BaseModel):
-    id: str                           # slug, e.g. "agent-vision-team"
-    name: str                         # display name
-    path: str                         # absolute path to project root
+    id: str  # slug, e.g. "agent-vision-team"
+    name: str  # display name
+    path: str  # absolute path to project root
     status: ProjectStatus = ProjectStatus.STOPPED
-    slot: int                         # port allocation slot (0, 1, 2, ...)
-    mcp_base_port: int                # base port = 3101 + (slot * 3)
+    slot: int  # port allocation slot (0, 1, 2, ...)
+    mcp_base_port: int  # base port = 3101 + (slot * 3)
 
     @property
     def kg_port(self) -> int:

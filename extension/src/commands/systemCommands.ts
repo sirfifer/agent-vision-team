@@ -6,7 +6,7 @@ import { logSystem } from '../utils/logger';
 export function registerSystemCommands(
   context: vscode.ExtensionContext,
   mcpClient: McpClientService,
-  statusBar: StatusBarService
+  statusBar: StatusBarService,
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('collab.startSystem', async () => {
@@ -23,7 +23,7 @@ export function registerSystemCommands(
         statusBar.setHealth('error');
         vscode.window.showErrorMessage(`Failed to start system: ${error}`);
       }
-    })
+    }),
   );
 
   context.subscriptions.push(
@@ -38,6 +38,6 @@ export function registerSystemCommands(
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to stop system: ${error}`);
       }
-    })
+    }),
   );
 }

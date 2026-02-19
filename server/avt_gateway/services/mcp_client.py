@@ -155,11 +155,14 @@ class McpSseConnection:
 
     async def _initialize(self) -> None:
         """Perform MCP initialize + initialized handshake."""
-        await self._send_request("initialize", {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": {"name": "avt-gateway", "version": "0.1.0"},
-        })
+        await self._send_request(
+            "initialize",
+            {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "avt-gateway", "version": "0.1.0"},
+            },
+        )
 
         # Send initialized notification (no id, no response expected)
         await self._client.post(

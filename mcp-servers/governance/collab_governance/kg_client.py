@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 from typing import Optional
 
-
 DEFAULT_KG_PATH = Path(".avt/knowledge-graph.jsonl")
 
 # Cache TTL in seconds (5 minutes)
@@ -83,12 +82,7 @@ class KGClient:
         if cached is not None:
             return cached
         entities = self._load_entities()
-        result = [
-            e
-            for e in entities
-            if e.get("entityType")
-            in ("architectural_standard", "pattern", "component")
-        ]
+        result = [e for e in entities if e.get("entityType") in ("architectural_standard", "pattern", "component")]
         self._set_cached("architecture_entities", result)
         return result
 

@@ -20,9 +20,8 @@ export function WarningDialog({
   const bgColor = severity === 'danger' ? 'bg-red-500/10' : 'bg-amber-500/10';
   const borderColor = severity === 'danger' ? 'border-red-500/50' : 'border-amber-500/50';
   const iconColor = severity === 'danger' ? 'text-red-400' : 'text-amber-400';
-  const btnColor = severity === 'danger'
-    ? 'bg-red-600 hover:bg-red-500'
-    : 'bg-amber-600 hover:bg-amber-500';
+  const btnColor =
+    severity === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-amber-600 hover:bg-amber-500';
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70">

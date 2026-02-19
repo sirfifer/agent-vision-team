@@ -5,7 +5,6 @@ from typing import Optional
 
 from ..config import get_coverage_threshold
 
-
 COVERAGE_TOOLS = {
     "python": ["pytest", "--cov", "--cov-report=term"],
     "javascript": ["npm", "run", "coverage"],

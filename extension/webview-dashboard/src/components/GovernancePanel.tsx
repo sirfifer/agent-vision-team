@@ -10,9 +10,17 @@ export function GovernancePanel({ className = '' }: { className?: string }) {
   const [archOpen, setArchOpen] = useState(true);
 
   return (
-    <div className={`border-r border-vscode-border ${className}`} title="Governance panel: shows the three-tier hierarchy of standards and patterns from the Knowledge Graph">
+    <div
+      className={`border-r border-vscode-border ${className}`}
+      title="Governance panel: shows the three-tier hierarchy of standards and patterns from the Knowledge Graph"
+    >
       <div className="px-3 py-2 border-b border-vscode-border">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-vscode-muted" title="Entities loaded from the Knowledge Graph, organized by protection tier. Vision standards are inviolable; architecture patterns guide implementation.">Governance</h2>
+        <h2
+          className="text-xs font-semibold uppercase tracking-wider text-vscode-muted"
+          title="Entities loaded from the Knowledge Graph, organized by protection tier. Vision standards are inviolable; architecture patterns guide implementation."
+        >
+          Governance
+        </h2>
       </div>
 
       {/* Vision Standards */}
@@ -24,18 +32,24 @@ export function GovernancePanel({ className = '' }: { className?: string }) {
         >
           <span className="text-xs text-vscode-muted">{visionOpen ? '\u25BC' : '\u25B6'}</span>
           <span className="text-xs font-semibold flex-1 text-left">Vision Standards</span>
-          <span className="text-2xs px-1.5 py-0.5 rounded-full bg-tier-vision/20 text-tier-vision font-semibold" title={`${data.visionStandards.length} vision standard(s) loaded from the Knowledge Graph`}>
+          <span
+            className="text-2xs px-1.5 py-0.5 rounded-full bg-tier-vision/20 text-tier-vision font-semibold"
+            title={`${data.visionStandards.length} vision standard(s) loaded from the Knowledge Graph`}
+          >
             {data.visionStandards.length}
           </span>
         </button>
         {visionOpen && (
           <div>
             {data.visionStandards.length === 0 ? (
-              <div className="px-3 py-4 text-xs text-vscode-muted text-center italic" title="Use 'Refresh' to load vision standards from the Knowledge Graph, or create them with create_entities() using entityType: 'vision_standard'">
+              <div
+                className="px-3 py-4 text-xs text-vscode-muted text-center italic"
+                title="Use 'Refresh' to load vision standards from the Knowledge Graph, or create them with create_entities() using entityType: 'vision_standard'"
+              >
                 No vision standards loaded
               </div>
             ) : (
-              data.visionStandards.map(entity => (
+              data.visionStandards.map((entity) => (
                 <GovernanceItem key={entity.name} entity={entity} />
               ))
             )}
@@ -52,18 +66,24 @@ export function GovernancePanel({ className = '' }: { className?: string }) {
         >
           <span className="text-xs text-vscode-muted">{archOpen ? '\u25BC' : '\u25B6'}</span>
           <span className="text-xs font-semibold flex-1 text-left">Architecture</span>
-          <span className="text-2xs px-1.5 py-0.5 rounded-full bg-tier-architecture/20 text-tier-architecture font-semibold" title={`${data.architecturalElements.length} architectural element(s) loaded from the Knowledge Graph`}>
+          <span
+            className="text-2xs px-1.5 py-0.5 rounded-full bg-tier-architecture/20 text-tier-architecture font-semibold"
+            title={`${data.architecturalElements.length} architectural element(s) loaded from the Knowledge Graph`}
+          >
             {data.architecturalElements.length}
           </span>
         </button>
         {archOpen && (
           <div>
             {data.architecturalElements.length === 0 ? (
-              <div className="px-3 py-4 text-xs text-vscode-muted text-center italic" title="Use 'Refresh' to load architectural entities from the Knowledge Graph">
+              <div
+                className="px-3 py-4 text-xs text-vscode-muted text-center italic"
+                title="Use 'Refresh' to load architectural entities from the Knowledge Graph"
+              >
                 No architectural elements loaded
               </div>
             ) : (
-              data.architecturalElements.map(entity => (
+              data.architecturalElements.map((entity) => (
                 <GovernanceItem key={entity.name} entity={entity} />
               ))
             )}

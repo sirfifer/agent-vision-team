@@ -37,7 +37,7 @@ class JobRunner:
         self._jobs: dict[str, Job] = {}
         self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._worker_task: asyncio.Task | None = None
-        self._jobs_dir = (self._project_dir / ".avt" / "jobs")
+        self._jobs_dir = self._project_dir / ".avt" / "jobs"
         self._jobs_dir.mkdir(parents=True, exist_ok=True)
 
         # Load persisted jobs
@@ -193,6 +193,7 @@ class JobRunner:
         """Broadcast job status to WebSocket clients."""
         try:
             from ..ws.manager import ws_manager
+
             await ws_manager.broadcast("job_status", job.model_dump())
         except Exception:
             pass

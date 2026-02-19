@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import type { ProjectConfig, RuleEntry, RuleCategory, RuleEnforcement, RuleScope, RulesConfig } from '../../../types';
+import type {
+  ProjectConfig,
+  RuleEntry,
+  RuleCategory,
+  RuleEnforcement,
+  RuleScope,
+  RulesConfig,
+} from '../../../types';
 
 interface RulesStepProps {
   config: ProjectConfig;
@@ -15,7 +22,8 @@ interface RulesStepProps {
 const DEFAULT_RULES: RuleEntry[] = [
   {
     id: 'no-mocks',
-    statement: 'Write real integration and unit tests — never use mocks or stubs unless testing external service boundaries',
+    statement:
+      'Write real integration and unit tests — never use mocks or stubs unless testing external service boundaries',
     rationale: 'Mocks hide integration bugs and create false confidence in test suites',
     category: 'testing',
     enforcement: 'enforce',
@@ -45,7 +53,8 @@ const DEFAULT_RULES: RuleEntry[] = [
   },
   {
     id: 'follow-patterns',
-    statement: 'Follow existing patterns in the codebase. Search for similar implementations before creating new patterns',
+    statement:
+      'Follow existing patterns in the codebase. Search for similar implementations before creating new patterns',
     rationale: 'Consistency reduces cognitive load; new patterns require justification',
     category: 'code-quality',
     enforcement: 'enforce',
@@ -65,7 +74,7 @@ const DEFAULT_RULES: RuleEntry[] = [
   },
   {
     id: 'focused-changes',
-    statement: 'Keep changes focused. Don\'t refactor surrounding code unless it\'s part of the task',
+    statement: "Keep changes focused. Don't refactor surrounding code unless it's part of the task",
     rationale: 'Scope creep makes reviews harder and introduces unrelated risk',
     category: 'workflow',
     enforcement: 'prefer',
@@ -75,7 +84,8 @@ const DEFAULT_RULES: RuleEntry[] = [
   },
   {
     id: 'read-before-modify',
-    statement: 'Read relevant code before modifying it. Never propose changes to code you haven\'t read',
+    statement:
+      "Read relevant code before modifying it. Never propose changes to code you haven't read",
     rationale: 'Blind modifications break assumptions and miss existing constraints',
     category: 'workflow',
     enforcement: 'enforce',
@@ -85,8 +95,10 @@ const DEFAULT_RULES: RuleEntry[] = [
   },
   {
     id: 'reassess-on-failure',
-    statement: 'When encountering repeated failures (3+ attempts), stop and reassess the approach rather than continuing to iterate',
-    rationale: 'Repeated failures signal a wrong approach — iteration without reflection wastes resources',
+    statement:
+      'When encountering repeated failures (3+ attempts), stop and reassess the approach rather than continuing to iterate',
+    rationale:
+      'Repeated failures signal a wrong approach — iteration without reflection wastes resources',
     category: 'workflow',
     enforcement: 'prefer',
     scope: ['worker'],
@@ -172,16 +184,24 @@ const SCOPE_LABELS: Record<RuleScope, string> = {
   steward: 'Steward',
 };
 
-const CATEGORY_ORDER: RuleCategory[] = ['testing', 'code-quality', 'workflow', 'patterns', 'security', 'performance', 'custom'];
+const CATEGORY_ORDER: RuleCategory[] = [
+  'testing',
+  'code-quality',
+  'workflow',
+  'patterns',
+  'security',
+  'performance',
+  'custom',
+];
 
 // Rough estimate: ~4 tokens per word, average rule ~12 words
 function estimateTokens(rules: RuleEntry[]): number {
-  const enabledRules = rules.filter(r => r.enabled);
+  const enabledRules = rules.filter((r) => r.enabled);
   // Header + structure overhead (~30 tokens) + ~4 tokens per word per rule
   const headerTokens = 30;
   const ruleTokens = enabledRules.reduce((sum, r) => {
     const words = r.statement.split(/\s+/).length;
-    return sum + (words * 4) + 8; // +8 for bullet formatting
+    return sum + words * 4 + 8; // +8 for bullet formatting
   }, 0);
   return headerTokens + ruleTokens;
 }
@@ -220,9 +240,7 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
   };
 
   const handleToggle = (ruleId: string) => {
-    const updated = currentRules.map(r =>
-      r.id === ruleId ? { ...r, enabled: !r.enabled } : r
-    );
+    const updated = currentRules.map((r) => (r.id === ruleId ? { ...r, enabled: !r.enabled } : r));
     updateRules(updated);
   };
 
@@ -252,24 +270,24 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
   };
 
   const handleRemoveCustomRule = (ruleId: string) => {
-    const updated = currentRules.filter(r => r.id !== ruleId);
+    const updated = currentRules.filter((r) => r.id !== ruleId);
     updateRules(updated);
   };
 
   const handleScopeToggle = (scope: RuleScope) => {
-    setCustomScope(prev =>
-      prev.includes(scope) ? prev.filter(s => s !== scope) : [...prev, scope]
+    setCustomScope((prev) =>
+      prev.includes(scope) ? prev.filter((s) => s !== scope) : [...prev, scope],
     );
   };
 
   // Group rules by category for display
-  const groupedRules = CATEGORY_ORDER.map(category => ({
+  const groupedRules = CATEGORY_ORDER.map((category) => ({
     category,
     label: CATEGORY_LABELS[category],
-    rules: currentRules.filter(r => r.category === category),
-  })).filter(g => g.rules.length > 0);
+    rules: currentRules.filter((r) => r.category === category),
+  })).filter((g) => g.rules.length > 0);
 
-  const enabledCount = currentRules.filter(r => r.enabled).length;
+  const enabledCount = currentRules.filter((r) => r.enabled).length;
   const estimatedTokens = estimateTokens(currentRules);
   const tokenBudget = config.rules?.maxTokenBudget ?? 600;
 
@@ -278,17 +296,17 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
       <div>
         <h3 className="text-xl font-semibold mb-2">Project Rules</h3>
         <p className="text-vscode-muted">
-          Rules guide agent behavior during sessions. They are injected into every agent's
-          context at spawn time as concise imperatives.
+          Rules guide agent behavior during sessions. They are injected into every agent's context
+          at spawn time as concise imperatives.
         </p>
       </div>
 
       {/* Warning banner */}
       <div className="p-3 rounded bg-amber-500/10 border border-amber-500/30 text-sm">
-        <strong>Balance matters.</strong> Too many rules reduce agent effectiveness — agents focus on
-        compliance instead of problem-solving. We recommend 8-12 high-impact rules.
-        Deterministic checks (linting, formatting, build) are handled by quality gates, not rules.
-        Rules are for behavioral guidance that tools can't check.
+        <strong>Balance matters.</strong> Too many rules reduce agent effectiveness — agents focus
+        on compliance instead of problem-solving. We recommend 8-12 high-impact rules. Deterministic
+        checks (linting, formatting, build) are handled by quality gates, not rules. Rules are for
+        behavioral guidance that tools can't check.
       </div>
 
       {/* Token budget meter */}
@@ -309,21 +327,22 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
           />
         </div>
         <p className="text-xs text-vscode-muted mt-1">
-          Estimated context cost of enabled rules. Each rule consumes tokens from the agent's context window.
+          Estimated context cost of enabled rules. Each rule consumes tokens from the agent's
+          context window.
         </p>
       </div>
 
       {/* Rules by category */}
       <div className="space-y-4">
-        {groupedRules.map(group => (
-          <div key={group.category} className="p-4 rounded-lg border border-vscode-border bg-vscode-widget-bg">
+        {groupedRules.map((group) => (
+          <div
+            key={group.category}
+            className="p-4 rounded-lg border border-vscode-border bg-vscode-widget-bg"
+          >
             <h4 className="font-medium mb-3">{group.label}</h4>
             <div className="space-y-3">
-              {group.rules.map(rule => (
-                <label
-                  key={rule.id}
-                  className="flex items-start gap-3 cursor-pointer group"
-                >
+              {group.rules.map((rule) => (
+                <label key={rule.id} className="flex items-start gap-3 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={rule.enabled}
@@ -333,7 +352,9 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm">{rule.statement}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase whitespace-nowrap ${ENFORCEMENT_LABELS[rule.enforcement].color}`}>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded uppercase whitespace-nowrap ${ENFORCEMENT_LABELS[rule.enforcement].color}`}
+                      >
                         {ENFORCEMENT_LABELS[rule.enforcement].label}
                       </span>
                       {!rule.isDefault && (
@@ -351,8 +372,11 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
                     </div>
                     <p className="text-xs text-vscode-muted mt-0.5">{rule.rationale}</p>
                     <div className="flex gap-1 mt-1">
-                      {rule.scope.map(s => (
-                        <span key={s} className="text-[10px] px-1 py-0.5 rounded bg-vscode-bg text-vscode-muted">
+                      {rule.scope.map((s) => (
+                        <span
+                          key={s}
+                          className="text-[10px] px-1 py-0.5 rounded bg-vscode-bg text-vscode-muted"
+                        >
                           {SCOPE_LABELS[s]}
                         </span>
                       ))}
@@ -382,7 +406,7 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
             <input
               type="text"
               value={customStatement}
-              onChange={e => setCustomStatement(e.target.value)}
+              onChange={(e) => setCustomStatement(e.target.value)}
               placeholder="Concise imperative, e.g., 'All database queries must use parameterized statements'"
               className="w-full px-3 py-2 rounded bg-vscode-bg border border-vscode-border text-sm focus:border-vscode-btn-bg outline-none"
             />
@@ -393,7 +417,7 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
             <input
               type="text"
               value={customRationale}
-              onChange={e => setCustomRationale(e.target.value)}
+              onChange={(e) => setCustomRationale(e.target.value)}
               placeholder="One sentence explaining why (shown here, not injected into agent context)"
               className="w-full px-3 py-2 rounded bg-vscode-bg border border-vscode-border text-sm focus:border-vscode-btn-bg outline-none"
             />
@@ -404,11 +428,13 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
               <label className="block text-sm font-medium mb-1">Category</label>
               <select
                 value={customCategory}
-                onChange={e => setCustomCategory(e.target.value as RuleCategory)}
+                onChange={(e) => setCustomCategory(e.target.value as RuleCategory)}
                 className="w-full px-3 py-2 rounded bg-vscode-bg border border-vscode-border text-sm"
               >
-                {CATEGORY_ORDER.map(cat => (
-                  <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+                {CATEGORY_ORDER.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {CATEGORY_LABELS[cat]}
+                  </option>
                 ))}
               </select>
             </div>
@@ -417,7 +443,7 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
               <label className="block text-sm font-medium mb-1">Enforcement</label>
               <select
                 value={customEnforcement}
-                onChange={e => setCustomEnforcement(e.target.value as RuleEnforcement)}
+                onChange={(e) => setCustomEnforcement(e.target.value as RuleEnforcement)}
                 className="w-full px-3 py-2 rounded bg-vscode-bg border border-vscode-border text-sm"
               >
                 <option value="enforce">Enforce (must follow)</option>
@@ -430,16 +456,18 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
           <div>
             <label className="block text-sm font-medium mb-1">Applies to</label>
             <div className="flex flex-wrap gap-2">
-              {(['worker', 'quality-reviewer', 'researcher', 'steward'] as RuleScope[]).map(scope => (
-                <label key={scope} className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={customScope.includes(scope)}
-                    onChange={() => handleScopeToggle(scope)}
-                  />
-                  <span className="text-sm">{SCOPE_LABELS[scope]}</span>
-                </label>
-              ))}
+              {(['worker', 'quality-reviewer', 'researcher', 'steward'] as RuleScope[]).map(
+                (scope) => (
+                  <label key={scope} className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={customScope.includes(scope)}
+                      onChange={() => handleScopeToggle(scope)}
+                    />
+                    <span className="text-sm">{SCOPE_LABELS[scope]}</span>
+                  </label>
+                ),
+              )}
             </div>
           </div>
 
@@ -462,10 +490,10 @@ export function RulesStep({ config, updateConfig }: RulesStepProps) {
       )}
 
       <div className="p-3 rounded bg-blue-500/10 border border-blue-500/30 text-sm">
-        <strong>How it works:</strong> Enabled rules are compiled into a concise preamble and injected
-        into every agent session at spawn time. The preamble groups rules by enforcement level
-        (Enforce, then Prefer). Rationale is not injected — it stays in the Knowledge Graph for agents
-        that need deeper context.
+        <strong>How it works:</strong> Enabled rules are compiled into a concise preamble and
+        injected into every agent session at spawn time. The preamble groups rules by enforcement
+        level (Enforce, then Prefer). Rationale is not injected — it stays in the Knowledge Graph
+        for agents that need deeper context.
       </div>
     </div>
   );

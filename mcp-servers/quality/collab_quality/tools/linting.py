@@ -5,7 +5,6 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-
 LINTERS = {
     "swift": ["swiftlint", "lint", "--reporter", "json"],
     "python": ["ruff", "check", "--output-format=json"],

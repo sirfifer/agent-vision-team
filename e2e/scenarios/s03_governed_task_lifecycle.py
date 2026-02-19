@@ -30,8 +30,8 @@ if str(_GOV_LIB) not in sys.path:
 
 from collab_governance.task_integration import (  # noqa: E402
     TaskFileManager,
-    create_governed_task_pair,
     add_additional_review,
+    create_governed_task_pair,
     get_task_governance_status,
     release_task,
 )
@@ -265,9 +265,7 @@ class GovernedTaskLifecycleScenario(BaseScenario):
             task_dir=task_dir_multi,
         )
 
-        status_fully_released = get_task_governance_status(
-            impl_task_2.id, task_dir=task_dir_multi
-        )
+        status_fully_released = get_task_governance_status(impl_task_2.id, task_dir=task_dir_multi)
         self.assert_true(
             "T9: After releasing all blockers, is_blocked=False",
             status_fully_released.get("is_blocked") is False,
@@ -312,9 +310,7 @@ class GovernedTaskLifecycleScenario(BaseScenario):
         )
 
         # The implementation task should still have blockers (not removed on block)
-        status_blocked = get_task_governance_status(
-            impl_task_3.id, task_dir=task_dir_blocked
-        )
+        status_blocked = get_task_governance_status(impl_task_3.id, task_dir=task_dir_blocked)
         self.assert_true(
             "T10b: Blocked verdict keeps is_blocked=True",
             status_blocked.get("is_blocked") is True,

@@ -1,6 +1,21 @@
-export type AgentRole = 'orchestrator' | 'worker' | 'quality-reviewer' | 'kg-librarian' | 'governance-reviewer' | 'researcher' | 'project-steward';
+export type AgentRole =
+  | 'orchestrator'
+  | 'worker'
+  | 'quality-reviewer'
+  | 'kg-librarian'
+  | 'governance-reviewer'
+  | 'researcher'
+  | 'project-steward';
 export type AgentStatusValue = 'active' | 'idle' | 'blocked' | 'reviewing' | 'not-configured';
-export type ActivityType = 'finding' | 'guidance' | 'response' | 'status' | 'drift' | 'decision' | 'review' | 'research';
+export type ActivityType =
+  | 'finding'
+  | 'guidance'
+  | 'response'
+  | 'status'
+  | 'drift'
+  | 'decision'
+  | 'review'
+  | 'research';
 
 export interface AgentStatus {
   id: string;
@@ -25,7 +40,12 @@ export interface ActivityEntry {
 }
 
 // Governed task types for dashboard display
-export type GovernedTaskStatus = 'pending_review' | 'approved' | 'blocked' | 'in_progress' | 'completed';
+export type GovernedTaskStatus =
+  | 'pending_review'
+  | 'approved'
+  | 'blocked'
+  | 'in_progress'
+  | 'completed';
 export type TaskReviewStatusValue = 'pending' | 'approved' | 'blocked' | 'needs_human_review';
 
 export interface TaskReviewInfo {

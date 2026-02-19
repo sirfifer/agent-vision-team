@@ -39,9 +39,7 @@ export function SetupBanner() {
       </svg>
       <div className="flex-1">
         <span className="font-medium">Setup Incomplete</span>
-        <span className="text-amber-300/80 ml-2">
-          Missing: {missingItems.join(', ')}
-        </span>
+        <span className="text-amber-300/80 ml-2">Missing: {missingItems.join(', ')}</span>
       </div>
       <button
         onClick={() => setShowWizard(true)}

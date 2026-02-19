@@ -54,7 +54,8 @@ export function ReadyStep({ onLaunchWizard }: ReadyStepProps) {
       </div>
 
       <p className="text-center text-xs text-vscode-muted">
-        The system handles complexity. You provide the goals, agents handle execution, and the dashboard keeps you informed.
+        The system handles complexity. You provide the goals, agents handle execution, and the
+        dashboard keeps you informed.
       </p>
     </div>
   );

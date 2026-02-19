@@ -15,8 +15,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "kn
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "governance"))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp-servers" / "quality"))
 
-from collab_quality.trust_engine import TrustEngine
 from collab_quality.models import TrustDecision
+from collab_quality.trust_engine import TrustEngine
 
 from .base import BaseScenario, ScenarioResult
 

@@ -14,15 +14,20 @@ interface SettingsStepProps {
 
 type WarningType = 'mockTests' | 'mockTestsForCostlyOps' | null;
 
-const WARNINGS: Record<Exclude<WarningType, null>, { title: string; message: string; severity: 'warning' | 'danger' }> = {
+const WARNINGS: Record<
+  Exclude<WarningType, null>,
+  { title: string; message: string; severity: 'warning' | 'danger' }
+> = {
   mockTests: {
     title: 'Enable Mock Tests?',
-    message: 'Mocking all tests significantly reduces the value of AI-assisted development. Real tests catch real bugs that mocks hide. We strongly recommend leaving this OFF unless you have a specific reason to enable it.',
+    message:
+      'Mocking all tests significantly reduces the value of AI-assisted development. Real tests catch real bugs that mocks hide. We strongly recommend leaving this OFF unless you have a specific reason to enable it.',
     severity: 'danger',
   },
   mockTestsForCostlyOps: {
     title: 'Disable Mock Tests for Costly Operations?',
-    message: 'Disabling this means tests will make real API calls, database connections, and other operations that may incur costs or rate-limiting. Only disable if you have dedicated test accounts and budgets.',
+    message:
+      'Disabling this means tests will make real API calls, database connections, and other operations that may incur costs or rate-limiting. Only disable if you have dedicated test accounts and budgets.',
     severity: 'warning',
   },
 };
@@ -76,9 +81,7 @@ export function SettingsStep({ config, updateSettings }: SettingsStepProps) {
     <div className="space-y-6">
       <div>
         <h3 className="text-xl font-semibold mb-2">Project Settings</h3>
-        <p className="text-vscode-muted">
-          Configure how the AI agents behave during development.
-        </p>
+        <p className="text-vscode-muted">Configure how the AI agents behave during development.</p>
       </div>
 
       {/* Mock Tests Settings */}
@@ -101,8 +104,8 @@ export function SettingsStep({ config, updateSettings }: SettingsStepProps) {
                 </span>
               </div>
               <p className="text-sm text-vscode-muted">
-                Replace all test execution with mocks. This prevents real test validation
-                and significantly reduces the value of AI-assisted development.
+                Replace all test execution with mocks. This prevents real test validation and
+                significantly reduces the value of AI-assisted development.
               </p>
             </div>
           </label>
@@ -122,8 +125,8 @@ export function SettingsStep({ config, updateSettings }: SettingsStepProps) {
                 </span>
               </div>
               <p className="text-sm text-vscode-muted">
-                Mock operations that require API keys, make network calls, or incur costs.
-                Tests still run but external dependencies are simulated.
+                Mock operations that require API keys, make network calls, or incur costs. Tests
+                still run but external dependencies are simulated.
               </p>
             </div>
           </label>
@@ -145,8 +148,8 @@ export function SettingsStep({ config, updateSettings }: SettingsStepProps) {
             <div>
               <div className="font-medium">Auto-Governance</div>
               <p className="text-sm text-vscode-muted">
-                Require governance checkpoints for significant agent decisions.
-                The governance-reviewer agent will validate changes against standards.
+                Require governance checkpoints for significant agent decisions. The
+                governance-reviewer agent will validate changes against standards.
               </p>
             </div>
           </label>
@@ -161,8 +164,8 @@ export function SettingsStep({ config, updateSettings }: SettingsStepProps) {
             <div>
               <div className="font-medium">KG Auto-Curation</div>
               <p className="text-sm text-vscode-muted">
-                Automatically run the kg-librarian agent after task completion to
-                maintain and curate the Knowledge Graph.
+                Automatically run the kg-librarian agent after task completion to maintain and
+                curate the Knowledge Graph.
               </p>
             </div>
           </label>
@@ -177,16 +180,18 @@ export function SettingsStep({ config, updateSettings }: SettingsStepProps) {
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {(Object.keys(config.settings.qualityGates) as (keyof QualityGatesConfig)[]).map(gate => (
-            <label key={gate} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.settings.qualityGates[gate]}
-                onChange={() => handleGateToggle(gate)}
-              />
-              <span className="capitalize">{gate}</span>
-            </label>
-          ))}
+          {(Object.keys(config.settings.qualityGates) as (keyof QualityGatesConfig)[]).map(
+            (gate) => (
+              <label key={gate} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.settings.qualityGates[gate]}
+                  onChange={() => handleGateToggle(gate)}
+                />
+                <span className="capitalize">{gate}</span>
+              </label>
+            ),
+          )}
         </div>
       </div>
 

@@ -3,13 +3,25 @@ interface SetupStepProps {
 }
 
 const WIZARD_ITEMS = [
-  { label: 'Vision Documents', desc: 'Define immutable principles and invariants that govern your project' },
-  { label: 'Architecture Documents', desc: 'Describe patterns, components, and technical standards' },
-  { label: 'Quality Configuration', desc: 'Set test, lint, build, and format commands for your languages' },
-  { label: 'Project Rules', desc: 'Behavioral guidelines injected into every agent\'s context' },
+  {
+    label: 'Vision Documents',
+    desc: 'Define immutable principles and invariants that govern your project',
+  },
+  {
+    label: 'Architecture Documents',
+    desc: 'Describe patterns, components, and technical standards',
+  },
+  {
+    label: 'Quality Configuration',
+    desc: 'Set test, lint, build, and format commands for your languages',
+  },
+  { label: 'Project Rules', desc: "Behavioral guidelines injected into every agent's context" },
   { label: 'Permissions', desc: 'Which tools and commands Claude Code can run autonomously' },
   { label: 'Settings', desc: 'Coverage thresholds, mock tests, governance automation' },
-  { label: 'KG Ingestion', desc: 'Push your vision and architecture documents into the Knowledge Graph' },
+  {
+    label: 'KG Ingestion',
+    desc: 'Push your vision and architecture documents into the Knowledge Graph',
+  },
 ];
 
 export function SetupStep({ onLaunchWizard }: SetupStepProps) {
@@ -17,7 +29,8 @@ export function SetupStep({ onLaunchWizard }: SetupStepProps) {
     <div className="space-y-6">
       <h3 className="text-xl font-bold">First: Run the Setup Wizard</h3>
       <p className="text-vscode-muted">
-        Before using the system, configure your project. The Setup Wizard walks you through 7 key steps:
+        Before using the system, configure your project. The Setup Wizard walks you through 7 key
+        steps:
       </p>
 
       <div className="space-y-2">
@@ -42,7 +55,8 @@ export function SetupStep({ onLaunchWizard }: SetupStepProps) {
           Launch Setup Wizard
         </button>
         <p className="text-xs text-vscode-muted mt-2">
-          You can continue this tutorial after running the wizard &mdash; it will remember your place.
+          You can continue this tutorial after running the wizard &mdash; it will remember your
+          place.
         </p>
       </div>
     </div>

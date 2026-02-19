@@ -22,7 +22,9 @@ export function QualityGatesPanel({ className = '' }: { className?: string }) {
     return (
       <div className={`px-4 py-2 border-b border-vscode-border ${className}`}>
         <div className="flex items-center gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-vscode-muted">Quality Gates</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-vscode-muted">
+            Quality Gates
+          </h2>
           <span className="text-2xs text-vscode-muted italic">Not yet run</span>
         </div>
       </div>
@@ -30,21 +32,21 @@ export function QualityGatesPanel({ className = '' }: { className?: string }) {
   }
 
   const gates = [results.build, results.lint, results.tests, results.coverage, results.findings];
-  const failedCount = gates.filter(g => !g.passed).length;
+  const failedCount = gates.filter((g) => !g.passed).length;
 
   return (
     <div className={`px-4 py-2 border-b border-vscode-border ${className}`}>
       <div className="flex items-center gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-vscode-muted shrink-0">Quality Gates</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-vscode-muted shrink-0">
+          Quality Gates
+        </h2>
 
         <div className="flex items-center gap-2 flex-1">
-          {gates.map(gate => (
+          {gates.map((gate) => (
             <div
               key={gate.name}
               className={`flex items-center gap-1 px-2 py-0.5 rounded text-2xs font-medium ${
-                gate.passed
-                  ? 'bg-green-500/10 text-green-400'
-                  : 'bg-red-500/10 text-red-400'
+                gate.passed ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
               }`}
               title={`${gate.name}: ${gate.detail || (gate.passed ? 'Passed' : 'Failed')}`}
             >
@@ -61,7 +63,9 @@ export function QualityGatesPanel({ className = '' }: { className?: string }) {
             <span className="text-2xs font-medium text-red-400">{failedCount} failed</span>
           )}
           {results.timestamp && (
-            <span className="text-2xs text-vscode-muted">{formatRelativeTime(results.timestamp)}</span>
+            <span className="text-2xs text-vscode-muted">
+              {formatRelativeTime(results.timestamp)}
+            </span>
           )}
         </div>
       </div>

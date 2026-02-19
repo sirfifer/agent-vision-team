@@ -1,0 +1,16 @@
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E", "F", "W", "I"]
+
+# E402: Module-level imports not at top of file.
+# Intentional in e2e/ and server/ which manipulate sys.path before imports.
+# E501: Line too long in reviewer.py -- prompt template strings.
+[lint.per-file-ignores]
+"e2e/run-e2e.py" = ["E402"]
+"e2e/parallel/executor.py" = ["E402"]
+"e2e/scenarios/*.py" = ["E402"]
+"server/avt_gateway/app.py" = ["E402"]
+"scripts/hooks/*.py" = ["E402"]
+"mcp-servers/governance/collab_governance/reviewer.py" = ["E501"]

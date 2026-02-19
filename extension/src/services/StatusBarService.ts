@@ -7,16 +7,10 @@ export class StatusBarService {
   private summaryItem: vscode.StatusBarItem;
 
   constructor() {
-    this.statusItem = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Left,
-      100
-    );
+    this.statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     this.statusItem.command = 'collab.viewDashboard';
 
-    this.summaryItem = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Left,
-      99
-    );
+    this.summaryItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
     this.summaryItem.command = 'collab.viewDashboard';
   }
 
@@ -38,15 +32,11 @@ export class StatusBarService {
         break;
       case 'warning':
         this.statusItem.text = '$(warning) Collab: Warning';
-        this.statusItem.backgroundColor = new vscode.ThemeColor(
-          'statusBarItem.warningBackground'
-        );
+        this.statusItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
         break;
       case 'error':
         this.statusItem.text = '$(error) Collab: Error';
-        this.statusItem.backgroundColor = new vscode.ThemeColor(
-          'statusBarItem.errorBackground'
-        );
+        this.statusItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
         break;
       case 'inactive':
         this.statusItem.text = '$(circle-outline) Collab: Inactive';

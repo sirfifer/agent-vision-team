@@ -53,7 +53,14 @@ export interface IngestionStatus {
   architectureDocCount: number;
 }
 
-export type RuleCategory = 'testing' | 'code-quality' | 'security' | 'performance' | 'patterns' | 'workflow' | 'custom';
+export type RuleCategory =
+  | 'testing'
+  | 'code-quality'
+  | 'security'
+  | 'performance'
+  | 'patterns'
+  | 'workflow'
+  | 'custom';
 export type RuleEnforcement = 'enforce' | 'prefer' | 'guide';
 export type RuleScope = 'all' | 'worker' | 'quality-reviewer' | 'researcher' | 'steward';
 
@@ -127,15 +134,15 @@ export const WIZARD_STEPS: WizardStep[] = [
 ];
 
 export const WIZARD_STEP_LABELS: Record<WizardStep, string> = {
-  'welcome': 'Welcome',
+  welcome: 'Welcome',
   'vision-docs': 'Vision Docs',
   'architecture-docs': 'Architecture Docs',
   'quality-config': 'Quality Config',
-  'rules': 'Rules',
-  'permissions': 'Permissions',
-  'settings': 'Settings',
-  'ingestion': 'Ingestion',
-  'complete': 'Complete',
+  rules: 'Rules',
+  permissions: 'Permissions',
+  settings: 'Settings',
+  ingestion: 'Ingestion',
+  complete: 'Complete',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,20 +175,20 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 ];
 
 export const TUTORIAL_STEP_LABELS: Record<TutorialStep, string> = {
-  'welcome': 'Welcome',
+  welcome: 'Welcome',
   'big-picture': 'Big Picture',
-  'setup': 'Run Setup',
+  setup: 'Run Setup',
   'starting-work': 'Start Work',
   'behind-scenes': 'Behind the Scenes',
-  'monitoring': 'Monitoring',
+  monitoring: 'Monitoring',
   'knowledge-graph': 'Knowledge Graph',
   'quality-gates': 'Quality Gates',
-  'tips': 'Tips',
-  'ready': 'Ready!',
+  tips: 'Tips',
+  ready: 'Ready!',
 };
 
 export const SUPPORTED_LANGUAGES = ['python', 'typescript', 'javascript', 'swift', 'rust'] as const;
-export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
+export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 export type EntityType =
   | 'component'
@@ -198,15 +205,35 @@ export interface Entity {
   relations: { from: string; to: string; relationType: string }[];
 }
 
-export type AgentRole = 'orchestrator' | 'worker' | 'quality-reviewer' | 'kg-librarian' | 'governance-reviewer' | 'researcher' | 'project-steward';
+export type AgentRole =
+  | 'orchestrator'
+  | 'worker'
+  | 'quality-reviewer'
+  | 'kg-librarian'
+  | 'governance-reviewer'
+  | 'researcher'
+  | 'project-steward';
 export type AgentStatusValue = 'active' | 'idle' | 'blocked' | 'reviewing' | 'not-configured';
-export type ActivityType = 'finding' | 'guidance' | 'response' | 'status' | 'drift' | 'decision' | 'review' | 'research';
+export type ActivityType =
+  | 'finding'
+  | 'guidance'
+  | 'response'
+  | 'status'
+  | 'drift'
+  | 'decision'
+  | 'review'
+  | 'research';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Governed Task Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type GovernedTaskStatus = 'pending_review' | 'approved' | 'blocked' | 'in_progress' | 'completed';
+export type GovernedTaskStatus =
+  | 'pending_review'
+  | 'approved'
+  | 'blocked'
+  | 'in_progress'
+  | 'completed';
 export type TaskReviewStatusValue = 'pending' | 'approved' | 'blocked' | 'needs_human_review';
 
 export interface TaskReviewInfo {
@@ -337,11 +364,11 @@ export type ResearchStatus = 'pending' | 'scheduled' | 'in_progress' | 'complete
 
 export interface ResearchSchedule {
   type: 'once' | 'daily' | 'weekly' | 'monthly';
-  dayOfWeek?: number;  // 0-6 for weekly
+  dayOfWeek?: number; // 0-6 for weekly
   dayOfMonth?: number; // 1-31 for monthly
-  time?: string;       // HH:MM format
-  lastRun?: string;    // ISO timestamp
-  nextRun?: string;    // ISO timestamp
+  time?: string; // HH:MM format
+  lastRun?: string; // ISO timestamp
+  nextRun?: string; // ISO timestamp
 }
 
 export interface ResearchPrompt {
@@ -439,7 +466,13 @@ export type ExtensionMessage =
   | { type: 'researchPromptDeleted'; id: string }
   | { type: 'governedTasks'; tasks: GovernedTask[] }
   | { type: 'governanceStats'; stats: GovernanceStats }
-  | { type: 'formatDocContentResult'; requestId: string; success: boolean; formattedContent?: string; error?: string }
+  | {
+      type: 'formatDocContentResult';
+      requestId: string;
+      success: boolean;
+      formattedContent?: string;
+      error?: string;
+    }
   | { type: 'findingsUpdate'; findings: TrustFinding[] }
   | { type: 'findingDismissed'; findingId: string; success: boolean }
   | { type: 'researchBriefContent'; briefPath: string; content: string; error?: string }
@@ -449,7 +482,13 @@ export type ExtensionMessage =
   | { type: 'toggleDemo' }
   | { type: 'bootstrapScaleResult'; profile: BootstrapScaleProfile }
   | { type: 'bootstrapStarted'; jobId?: string }
-  | { type: 'bootstrapProgress'; phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] }
+  | {
+      type: 'bootstrapProgress';
+      phase: string;
+      detail: string;
+      percent?: number;
+      activities?: BootstrapActivity[];
+    }
   | { type: 'bootstrapComplete'; success: boolean; reportPath?: string; error?: string }
   | { type: 'bootstrapReviewLoaded'; items: BootstrapReviewItem[] }
   | { type: 'bootstrapReviewFinalized'; result: BootstrapFinalizationResult }
@@ -473,7 +512,12 @@ export type WebviewMessage =
   | { type: 'deleteResearchPrompt'; id: string }
   | { type: 'runResearchPrompt'; id: string }
   | { type: 'requestGovernedTasks' }
-  | { type: 'formatDocContent'; tier: 'vision' | 'architecture'; rawContent: string; requestId: string }
+  | {
+      type: 'formatDocContent';
+      tier: 'vision' | 'architecture';
+      rawContent: string;
+      requestId: string;
+    }
   | { type: 'dismissFinding'; findingId: string; justification: string; dismissedBy: string }
   | { type: 'requestFindings' }
   | { type: 'readResearchBrief'; briefPath: string }

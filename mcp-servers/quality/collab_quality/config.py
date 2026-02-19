@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-
 DEFAULT_CONFIG_PATH = Path(".avt/project-config.json")
 
 # Default values matching extension/src/models/ProjectConfig.ts

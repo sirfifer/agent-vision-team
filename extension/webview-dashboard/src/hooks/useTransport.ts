@@ -63,19 +63,19 @@ let webWsReconnect: (() => void) | null = null;
 
 /** Message type to HTTP endpoint mapping */
 const MESSAGE_ROUTES: Record<string, { method: string; path: string; bodyKey?: string }> = {
-  connect:              { method: 'POST', path: '/api/mcp/connect' },
-  refresh:              { method: 'POST', path: '/api/refresh' },
-  validate:             { method: 'POST', path: '/api/quality/validate' },
-  checkSetup:           { method: 'GET',  path: '/api/setup/readiness' },
-  saveProjectConfig:    { method: 'PUT',  path: '/api/config', bodyKey: 'config' },
-  openSettings:         { method: 'GET',  path: '/api/config' },
-  savePermissions:      { method: 'PUT',  path: '/api/config/permissions' },
-  listVisionDocs:       { method: 'GET',  path: '/api/documents/vision' },
-  listArchDocs:         { method: 'GET',  path: '/api/documents/architecture' },
-  listResearchPrompts:  { method: 'GET',  path: '/api/research-prompts' },
-  listResearchBriefs:   { method: 'GET',  path: '/api/research-briefs' },
-  requestGovernedTasks: { method: 'GET',  path: '/api/governance/tasks' },
-  requestFindings:      { method: 'GET',  path: '/api/quality/findings' },
+  connect: { method: 'POST', path: '/api/mcp/connect' },
+  refresh: { method: 'POST', path: '/api/refresh' },
+  validate: { method: 'POST', path: '/api/quality/validate' },
+  checkSetup: { method: 'GET', path: '/api/setup/readiness' },
+  saveProjectConfig: { method: 'PUT', path: '/api/config', bodyKey: 'config' },
+  openSettings: { method: 'GET', path: '/api/config' },
+  savePermissions: { method: 'PUT', path: '/api/config/permissions' },
+  listVisionDocs: { method: 'GET', path: '/api/documents/vision' },
+  listArchDocs: { method: 'GET', path: '/api/documents/architecture' },
+  listResearchPrompts: { method: 'GET', path: '/api/research-prompts' },
+  listResearchBriefs: { method: 'GET', path: '/api/research-briefs' },
+  requestGovernedTasks: { method: 'GET', path: '/api/governance/tasks' },
+  requestFindings: { method: 'GET', path: '/api/quality/findings' },
 };
 
 function getApiBase(): string {
@@ -83,9 +83,9 @@ function getApiBase(): string {
 }
 
 function getApiKey(): string {
-  return (window as any).__AVT_API_KEY__
-    || new URLSearchParams(window.location.search).get('key')
-    || '';
+  return (
+    (window as any).__AVT_API_KEY__ || new URLSearchParams(window.location.search).get('key') || ''
+  );
 }
 
 function createWebTransport(): Transport {
@@ -96,7 +96,11 @@ function createWebTransport(): Transport {
   // Connect WebSocket for server-push events
   function connectWs() {
     if (ws) {
-      try { ws.close(); } catch { /* ignore */ }
+      try {
+        ws.close();
+      } catch {
+        /* ignore */
+      }
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -143,13 +147,16 @@ function createWebTransport(): Transport {
       case 'governed_tasks':
         return { type: 'governedTasks', tasks: msg.data.tasks || msg.data };
       case 'job_status':
-        return { type: 'activityAdd', entry: {
-          id: msg.data.id,
-          timestamp: msg.data.completed_at || msg.data.started_at || msg.data.submitted_at,
-          agent: 'job-runner',
-          type: 'status',
-          summary: `Job ${msg.data.id}: ${msg.data.status}`,
-        }};
+        return {
+          type: 'activityAdd',
+          entry: {
+            id: msg.data.id,
+            timestamp: msg.data.completed_at || msg.data.started_at || msg.data.submitted_at,
+            agent: 'job-runner',
+            type: 'status',
+            summary: `Job ${msg.data.id}: ${msg.data.status}`,
+          },
+        };
       default:
         return msg as any;
     }
@@ -209,7 +216,10 @@ function createWebTransport(): Transport {
         await apiPost(`/api/documents/vision`, { name: message.name, content: message.content });
         break;
       case 'createArchDoc':
-        await apiPost(`/api/documents/architecture`, { name: message.name, content: message.content });
+        await apiPost(`/api/documents/architecture`, {
+          name: message.name,
+          content: message.content,
+        });
         break;
       case 'ingestDocs':
         await apiPost(`/api/documents/${message.tier}/ingest`, {});
@@ -258,7 +268,11 @@ function createWebTransport(): Transport {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
     try {
-      const resp = await fetch(`${apiBase}${prefixPath(path)}`, { method: 'POST', headers, body: JSON.stringify(body) });
+      const resp = await fetch(`${apiBase}${prefixPath(path)}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
       return await resp.json();
     } catch (err) {
       console.error('API POST failed:', path, err);
@@ -269,7 +283,11 @@ function createWebTransport(): Transport {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
     try {
-      const resp = await fetch(`${apiBase}${prefixPath(path)}`, { method: 'PUT', headers, body: JSON.stringify(body) });
+      const resp = await fetch(`${apiBase}${prefixPath(path)}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(body),
+      });
       return await resp.json();
     } catch (err) {
       console.error('API PUT failed:', path, err);

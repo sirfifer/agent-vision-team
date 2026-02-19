@@ -4,11 +4,42 @@
   "private": true,
   "description": "Collaborative Intelligence System — multi-agent development coordination with VS Code extension and MCP servers",
   "scripts": {
-    "build:extension": "cd extension && npm run build",
-    "build:webview": "cd extension/webview-dashboard && npm run build",
-    "build": "npm run build:extension && npm run build:webview",
+    "setup": "./scripts/ci/setup.sh",
+    "lint": "./scripts/ci/lint.sh",
+    "lint:fix": "./scripts/ci/lint.sh --fix",
+    "typecheck": "./scripts/ci/typecheck.sh",
+    "build": "./scripts/ci/build.sh",
+    "test": "./scripts/ci/test.sh",
+    "test:e2e": "./scripts/ci/test-e2e.sh",
+    "test:hooks": "./scripts/ci/test-hooks.sh",
+    "coverage": "./scripts/ci/coverage.sh",
+    "check": "./scripts/ci/check-all.sh",
+    "format": "./scripts/ci/lint.sh --fix",
     "watch:extension": "cd extension && npm run watch",
-    "dev": "npm run watch:extension"
+    "dev": "npm run watch:extension",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0"
+  },
+  "lint-staged": {
+    "extension/src/**/*.ts": [
+      "./scripts/ci/lint-staged-eslint.sh",
+      "npx prettier --write"
+    ],
+    "extension/webview-dashboard/src/**/*.{ts,tsx}": [
+      "npx prettier --write"
+    ],
+    "mcp-servers/**/*.py": [
+      "ruff check --fix",
+      "ruff format"
+    ],
+    "scripts/**/*.py": [
+      "ruff check --fix",
+      "ruff format"
+    ]
   },
   "license": "MIT"
 }

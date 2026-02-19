@@ -126,9 +126,7 @@ export const DEMO_DATA: DashboardData = {
         'Hot-swappable model versions via feature flags',
         'protection_tier: architecture',
       ],
-      relations: [
-        { from: 'IntentClassifier', to: 'DialogManager', relationType: 'feeds' },
-      ],
+      relations: [{ from: 'IntentClassifier', to: 'DialogManager', relationType: 'feeds' }],
     },
     {
       name: 'AudioSessionManager',
@@ -181,7 +179,8 @@ export const DEMO_DATA: DashboardData = {
       type: 'decision',
       summary: '[pattern_choice] Use WebSocket for real-time audio streaming',
       tier: 'architecture',
-      detail: 'Verdict: approved. WebSocket provides the lowest latency for bidirectional audio. Evaluated against SSE and HTTP/2 streaming.',
+      detail:
+        'Verdict: approved. WebSocket provides the lowest latency for bidirectional audio. Evaluated against SSE and HTTP/2 streaming.',
       governanceRef: 'dec-ws-001',
     },
     {
@@ -199,7 +198,8 @@ export const DEMO_DATA: DashboardData = {
       type: 'finding',
       summary: 'Quality gates: 3/5 passed (tests, findings failing)',
       tier: 'quality',
-      detail: 'Build: pass, Lint: pass, Tests: 3 failing in NLU module, Coverage: 87%, Findings: 2 open',
+      detail:
+        'Build: pass, Lint: pass, Tests: 3 failing in NLU module, Coverage: 87%, Findings: 2 open',
     },
     {
       id: 'act-demo-5',
@@ -208,7 +208,8 @@ export const DEMO_DATA: DashboardData = {
       type: 'decision',
       summary: '[component_design] IntentClassifier uses transformer-based model',
       tier: 'architecture',
-      detail: 'Verdict: approved. Transformer model provides best accuracy/latency tradeoff for our intent categories.',
+      detail:
+        'Verdict: approved. Transformer model provides best accuracy/latency tradeoff for our intent categories.',
       governanceRef: 'dec-nlp-002',
     },
     {
@@ -217,7 +218,8 @@ export const DEMO_DATA: DashboardData = {
       agent: 'researcher',
       type: 'research',
       summary: 'Starting research: "WebSocket streaming protocol evaluation"',
-      detail: 'Topic: Compare WebSocket, SSE, and gRPC for bidirectional audio streaming\nModel: opus',
+      detail:
+        'Topic: Compare WebSocket, SSE, and gRPC for bidirectional audio streaming\nModel: opus',
     },
     {
       id: 'act-demo-7',
@@ -233,7 +235,8 @@ export const DEMO_DATA: DashboardData = {
       type: 'decision',
       summary: '[api_design] Voice session API: REST for setup, WebSocket for streaming',
       tier: 'architecture',
-      detail: 'Verdict: approved. REST handles session creation/configuration; WebSocket handles real-time audio bidirectional streaming.',
+      detail:
+        'Verdict: approved. REST handles session creation/configuration; WebSocket handles real-time audio bidirectional streaming.',
       governanceRef: 'dec-api-003',
     },
     {
@@ -270,7 +273,8 @@ export const DEMO_DATA: DashboardData = {
           reviewType: 'governance',
           status: 'approved',
           verdict: 'approved',
-          guidance: 'Approved. Use the VoiceStreamPipeline pattern. Ensure latency stays within 200ms for STT stage.',
+          guidance:
+            'Approved. Use the VoiceStreamPipeline pattern. Ensure latency stays within 200ms for STT stage.',
           createdAt: ago(45),
           completedAt: ago(42),
         },
@@ -304,7 +308,8 @@ export const DEMO_DATA: DashboardData = {
           reviewType: 'governance',
           status: 'blocked',
           verdict: 'blocked',
-          guidance: 'Needs revision: multi-language support requires updating the Latency Budget vision standard. Current 500ms budget may be insufficient for translation pipeline. Needs human review.',
+          guidance:
+            'Needs revision: multi-language support requires updating the Latency Budget vision standard. Current 500ms budget may be insufficient for translation pipeline. Needs human review.',
           createdAt: ago(30),
           completedAt: ago(28),
         },
@@ -341,7 +346,8 @@ export const DEMO_DATA: DashboardData = {
           reviewType: 'governance',
           status: 'approved',
           verdict: 'approved',
-          guidance: 'Approved. Follow the Graceful Degradation vision standard. Fallback should offer text-based alternatives.',
+          guidance:
+            'Approved. Follow the Graceful Degradation vision standard. Fallback should offer text-based alternatives.',
           createdAt: ago(60),
           completedAt: ago(55),
         },
@@ -369,7 +375,8 @@ export const DEMO_DATA: DashboardData = {
           reviewType: 'architecture',
           status: 'approved',
           verdict: 'approved',
-          guidance: 'Architecture review passed. VAD integrates correctly with VoiceStreamPipeline.',
+          guidance:
+            'Architecture review passed. VAD integrates correctly with VoiceStreamPipeline.',
           createdAt: ago(85),
           completedAt: ago(80),
         },
@@ -394,7 +401,11 @@ export const DEMO_DATA: DashboardData = {
   qualityGateResults: {
     build: { name: 'build', passed: true, detail: 'TypeScript compilation successful' },
     lint: { name: 'lint', passed: true, detail: '0 lint violations' },
-    tests: { name: 'tests', passed: false, detail: '3 tests failing in NLU intent classifier module' },
+    tests: {
+      name: 'tests',
+      passed: false,
+      detail: '3 tests failing in NLU intent classifier module',
+    },
     coverage: { name: 'coverage', passed: true, detail: '87% coverage (threshold: 80%)' },
     findings: { name: 'findings', passed: false, detail: '2 open findings requiring attention' },
     all_passed: false,
@@ -411,7 +422,8 @@ export const DEMO_DATA: DashboardData = {
       summary: 'Use WebSocket for real-time bidirectional audio streaming',
       confidence: 'high',
       verdict: 'approved',
-      guidance: 'WebSocket provides lowest latency for bidirectional audio. Aligns with VoiceStreamPipeline architecture.',
+      guidance:
+        'WebSocket provides lowest latency for bidirectional audio. Aligns with VoiceStreamPipeline architecture.',
       createdAt: ago(5),
     },
     {
@@ -422,7 +434,8 @@ export const DEMO_DATA: DashboardData = {
       summary: 'IntentClassifier uses distilled transformer model for on-device inference',
       confidence: 'high',
       verdict: 'approved',
-      guidance: 'Transformer model achieves 92% F1 with <100ms inference. Fits within latency budget.',
+      guidance:
+        'Transformer model achieves 92% F1 with <100ms inference. Fits within latency budget.',
       createdAt: ago(15),
     },
     {
@@ -433,7 +446,8 @@ export const DEMO_DATA: DashboardData = {
       summary: 'Voice session API: REST for lifecycle, WebSocket for streaming',
       confidence: 'high',
       verdict: 'approved',
-      guidance: 'Clean separation of concerns. REST handles session CRUD; WebSocket handles real-time audio.',
+      guidance:
+        'Clean separation of concerns. REST handles session CRUD; WebSocket handles real-time audio.',
       createdAt: ago(30),
     },
     {
@@ -444,7 +458,8 @@ export const DEMO_DATA: DashboardData = {
       summary: 'Multi-language support requires exceeding 500ms latency budget for translation',
       confidence: 'medium',
       verdict: 'blocked',
-      guidance: 'Deviating from Latency Budget vision standard requires human approval. Consider async translation pipeline.',
+      guidance:
+        'Deviating from Latency Budget vision standard requires human approval. Consider async translation pipeline.',
       createdAt: ago(28),
     },
     {
@@ -466,7 +481,8 @@ export const DEMO_DATA: DashboardData = {
       summary: 'TTS fallback chain: primary neural TTS, secondary concatenative, text output',
       confidence: 'high',
       verdict: 'approved',
-      guidance: 'Aligned with Graceful Degradation standard. Three-tier fallback ensures user always gets a response.',
+      guidance:
+        'Aligned with Graceful Degradation standard. Three-tier fallback ensures user always gets a response.',
       createdAt: ago(55),
     },
   ],
@@ -478,7 +494,8 @@ export const DEMO_DATA: DashboardData = {
       tool: 'eslint',
       severity: 'warning',
       component: 'AudioProcessor',
-      description: 'Missing error boundary for malformed PCM frames in AudioProcessor.processChunk()',
+      description:
+        'Missing error boundary for malformed PCM frames in AudioProcessor.processChunk()',
       createdAt: ago(35),
       status: 'open',
     },

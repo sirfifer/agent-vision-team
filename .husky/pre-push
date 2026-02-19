@@ -1,0 +1,4 @@
+./scripts/ci/typecheck.sh
+./scripts/ci/build.sh
+./scripts/ci/test.sh
+./scripts/ci/coverage.sh

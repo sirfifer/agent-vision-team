@@ -124,10 +124,7 @@ export class ProjectConfigService {
 
     try {
       const files = fs.readdirSync(folderPath);
-      return files.some(f =>
-        f.endsWith('.md') &&
-        f.toLowerCase() !== 'readme.md'
-      );
+      return files.some((f) => f.endsWith('.md') && f.toLowerCase() !== 'readme.md');
     } catch {
       return false;
     }
@@ -169,7 +166,7 @@ export class ProjectConfigService {
    * Get the default recommended permissions
    */
   getDefaultPermissions(): string[] {
-    return RECOMMENDED_PERMISSIONS.map(p => p.pattern);
+    return RECOMMENDED_PERMISSIONS.map((p) => p.pattern);
   }
 
   /**
@@ -228,10 +225,7 @@ export class ProjectConfigService {
 
     try {
       const files = fs.readdirSync(folderPath);
-      return files.filter(f =>
-        f.endsWith('.md') &&
-        f.toLowerCase() !== 'readme.md'
-      );
+      return files.filter((f) => f.endsWith('.md') && f.toLowerCase() !== 'readme.md');
     } catch {
       return [];
     }
@@ -268,21 +262,18 @@ export class ProjectConfigService {
     }
 
     // Create starter documents if they don't exist
-    this.createFileIfMissing(
-      path.join(this.docsRoot, 'vision', 'vision.md'),
-      VISION_STARTER
-    );
+    this.createFileIfMissing(path.join(this.docsRoot, 'vision', 'vision.md'), VISION_STARTER);
     this.createFileIfMissing(
       path.join(this.docsRoot, 'architecture', 'architecture.md'),
-      ARCHITECTURE_STARTER
+      ARCHITECTURE_STARTER,
     );
     this.createFileIfMissing(
       path.join(this.avtRoot, 'research-prompts', 'README.md'),
-      RESEARCH_PROMPTS_README
+      RESEARCH_PROMPTS_README,
     );
     this.createFileIfMissing(
       path.join(this.avtRoot, 'research-briefs', 'README.md'),
-      RESEARCH_BRIEFS_README
+      RESEARCH_BRIEFS_README,
     );
   }
 
@@ -329,7 +320,7 @@ export class ProjectConfigService {
    */
   saveResearchPrompt(prompt: ResearchPrompt): void {
     const prompts = this.listResearchPrompts();
-    const idx = prompts.findIndex(p => p.id === prompt.id);
+    const idx = prompts.findIndex((p) => p.id === prompt.id);
 
     if (idx >= 0) {
       prompts[idx] = prompt;
@@ -356,7 +347,7 @@ export class ProjectConfigService {
    */
   deleteResearchPrompt(id: string): void {
     const prompts = this.listResearchPrompts();
-    const filtered = prompts.filter(p => p.id !== id);
+    const filtered = prompts.filter((p) => p.id !== id);
 
     if (filtered.length === prompts.length) {
       return; // Not found
@@ -378,13 +369,17 @@ export class ProjectConfigService {
    */
   getResearchPrompt(id: string): ResearchPrompt | undefined {
     const prompts = this.listResearchPrompts();
-    return prompts.find(p => p.id === id);
+    return prompts.find((p) => p.id === id);
   }
 
   /**
    * Update the status of a research prompt
    */
-  updateResearchPromptStatus(id: string, status: ResearchPrompt['status'], result?: ResearchPrompt['lastResult']): void {
+  updateResearchPromptStatus(
+    id: string,
+    status: ResearchPrompt['status'],
+    result?: ResearchPrompt['lastResult'],
+  ): void {
     const prompt = this.getResearchPrompt(id);
     if (!prompt) return;
 
