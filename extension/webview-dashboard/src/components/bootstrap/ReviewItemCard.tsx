@@ -17,6 +17,12 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   observation: 'Observation',
 };
 
+const CONFIDENCE_STYLES: Record<string, string> = {
+  high: 'bg-green-500/15 text-green-400',
+  medium: 'bg-yellow-500/15 text-yellow-400',
+  low: 'bg-orange-500/15 text-orange-400',
+};
+
 export function ReviewItemCard({
   item,
   onApprove,
@@ -58,7 +64,9 @@ export function ReviewItemCard({
   const entityLabel = ENTITY_TYPE_LABELS[item.entityType] || item.entityType;
 
   return (
-    <div className="border border-vscode-border rounded bg-vscode-widget-bg">
+    <div className={`border rounded bg-vscode-widget-bg ${
+      item.isContradiction ? 'border-yellow-500/30' : 'border-vscode-border'
+    }`}>
       {/* Header row */}
       <div
         className="px-3 py-2 flex items-center gap-2 cursor-pointer select-none"
@@ -78,6 +86,27 @@ export function ReviewItemCard({
         <span className="text-2xs px-1.5 py-0.5 rounded bg-vscode-bg text-vscode-muted">
           {entityLabel}
         </span>
+
+        {/* Confidence badge */}
+        {item.confidence && (
+          <span className={`text-2xs px-1.5 py-0.5 rounded ${CONFIDENCE_STYLES[item.confidence] || ''}`}>
+            {item.confidence}
+          </span>
+        )}
+
+        {/* Contradiction indicator */}
+        {item.isContradiction && (
+          <span className="text-2xs px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400">
+            contradiction
+          </span>
+        )}
+
+        {/* User-created indicator */}
+        {item.isUserCreated && (
+          <span className="text-2xs px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400">
+            manual
+          </span>
+        )}
 
         {/* Name and description */}
         <div className="flex-1 min-w-0">
@@ -149,14 +178,65 @@ export function ReviewItemCard({
               </div>
             </>
           ) : (
-            <ul className="space-y-1">
-              {(item.editedObservations || item.observations).map((obs, i) => (
-                <li key={i} className="text-2xs text-vscode-fg flex items-start gap-1.5">
-                  <span className="text-vscode-muted flex-shrink-0 mt-0.5">&bull;</span>
-                  <span>{obs}</span>
-                </li>
-              ))}
-            </ul>
+            <>
+              {/* Observations */}
+              <ul className="space-y-1">
+                {(item.editedObservations || item.observations).map((obs, i) => (
+                  <li key={i} className="text-2xs text-vscode-fg flex items-start gap-1.5">
+                    <span className="text-vscode-muted flex-shrink-0 mt-0.5">&bull;</span>
+                    <span>{obs}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Source files */}
+              {item.sourceFiles && item.sourceFiles.length > 0 && (
+                <div className="text-2xs text-vscode-muted pt-1 border-t border-vscode-border/50">
+                  <span className="font-medium">Sources:</span>{' '}
+                  {item.sourceFiles.join(', ')}
+                </div>
+              )}
+
+              {/* Source evidence */}
+              {item.sourceEvidence && (
+                <div className="text-2xs text-vscode-muted italic">
+                  {item.sourceEvidence}
+                </div>
+              )}
+
+              {/* Contradiction details */}
+              {item.isContradiction && item.contradiction && (
+                <div className="mt-2 pt-2 border-t border-yellow-500/20 space-y-2">
+                  <div className="text-2xs font-semibold text-yellow-400 uppercase tracking-wider">
+                    Competing Approaches
+                  </div>
+                  {item.contradiction.alternatives.map((alt, i) => (
+                    <div key={i} className="bg-vscode-bg rounded p-2 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium">{alt.name}</span>
+                        <span className="text-2xs text-vscode-muted">
+                          {alt.usage} ({alt.percentage}%)
+                        </span>
+                      </div>
+                      {/* Usage bar */}
+                      <div className="w-full h-1 bg-vscode-border rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 rounded-full"
+                          style={{ width: `${Math.min(alt.percentage, 100)}%` }}
+                        />
+                      </div>
+                      <div className="text-2xs text-vscode-muted">{alt.description}</div>
+                      <div className="text-2xs italic text-vscode-fg">{alt.qualitativeAssessment}</div>
+                    </div>
+                  ))}
+                  {/* Recommendation */}
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded p-2">
+                    <div className="text-2xs font-medium text-blue-400 mb-0.5">Recommendation</div>
+                    <div className="text-2xs text-vscode-fg">{item.contradiction.recommendation}</div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

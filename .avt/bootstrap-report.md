@@ -1,143 +1,197 @@
-# Bootstrap Report — agent-vision-team-devhost
+# Bootstrap Report: Agent Vision Team
+
+**Generated**: 2026-02-18
+**Scale Tier**: Medium (35,530 LOC across ~210 source files)
+**Status**: DRAFT (pending human review)
+
+---
 
 ## Scale Assessment
 
 | Metric | Value |
 |--------|-------|
-| Scale Tier | **Medium** |
-| Source LOC | 37,913 |
-| Source Files | 209 |
-| Documentation Files | 97 |
-| Languages | Python (95), TypeScript (36), TSX (47), Shell (22), JS (9) |
-| Package Boundaries | 8 |
-| Top-Level Directories | 9 |
+| Source files | ~210 (95 Python, 49 TSX, 36 TS, 22 Bash, 8 JS) |
+| Total source LOC | 35,530 |
+| Documentation files | 149 Markdown |
+| Top-level directories | 9 (docs, e2e, extension, mcp-servers, prompts, scripts, server, templates, work) |
+| Package boundaries | 7 (root, extension, extension/webview-dashboard, 3 MCP servers, server, e2e) |
+| Monorepo | Yes (multi-language, multiple package.json/pyproject.toml) |
+| Languages | TypeScript, Python, Bash, React/JSX |
+| Config files | 12 (tsconfig x2, vite.config, esbuild.config, tailwind.config, pyproject.toml x5, Dockerfile, settings.json) |
 
-## Knowledge Graph Seed
+**Classification**: Medium tier (10K-100K LOC, 100-1K files). Analysis performed inline without sub-agent waves.
 
-**30 entities seeded** into `.avt/knowledge-graph.jsonl`:
+---
 
-### Vision Tier (11 entities)
-These are the inviolable principles discovered from documentation:
+## Partition Map
 
-1. **three_tier_hierarchy**: Lower tiers cannot modify higher tiers
-2. **vision_tier_human_only**: Only humans modify vision entities
-3. **every_task_governed**: Every task gets automatic governance review
-4. **quality_is_deterministic**: Use tools, not subjective judgment
-5. **no_silent_dismissals**: Every dismissal requires justification
-6. **pin_review_methodology**: All reviews follow Positive, Innovative, Negative
-7. **platform_native_philosophy**: Build only what the platform cannot do
-8. **workers_must_submit_decision**: submit_decision before key choices
-9. **governance_reviewer_isolation**: Isolation is a security feature
-10. **no_em_dashes**: Writing style prohibition
-11. **five_quality_gates**: Build, lint, tests, coverage, findings
+| Partition | Path | Language | LOC (est.) | Role |
+|-----------|------|----------|------------|------|
+| Extension Backend | `extension/src/` | TypeScript | ~3,500 | VS Code extension host, MCP clients, providers, commands |
+| Dashboard Webview | `extension/webview-dashboard/src/` | React/TSX | ~6,000 | React dashboard, 29+ components, dual-mode transport |
+| KG MCP Server | `mcp-servers/knowledge-graph/collab_kg/` | Python | ~1,200 | Knowledge graph CRUD, tier protection, JSONL persistence |
+| Quality MCP Server | `mcp-servers/quality/collab_quality/` | Python | ~1,800 | Quality gates, trust engine, multi-language tool wrapping |
+| Governance MCP Server | `mcp-servers/governance/collab_governance/` | Python | ~3,500 | Decision review, governed tasks, AI reviewer, usage tracking |
+| AVT Gateway | `server/avt_gateway/` | Python | ~3,000 | FastAPI backend, REST API, WebSocket, job runner, MCP SSE client |
+| E2E Tests | `e2e/` | Python | ~4,500 | 14 scenarios, project generator, parallel executor |
+| Hook Scripts | `scripts/hooks/` | Bash/Python | ~2,500 | 5 lifecycle hooks, test harnesses |
+| Agent Definitions | `.claude/agents/` | Markdown | ~3,000 | 8 agent role specifications |
 
-### Architecture Tier (15 entities)
-Key patterns and components:
+---
 
-1. **hook_based_governance**: 5 lifecycle hooks for deterministic verification
-2. **holistic_review_settle_debounce**: 3s settle, session-scoped flags
-3. **knowledge_graph_mcp_server**: 11 tools, JSONL, port 3101
-4. **quality_mcp_server**: 10 tools, SQLite trust engine, port 3102
-5. **governance_mcp_server**: 12 tools, AI review, port 3103
-6. **agent_teams_orchestration**: Full sessions, shared task list, self-claim
-7. **eight_specialized_agents**: Worker, QR, KG-lib, Gov-rev, Researcher, Steward, Architect, Bootstrapper
-8. **governed_task_lifecycle**: Blocked-from-birth, multi-blocker stacking
-9. **vscode_extension**: Observability layer, MCP clients
-10. **webview_dashboard**: React + Tailwind, dual-mode transport
-11. **avt_gateway**: FastAPI, 35 endpoints, WebSocket
-12. **e2e_testing_harness**: 14 scenarios, 292+ assertions
-13. **temp_file_io_pattern**: Temp files for CLI invocations
-14. **checkpoint_resume_pattern**: git tag checkpoints
-15. **drift_detection**: Time, loop, scope, quality
+## Vision Standard Candidates
 
-### Quality Tier (4 entities)
-Conventions and observations:
+| # | Draft Vision Standard | Source Evidence | Confidence |
+|---|----------------------|-----------------|------------|
+| V1 | **Vision First**: Vision standards are immutable by agents; only humans define the vision | `tier_protection.py`, `CLAUDE.md`, `project-overview.md` | HIGH |
+| V2 | **Build Only What the Platform Cannot Do**: Custom infrastructure limited to capabilities Claude Code genuinely lacks | `project-overview.md` (Platform-Native Philosophy), `CLAUDE.md` | HIGH |
+| V3 | **Intercept Early, Redirect Early**: Tasks governed from creation, verified before work begins | `governance-task-intercept.py`, `CLAUDE.md`, `project-overview.md` | HIGH |
+| V4 | **Deterministic Verification Over AI Judgment**: Quality gates use real tools (compilers, linters, test suites), not LLM opinions | `quality/server.py`, `gates.py`, `project-overview.md` | HIGH |
+| V5 | **No Silent Dismissals**: Every dismissed finding requires justification and identity | `trust_engine.py`, `project-overview.md` | HIGH |
+| V6 | **Research Before Implementing**: Unfamiliar domains require researcher agent before workers implement | `CLAUDE.md`, `project-overview.md`, `researcher.md` agent definition | HIGH |
+| V7 | **Three-Tier Governance Hierarchy**: Vision (human-only) > Architecture (human-gated) > Quality (automated) | `tier_protection.py`, `models.py`, `CLAUDE.md`, `project-overview.md` | HIGH |
+| V8 | **No Em Dashes in Generated Prose**: Replace with commas, semicolons, colons, or parentheses | `CLAUDE.md` (Writing Style), all agent definitions | MEDIUM |
 
-1. **python_conventions**: snake_case, Pydantic, FastMCP, uv
-2. **typescript_conventions**: camelCase, React hooks, Context, esbuild/Vite
-3. **shell_conventions**: set -e, CLAUDE_PROJECT_DIR, exit codes
-4. **bootstrap_scale_assessment**: Medium tier metrics
+---
 
-## Infrastructure Setup
+## Architecture Candidates
 
-### MCP Configuration
-- **Project-scope** `.claude/mcp.json` created with devhost paths
-- All three servers configured: collab-kg, collab-quality, collab-governance
-- Transport: stdio (uv run python -m ...)
-- Each server's `cwd` points to devhost's MCP server directory
+| # | Component/Pattern | Type | Source Evidence |
+|---|------------------|------|-----------------|
+| A1 | Knowledge Graph MCP Server | component | `collab_kg/server.py`, port 3101, JSONL persistence |
+| A2 | Quality MCP Server | component | `collab_quality/server.py`, port 3102, SQLite trust engine |
+| A3 | Governance MCP Server | component | `collab_governance/server.py`, port 3103, SQLite decision store |
+| A4 | AVT Gateway | component | `server/avt_gateway/app.py`, FastAPI, port 8080 |
+| A5 | VS Code Extension | component | `extension/src/extension.ts`, dashboard webview |
+| A6 | React Dashboard | component | `extension/webview-dashboard/`, dual-mode transport |
+| A7 | Five-Hook Verification Layer | pattern | `settings.json` hooks config, 5 hook scripts |
+| A8 | Governed Task Lifecycle | pattern | `task_integration.py`, `governance-task-intercept.py` |
+| A9 | Three-Tier Protection | pattern | `tier_protection.py`, enforced at KG tool level |
+| A10 | Dual-Mode Transport | pattern | `useTransport.ts`, VS Code postMessage vs HTTP/WebSocket |
+| A11 | Temp File I/O for CLI | pattern | `reviewer.py`, `DashboardWebviewProvider.ts` |
+| A12 | PIN Review Methodology | pattern | `reviewer.py` prompts, `CLAUDE.md`, agent definitions |
+| A13 | Session-Scoped Holistic Review | pattern | `governance-task-intercept.py`, flag files, settle checker |
+| A14 | Agent Teams Orchestration | pattern | `CLAUDE.md`, `settings.json`, `.claude/agents/` |
+| A15 | E2E Testing Harness | component | `e2e/`, 14 scenarios, project generator |
 
-### Settings
-- `.claude/settings.json` updated: Read/Write/Edit permissions for devhost path
-- Hook configuration uses `$CLAUDE_PROJECT_DIR` (resolves automatically)
-- Agent Teams enabled via env var
+---
 
-### Data State
-- `.avt/knowledge-graph.jsonl`: Seeded with 30 entities
-- `.avt/governance.db`: Backed up to .pre-bootstrap (fresh DB created on first use)
-- `.avt/trust-engine.db`: Backed up to .pre-bootstrap (fresh DB created on first use)
-- `.avt/hook-governance.log`: Backed up to .pre-bootstrap
-- `.avt/hook-holistic.log`: Backed up to .pre-bootstrap
+## Code Structure
 
-## Component Inventory
+### Layered Architecture
 
-| Component | Path | Language | MCP Tools |
-|-----------|------|----------|-----------|
-| Knowledge Graph Server | mcp-servers/knowledge-graph/ | Python | 11 |
-| Quality Server | mcp-servers/quality/ | Python | 10 |
-| Governance Server | mcp-servers/governance/ | Python | 12 |
-| VS Code Extension | extension/ | TypeScript | - |
-| Webview Dashboard | extension/webview-dashboard/ | TS/React | - |
-| AVT Gateway | server/ | Python | - |
-| Lifecycle Hooks | scripts/hooks/ | Python/Shell | - |
-| E2E Test Harness | e2e/ | Python | - |
-| Agent Definitions | .claude/agents/ | Markdown | - |
+1. **Presentation Layer**: VS Code Extension + React Dashboard (dual-mode)
+2. **API Layer**: AVT Gateway (FastAPI REST + WebSocket) OR VS Code postMessage bridge
+3. **Service Layer**: Three MCP Servers (KG, Quality, Governance)
+4. **Persistence Layer**: JSONL (KG), SQLite (Governance, Quality/Trust), JSON files (task system, jobs, config)
+5. **Hook Layer**: Five lifecycle hooks providing platform-level governance verification
+6. **Agent Layer**: Eight specialized agents with distinct roles and MCP access profiles
 
-## Cross-Component Dependencies
+### Entry Points
 
-```
-Orchestrator (CLAUDE.md)
-  |-- reads --> Agent Definitions (.claude/agents/)
-  |-- spawns --> Worker, QR, KG-lib, Architect, Researcher, Steward, Bootstrapper
-  |-- invokes --> Governance Reviewer (claude --print)
+| Entry Point | File | Purpose |
+|-------------|------|---------|
+| Extension activation | `extension/src/extension.ts` | `activate()` function |
+| Dashboard app | `extension/webview-dashboard/src/main.tsx` | React root |
+| KG Server | `mcp-servers/knowledge-graph/collab_kg/server.py` | `__main__` block |
+| Quality Server | `mcp-servers/quality/collab_quality/server.py` | `__main__` block |
+| Governance Server | `mcp-servers/governance/collab_governance/server.py` | `__main__` block |
+| Gateway | `server/avt_gateway/app.py` | FastAPI `app` instance |
+| E2E Runner | `e2e/run-e2e.py` | `main()` function |
+| Hook intercept | `scripts/hooks/governance-task-intercept.py` | `main()` function |
 
-PostToolUse Hook --> Governance MCP Server
-                 --> Holistic Settle Checker (background)
-                 --> Holistic Review Gate (flag file)
+---
 
-Worker Agent --> KG MCP (query standards)
-            --> Quality MCP (run gates)
-            --> Governance MCP (submit decisions)
+## Discovered Patterns
 
-Quality Reviewer --> KG MCP (load standards for three-lens review)
-                --> Quality MCP (record findings)
+| Pattern | Description | Frequency | Tier |
+|---------|-------------|-----------|------|
+| P1: FastMCP Server | Identical structure across all 3 MCP servers | 3/3 | Architecture |
+| P2: Pydantic Aliases | Field aliases for JSON serialization, Python names in code | Universal | Architecture |
+| P3: Temp File I/O | Claude CLI uses temp files, not args/pipes | 2/2 sites | Architecture |
+| P4: SSE MCP Connection | GET /sse + JSON-RPC 2.0 + SSE streaming | 2/2 clients | Architecture |
+| P5: Context Provider | React Context for dashboard state management | Universal | Architecture |
+| P6: Hook Verification | JSON stdin, fast-path, SQLite, exit codes | 5/5 hooks | Architecture |
+| P7: E2E Scenario | BaseScenario, isolation, structural assertions | 14/14 | Architecture |
+| P8: PIN Review | Positive, Innovative, Negative methodology | Universal | Vision |
 
-KG Librarian --> KG MCP (curate entities)
-             --> .avt/memory/ (sync archival files)
+---
 
-VS Code Extension --> All 3 MCP Servers (client connections)
-                  --> Webview Dashboard (postMessage transport)
+## Convention Discovery
 
-AVT Gateway --> All 3 MCP Servers (manages instances)
-            --> React Dashboard (HTTP + WebSocket)
-```
+### Naming Conventions
 
-## Verification Checklist
+| Context | Convention | Examples |
+|---------|-----------|----------|
+| Python packages | snake_case | `collab_kg`, `collab_quality`, `avt_gateway` |
+| Python modules | snake_case | `tier_protection.py`, `trust_engine.py` |
+| Python classes | PascalCase | `KnowledgeGraph`, `GovernanceStore` |
+| TypeScript files | PascalCase | `McpClientService.ts`, `DashboardWebviewProvider.ts` |
+| React components | PascalCase | `AgentCards.tsx`, `GovernancePanel.tsx` |
+| Agent definitions | kebab-case | `quality-reviewer.md`, `kg-librarian.md` |
+| Hook scripts | kebab-case | `governance-task-intercept.py` |
+| MCP tool names | snake_case | `create_entities`, `submit_decision` |
+| Config keys | camelCase (JSON) | `entityType`, `setupComplete` |
 
-To verify the bootstrap from a Claude Code session in devhost:
+### Error Handling
 
-1. [ ] `get_entities_by_tier("vision")` returns 11 entities
-2. [ ] `get_entities_by_tier("architecture")` returns 15 entities
-3. [ ] `search_nodes("governance")` returns relevant results
-4. [ ] `get_governance_status()` returns empty/fresh state
-5. [ ] Hooks fire on TaskCreate (check .avt/hook-governance.log)
-6. [ ] Holistic review gate passes when no flag file exists
-7. [ ] Quality gates can be invoked via `check_all_gates()`
+- **Python MCP servers**: Return error dicts `{"error": "message"}`, not exceptions
+- **TypeScript extension**: Try-catch with `vscode.window.showErrorMessage()`
+- **Hook scripts**: Never crash; exit silently on parse errors
 
-## Notes
+### Build Conventions
 
-- **Project-scope MCP config**: Created at `.claude/mcp.json` in devhost. Per Issue #13898, project-scope MCP may cause subagents to hallucinate MCP results. If this occurs, migrate to user-scope by updating `~/.claude/mcp.json` to point to devhost paths.
-- **Shared repo**: Both agent-vision-team and agent-vision-team-devhost point to the same Git remote. They share code but have independent KG, governance, and trust data.
-- **Example vision standards**: CLAUDE.md lists 4 example vision standards (protocol-based DI, no singletons, public API tests, Result types). These were NOT seeded as they are labeled as examples to populate, not confirmed project standards.
+- Python: `uv`, `pyproject.toml`, hatchling, Python 3.12+
+- TypeScript: `npm`, esbuild (extension), Vite (dashboard)
+- Extension build: `node esbuild.config.js` (not `npm run compile`)
+- Webview build: `cd extension/webview-dashboard && npm run build`
 
-## Bootstrap Timestamp
-2026-02-18
+---
+
+## Discovered Rules (Draft)
+
+| # | Rule | Level | Scope |
+|---|------|-------|-------|
+| R1 | No em dashes in generated prose; use commas, semicolons, colons, or parentheses | ENFORCE | all |
+| R2 | Use temp file I/O (not CLI args or pipes) for claude CLI invocations | ENFORCE | worker, governance-reviewer |
+| R3 | All quality gates must pass before task completion | ENFORCE | worker |
+| R4 | Workers must call `submit_decision` before implementing key decisions | ENFORCE | worker |
+| R5 | MCP servers return error dicts rather than raising exceptions | PREFER | worker, architect |
+| R6 | Hook scripts must never crash; fail silently with logging | ENFORCE | all |
+| R7 | Run the build before reporting task completion | ENFORCE | worker |
+| R8 | Extension backend build: `node esbuild.config.js` (not `npm run compile`) | ENFORCE | worker |
+| R9 | Python uses `uv` for package management, not pip directly | PREFER | worker |
+| R10 | Access Pydantic alias fields by Python name (`.entity_type`), not alias (`.entityType`) | ENFORCE | worker |
+
+---
+
+## Contradictions and Ambiguities
+
+1. **Language configuration**: `project-config.json` lists only `["typescript"]` but the codebase is ~45% Python, ~40% TypeScript, ~10% Bash
+2. **PIN methodology scope**: Documentation says PIN is for "all reviews" but quality gates are purely deterministic; PIN applies only to governance AI reviews
+
+---
+
+## Recommended Actions
+
+1. **APPROVE** vision standards V1-V8 for KG ingestion
+2. **APPROVE** architecture candidates A1-A15 for KG ingestion
+3. **APPROVE** rules R1-R10 for project-config.json
+4. **REVIEW** architecture docs with Mermaid diagrams
+5. **REVIEW** style guide
+6. **UPDATE** project-config.json languages to include Python and Bash
+
+---
+
+## Output Artifacts
+
+| Artifact | Path | Status |
+|----------|------|--------|
+| Bootstrap Report | `.avt/bootstrap-report.md` | This file |
+| Vision Standards | `docs/vision/*.md` | 8 files generated |
+| Architecture Overview | `docs/architecture/overview.md` | Generated |
+| Architecture Components | `docs/architecture/components/*.md` | Generated |
+| Architecture Patterns | `docs/architecture/patterns/*.md` | Generated |
+| Architecture Flows | `docs/architecture/flows/*.md` | Generated |
+| Style Guide | `docs/style/style-guide.md` | Generated |
+| Draft Rules | `.avt/bootstrap-rules-draft.json` | Generated |

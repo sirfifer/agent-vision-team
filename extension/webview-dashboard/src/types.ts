@@ -529,6 +529,21 @@ export interface BootstrapActivity {
 
 export type BootstrapReviewItemStatus = 'pending' | 'approved' | 'rejected' | 'edited';
 
+export interface BootstrapContradictionAlternative {
+  name: string;
+  description: string;
+  usage: string;
+  percentage: number;
+  fileCount: number;
+  qualitativeAssessment: string;
+}
+
+export interface BootstrapContradiction {
+  concern: string;
+  alternatives: BootstrapContradictionAlternative[];
+  recommendation: string;
+}
+
 export interface BootstrapReviewItem {
   /** Unique ID: entity name (snake_case) */
   id: string;
@@ -546,6 +561,18 @@ export interface BootstrapReviewItem {
   status: BootstrapReviewItemStatus;
   /** Updated observations if user edited */
   editedObservations?: string[];
+  /** Confidence level from bootstrapper */
+  confidence?: 'high' | 'medium' | 'low';
+  /** Source files that evidenced this discovery */
+  sourceFiles?: string[];
+  /** Evidence summary */
+  sourceEvidence?: string;
+  /** Whether this item represents an architectural contradiction */
+  isContradiction?: boolean;
+  /** Contradiction details */
+  contradiction?: BootstrapContradiction;
+  /** Whether this item was manually created by the user during review */
+  isUserCreated?: boolean;
 }
 
 export interface BootstrapFinalizationResult {

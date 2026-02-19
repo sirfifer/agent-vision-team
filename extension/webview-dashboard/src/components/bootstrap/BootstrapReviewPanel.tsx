@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useDashboard } from '../../context/DashboardContext';
 import { ReviewItemCard } from './ReviewItemCard';
+import { AddItemForm } from './AddItemForm';
 import type { BootstrapReviewItem } from '../../types';
 
 type TierTab = 'vision' | 'architecture' | 'quality';
@@ -22,6 +23,7 @@ export function BootstrapReviewPanel() {
   const [items, setItems] = useState<BootstrapReviewItem[]>(bootstrapReviewItems || []);
   const [activeTab, setActiveTab] = useState<TierTab>('vision');
   const [finalizing, setFinalizing] = useState(false);
+  const [isAddingItem, setIsAddingItem] = useState(false);
 
   // Group items by tier
   const grouped = useMemo(() => {
@@ -89,6 +91,11 @@ export function BootstrapReviewPanel() {
     ));
   };
 
+  const handleAddItem = (item: BootstrapReviewItem) => {
+    setItems(prev => [...prev, item]);
+    setIsAddingItem(false);
+  };
+
   const handleFinalize = () => {
     setFinalizing(true);
     sendMessage({ type: 'finalizeBootstrapReview', items });
@@ -147,6 +154,7 @@ export function BootstrapReviewPanel() {
 
   const currentItems = grouped[activeTab];
   const currentPending = currentItems.filter(i => i.status === 'pending').length;
+  const totalActionable = stats.approved + stats.edited + stats.rejected;
 
   return (
     <div className="flex flex-col" style={{ maxHeight: '70vh' }}>
@@ -154,18 +162,18 @@ export function BootstrapReviewPanel() {
       <div className="px-5 py-3 border-b border-vscode-border">
         <div className="text-xs text-vscode-muted mb-2">
           Review each discovery before it becomes permanent in the Knowledge Graph.
+          You can also add items manually.
         </div>
 
-        {/* Tab bar */}
+        {/* Tab bar - always show all three tiers */}
         <div className="flex items-center gap-1">
           {(Object.keys(TIER_LABELS) as TierTab[]).map(tier => {
             const count = grouped[tier].length;
-            if (count === 0) return null;
             const isActive = activeTab === tier;
             return (
               <button
                 key={tier}
-                onClick={() => setActiveTab(tier)}
+                onClick={() => { setActiveTab(tier); setIsAddingItem(false); }}
                 className={`px-3 py-1.5 text-xs rounded-t transition-colors ${
                   isActive
                     ? 'bg-vscode-bg border border-vscode-border border-b-transparent font-semibold text-vscode-fg -mb-px'
@@ -181,9 +189,11 @@ export function BootstrapReviewPanel() {
           <div className="flex-1" />
 
           {/* Progress indicator */}
-          <span className="text-2xs text-vscode-muted">
-            Reviewed: {stats.reviewed}/{stats.total}
-          </span>
+          {stats.total > 0 && (
+            <span className="text-2xs text-vscode-muted">
+              Reviewed: {stats.reviewed}/{stats.total}
+            </span>
+          )}
         </div>
       </div>
 
@@ -192,29 +202,56 @@ export function BootstrapReviewPanel() {
         <span className="text-xs font-semibold uppercase tracking-wider text-vscode-muted">
           {TIER_LABELS[activeTab]} ({currentItems.length})
         </span>
-        {currentPending > 0 && (
-          <div className="flex gap-1.5">
+        <div className="flex gap-1.5">
+          {currentPending > 0 && (
+            <>
+              <button
+                onClick={handleApproveAll}
+                className="text-2xs px-2 py-0.5 rounded bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors"
+              >
+                Approve All Pending
+              </button>
+              <button
+                onClick={handleRejectAll}
+                className="text-2xs px-2 py-0.5 rounded bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
+              >
+                Reject All Pending
+              </button>
+            </>
+          )}
+          {!isAddingItem && (
             <button
-              onClick={handleApproveAll}
-              className="text-2xs px-2 py-0.5 rounded bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors"
+              onClick={() => setIsAddingItem(true)}
+              className="text-2xs px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors"
             >
-              Approve All Pending
+              + Add Item
             </button>
-            <button
-              onClick={handleRejectAll}
-              className="text-2xs px-2 py-0.5 rounded bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
-            >
-              Reject All Pending
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Item list */}
       <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
-        {currentItems.length === 0 ? (
-          <div className="text-xs text-vscode-muted text-center py-8 italic">
-            No items in this tier.
+        {/* Add item form (shown at top when active) */}
+        {isAddingItem && (
+          <AddItemForm
+            tier={activeTab}
+            onAdd={handleAddItem}
+            onCancel={() => setIsAddingItem(false)}
+          />
+        )}
+
+        {currentItems.length === 0 && !isAddingItem ? (
+          <div className="text-center py-8 space-y-3">
+            <div className="text-xs text-vscode-muted italic">
+              No {TIER_LABELS[activeTab].toLowerCase()} items were discovered by the bootstrap.
+            </div>
+            <button
+              onClick={() => setIsAddingItem(true)}
+              className="text-xs px-3 py-1.5 rounded bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors"
+            >
+              + Add {TIER_LABELS[activeTab]} Item
+            </button>
           </div>
         ) : (
           currentItems.map(item => (
@@ -245,13 +282,17 @@ export function BootstrapReviewPanel() {
             </span>
           )}
           <button
-            onClick={handleFinalize}
-            disabled={finalizing || stats.total === 0}
+            onClick={stats.total === 0 && totalActionable === 0
+              ? () => setShowBootstrap(false)
+              : handleFinalize}
+            disabled={finalizing}
             className="px-4 py-1.5 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {finalizing
               ? 'Finalizing...'
-              : `Finalize: Apply ${stats.approved + stats.edited} approved, remove ${stats.rejected}`}
+              : stats.total === 0 && totalActionable === 0
+                ? 'Done'
+                : `Finalize: Apply ${stats.approved + stats.edited} approved, remove ${stats.rejected}`}
           </button>
         </div>
       </div>

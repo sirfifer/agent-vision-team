@@ -1129,7 +1129,9 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   // ─────────────────────────────────────────────────────────────────────────────
 
   /**
-   * Load KG entities from the JSONL file and convert them to review items.
+   * Load bootstrap discoveries for review. Reads from the structured
+   * bootstrap-discoveries.json staging file (preferred) or falls back
+   * to the legacy knowledge-graph.jsonl path for backward compatibility.
    */
   private async handleLoadBootstrapReview(): Promise<void> {
     try {
@@ -1139,6 +1141,29 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      // Preferred: structured discoveries file (staging, not yet in KG)
+      const discoveriesPath = path.join(projectDir, '.avt', 'bootstrap-discoveries.json');
+      if (fs.existsSync(discoveriesPath)) {
+        const data = JSON.parse(fs.readFileSync(discoveriesPath, 'utf-8'));
+        const items = (data.discoveries || []).map((d: any) => ({
+          id: d.id || '',
+          name: d.name || d.id || '',
+          description: d.description || (d.observations?.[0]?.slice(0, 120)) || d.entityType || '',
+          tier: d.tier || 'quality',
+          entityType: d.entityType || 'observation',
+          observations: d.observations || [],
+          status: 'pending' as const,
+          confidence: d.confidence,
+          sourceFiles: d.sourceFiles,
+          sourceEvidence: d.sourceEvidence,
+          isContradiction: d.isContradiction || false,
+          contradiction: d.contradiction,
+        }));
+        this.postMessage({ type: 'bootstrapReviewLoaded', items });
+        return;
+      }
+
+      // Fallback: legacy JSONL path (backward compatibility)
       const jsonlPath = path.join(projectDir, '.avt', 'knowledge-graph.jsonl');
       if (!fs.existsSync(jsonlPath)) {
         this.postMessage({ type: 'bootstrapReviewLoaded', items: [] });
@@ -1148,7 +1173,6 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       const content = fs.readFileSync(jsonlPath, 'utf-8');
       const lines = content.split('\n').filter(l => l.trim());
 
-      // Parse entities
       const items: Array<{
         id: string;
         name: string;
@@ -1164,7 +1188,6 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
           const entity = JSON.parse(line);
           if (!entity.name || !entity.entityType) continue;
 
-          // Map protectionTier to our tier categories
           let tier: 'vision' | 'architecture' | 'quality' = 'quality';
           const pt = (entity.protectionTier || '').toLowerCase();
           if (pt === 'vision') tier = 'vision';
@@ -1173,7 +1196,6 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
           const observations: string[] = entity.observations || [];
           const description = observations[0]?.slice(0, 120) || entity.entityType;
 
-          // Convert snake_case name to human-readable
           const humanName = entity.name
             .replace(/_/g, ' ')
             .replace(/\b\w/g, (c: string) => c.toUpperCase());
@@ -1200,12 +1222,18 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Finalize bootstrap review: delete rejected entities, update edited ones.
+   * Finalize bootstrap review: write approved/edited items to the Knowledge Graph.
+   * Rejected items are simply not written. This is the moment items become permanent.
    */
   private async handleFinalizeBootstrapReview(items: Array<{
     id: string;
+    name: string;
+    tier: string;
+    entityType: string;
+    observations: string[];
     status: string;
     editedObservations?: string[];
+    isUserCreated?: boolean;
   }>): Promise<void> {
     try {
       const projectDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -1217,64 +1245,62 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      const jsonlPath = path.join(projectDir, '.avt', 'knowledge-graph.jsonl');
-      if (!fs.existsSync(jsonlPath)) {
-        this.postMessage({
-          type: 'bootstrapReviewFinalized',
-          result: { success: false, approved: 0, rejected: 0, edited: 0, errors: ['Knowledge graph file not found'] },
-        });
-        return;
-      }
-
-      // Build lookup maps from review items
-      const rejectSet = new Set<string>();
-      const editMap = new Map<string, string[]>();
       let approved = 0;
       let rejected = 0;
       let edited = 0;
+      const newLines: string[] = [];
 
       for (const item of items) {
         if (item.status === 'rejected') {
-          rejectSet.add(item.id);
           rejected++;
-        } else if (item.status === 'edited' && item.editedObservations) {
-          editMap.set(item.id, item.editedObservations);
-          edited++;
-        } else if (item.status === 'approved') {
-          approved++;
+          continue;
         }
-        // 'pending' items are kept as-is
-      }
 
-      // Read and rewrite JSONL
-      const content = fs.readFileSync(jsonlPath, 'utf-8');
-      const lines = content.split('\n').filter(l => l.trim());
-      const outputLines: string[] = [];
-      const errors: string[] = [];
+        // Approved, edited, and pending items all get written
+        if (item.status === 'approved' || item.status === 'edited' || item.status === 'pending') {
+          if (item.status === 'edited') edited++;
+          else approved++;
 
-      for (const line of lines) {
-        try {
-          const entity = JSON.parse(line);
-          const name = entity.name;
+          const observations = item.editedObservations || item.observations;
 
-          // Skip rejected entities
-          if (rejectSet.has(name)) continue;
-
-          // Update edited entities
-          if (editMap.has(name)) {
-            entity.observations = editMap.get(name);
-            outputLines.push(JSON.stringify(entity));
-          } else {
-            outputLines.push(line);
+          // Ensure protection_tier observation exists
+          if (!observations.some(o => o.startsWith('protection_tier:'))) {
+            observations.unshift(`protection_tier: ${item.tier}`);
           }
-        } catch {
-          // Keep malformed lines as-is (might be non-entity data)
-          outputLines.push(line);
+
+          const entity: Record<string, unknown> = {
+            type: 'entity',
+            name: item.id,
+            entityType: item.entityType,
+            observations,
+          };
+
+          // Preserve protectionTier for KG server compatibility
+          if (item.tier) {
+            entity.protectionTier = item.tier;
+          }
+
+          newLines.push(JSON.stringify(entity));
         }
       }
 
-      // Write back
-      fs.writeFileSync(jsonlPath, outputLines.join('\n') + '\n', 'utf-8');
+      // Append approved items to the Knowledge Graph JSONL
+      const avtDir = path.join(projectDir, '.avt');
+      if (!fs.existsSync(avtDir)) {
+        fs.mkdirSync(avtDir, { recursive: true });
+      }
+
+      const jsonlPath = path.join(avtDir, 'knowledge-graph.jsonl');
+      if (newLines.length > 0) {
+        fs.appendFileSync(jsonlPath, newLines.join('\n') + '\n', 'utf-8');
+      }
+
+      // Archive the discoveries staging file
+      const discoveriesPath = path.join(avtDir, 'bootstrap-discoveries.json');
+      if (fs.existsSync(discoveriesPath)) {
+        const archivePath = path.join(avtDir, 'bootstrap-discoveries.finalized.json');
+        fs.renameSync(discoveriesPath, archivePath);
+      }
 
       // Add activity entry
       this.addActivity({
@@ -1287,7 +1313,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
       this.postMessage({
         type: 'bootstrapReviewFinalized',
-        result: { success: true, approved, rejected, edited, errors },
+        result: { success: true, approved, rejected, edited, errors: [] },
       });
     } catch (err: any) {
       console.error('Failed to finalize bootstrap review:', err);
