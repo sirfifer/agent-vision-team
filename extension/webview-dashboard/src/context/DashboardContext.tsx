@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, ResearchBriefInfo, BootstrapScaleProfile, BootstrapActivity } from '../types';
+import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, ResearchBriefInfo, BootstrapScaleProfile, BootstrapActivity, BootstrapReviewItem, BootstrapFinalizationResult } from '../types';
 import { useTransport } from '../hooks/useTransport';
 import { DEMO_DATA } from '../data/demoData';
 
@@ -55,6 +55,9 @@ interface DashboardContextValue {
   bootstrapRunning: boolean;
   bootstrapProgress: { phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] } | null;
   bootstrapResult: { success: boolean; reportPath?: string; error?: string } | null;
+  // Bootstrap review
+  bootstrapReviewItems: BootstrapReviewItem[] | null;
+  bootstrapReviewResult: BootstrapFinalizationResult | null;
   // Demo mode
   demoMode: boolean;
 }
@@ -110,6 +113,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [bootstrapRunning, setBootstrapRunning] = useState(false);
   const [bootstrapProgress, setBootstrapProgress] = useState<{ phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] } | null>(null);
   const [bootstrapResult, setBootstrapResult] = useState<{ success: boolean; reportPath?: string; error?: string } | null>(null);
+
+  // Bootstrap review state
+  const [bootstrapReviewItems, setBootstrapReviewItems] = useState<BootstrapReviewItem[] | null>(null);
+  const [bootstrapReviewResult, setBootstrapReviewResult] = useState<BootstrapFinalizationResult | null>(null);
 
   // Demo mode state
   const [demoMode, setDemoMode] = useState(false);
@@ -265,6 +272,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           setBootstrapResult({ success: msg.success, reportPath: msg.reportPath, error: msg.error });
           setBootstrapProgress(null);
           break;
+        case 'bootstrapReviewLoaded':
+          setBootstrapReviewItems(msg.items);
+          break;
+        case 'bootstrapReviewFinalized':
+          setBootstrapReviewResult(msg.result);
+          break;
       }
     };
     window.addEventListener('message', handler);
@@ -312,6 +325,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       bootstrapRunning,
       bootstrapProgress,
       bootstrapResult,
+      bootstrapReviewItems,
+      bootstrapReviewResult,
       demoMode,
     }}>
       {children}

@@ -451,6 +451,8 @@ export type ExtensionMessage =
   | { type: 'bootstrapStarted'; jobId?: string }
   | { type: 'bootstrapProgress'; phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] }
   | { type: 'bootstrapComplete'; success: boolean; reportPath?: string; error?: string }
+  | { type: 'bootstrapReviewLoaded'; items: BootstrapReviewItem[] }
+  | { type: 'bootstrapReviewFinalized'; result: BootstrapFinalizationResult }
   | { type: 'usageReport'; report: unknown };
 
 export type WebviewMessage =
@@ -478,6 +480,8 @@ export type WebviewMessage =
   | { type: 'listResearchBriefs' }
   | { type: 'bootstrapScaleCheck' }
   | { type: 'runBootstrap'; context: string; focusAreas: BootstrapFocusAreas }
+  | { type: 'loadBootstrapReview' }
+  | { type: 'finalizeBootstrapReview'; items: BootstrapReviewItem[] }
   | { type: 'requestUsageReport'; period: string; groupBy: string };
 
 export interface IngestionResult {
@@ -517,4 +521,37 @@ export interface BootstrapActivity {
   tool: string;
   summary: string;
   timestamp: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bootstrap Review Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type BootstrapReviewItemStatus = 'pending' | 'approved' | 'rejected' | 'edited';
+
+export interface BootstrapReviewItem {
+  /** Unique ID: entity name (snake_case) */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** First observation line (truncated) */
+  description: string;
+  /** Protection tier */
+  tier: 'vision' | 'architecture' | 'quality';
+  /** Entity type (vision_standard, pattern, component, etc.) */
+  entityType: string;
+  /** Full observation list */
+  observations: string[];
+  /** Review status */
+  status: BootstrapReviewItemStatus;
+  /** Updated observations if user edited */
+  editedObservations?: string[];
+}
+
+export interface BootstrapFinalizationResult {
+  success: boolean;
+  approved: number;
+  rejected: number;
+  edited: number;
+  errors: string[];
 }

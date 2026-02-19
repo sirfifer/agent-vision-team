@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useDashboard } from '../../context/DashboardContext';
 import { getActiveProjectId } from '../../hooks/useTransport';
+import { BootstrapReviewPanel } from './BootstrapReviewPanel';
 import type { BootstrapScaleProfile, BootstrapFocusAreas, BootstrapActivity } from '../../types';
 
 const TIER_COLORS: Record<string, string> = {
@@ -46,8 +47,9 @@ function ToolDot({ tool }: { tool: string }) {
 }
 
 function ProgressView() {
-  const { bootstrapProgress, bootstrapResult, setShowBootstrap } = useDashboard();
+  const { bootstrapProgress, bootstrapResult, bootstrapReviewItems, bootstrapReviewResult, sendMessage, setShowBootstrap } = useDashboard();
   const [elapsed, setElapsed] = useState(0);
+  const [loadingReview, setLoadingReview] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,7 +58,17 @@ function ProgressView() {
     return () => clearInterval(interval);
   }, []);
 
+  // Show review panel when review items are loaded
+  if (bootstrapReviewItems || bootstrapReviewResult) {
+    return <BootstrapReviewPanel />;
+  }
+
   if (bootstrapResult) {
+    const handleReviewDiscoveries = () => {
+      setLoadingReview(true);
+      sendMessage({ type: 'loadBootstrapReview' });
+    };
+
     return (
       <div className="px-6 py-8 space-y-4 text-center">
         {bootstrapResult.success ? (
@@ -69,13 +81,29 @@ function ProgressView() {
             <div>
               <div className="text-sm font-semibold">Bootstrap Complete</div>
               <div className="text-xs text-vscode-muted mt-1">
-                Review the bootstrap report to approve, reject, or revise each discovery.
+                Discoveries are ready for your review. Approve, edit, or reject each item
+                before it becomes permanent in the Knowledge Graph.
               </div>
               {bootstrapResult.reportPath && (
                 <div className="mt-2 text-xs font-mono text-blue-400">
                   {bootstrapResult.reportPath}
                 </div>
               )}
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                onClick={handleReviewDiscoveries}
+                disabled={loadingReview}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50"
+              >
+                {loadingReview ? 'Loading...' : 'Review Discoveries'}
+              </button>
+              <button
+                onClick={() => setShowBootstrap(false)}
+                className="px-4 py-2 text-sm rounded-lg bg-vscode-btn-bg text-vscode-btn-fg hover:opacity-80 transition-opacity"
+              >
+                Close
+              </button>
             </div>
           </>
         ) : (
@@ -91,14 +119,14 @@ function ProgressView() {
                 {bootstrapResult.error || 'An unknown error occurred.'}
               </div>
             </div>
+            <button
+              onClick={() => setShowBootstrap(false)}
+              className="px-4 py-2 text-sm rounded-lg bg-vscode-btn-bg text-vscode-btn-fg hover:opacity-80 transition-opacity"
+            >
+              Close
+            </button>
           </>
         )}
-        <button
-          onClick={() => setShowBootstrap(false)}
-          className="px-4 py-2 text-sm rounded-lg bg-vscode-btn-bg text-vscode-btn-fg hover:opacity-80 transition-opacity"
-        >
-          Close
-        </button>
       </div>
     );
   }
@@ -158,6 +186,7 @@ export function BootstrapDialog() {
     showBootstrap, setShowBootstrap, sendMessage,
     bootstrapScaleProfile, projectConfig,
     bootstrapRunning, bootstrapResult,
+    bootstrapReviewItems, bootstrapReviewResult,
   } = useDashboard();
   const [context, setContext] = useState('');
   const [focusAreas, setFocusAreas] = useState<BootstrapFocusAreas>({
@@ -244,15 +273,21 @@ export function BootstrapDialog() {
     ? `Project: ${projectConfig.metadata.name}${projectConfig.metadata.description ? `. ${projectConfig.metadata.description}` : ''}`
     : '';
 
+  const inReviewMode = !!(bootstrapReviewItems || bootstrapReviewResult);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-vscode-widget-bg border border-vscode-border rounded-xl shadow-2xl w-full max-w-xl">
+      <div className={`bg-vscode-widget-bg border border-vscode-border rounded-xl shadow-2xl w-full ${inReviewMode ? 'max-w-3xl' : 'max-w-xl'}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-vscode-border">
           <div>
-            <h2 className="text-base font-bold text-vscode-fg">Bootstrap Project</h2>
+            <h2 className="text-base font-bold text-vscode-fg">
+              {inReviewMode ? 'Review Bootstrap Discoveries' : 'Bootstrap Project'}
+            </h2>
             <p className="text-2xs text-vscode-muted">
-              Analyze your codebase and draft architecture documentation
+              {inReviewMode
+                ? 'Approve, edit, or reject each discovery'
+                : 'Analyze your codebase and draft architecture documentation'}
             </p>
           </div>
           <button

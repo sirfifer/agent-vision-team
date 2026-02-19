@@ -349,6 +349,14 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
           this.handleRunBootstrap(message.context, message.focusAreas);
           break;
 
+        case 'loadBootstrapReview':
+          this.handleLoadBootstrapReview();
+          break;
+
+        case 'finalizeBootstrapReview':
+          this.handleFinalizeBootstrapReview(message.items);
+          break;
+
         case 'requestUsageReport':
           this.handleRequestUsageReport(message.period, message.groupBy);
           break;
@@ -1114,6 +1122,180 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     if (!filePath) return 'file';
     const parts = filePath.replace(/\\/g, '/').split('/');
     return parts.length <= 3 ? parts.join('/') : '...' + '/' + parts.slice(-3).join('/');
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Bootstrap Review Handlers
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Load KG entities from the JSONL file and convert them to review items.
+   */
+  private async handleLoadBootstrapReview(): Promise<void> {
+    try {
+      const projectDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!projectDir) {
+        this.postMessage({ type: 'bootstrapReviewLoaded', items: [] });
+        return;
+      }
+
+      const jsonlPath = path.join(projectDir, '.avt', 'knowledge-graph.jsonl');
+      if (!fs.existsSync(jsonlPath)) {
+        this.postMessage({ type: 'bootstrapReviewLoaded', items: [] });
+        return;
+      }
+
+      const content = fs.readFileSync(jsonlPath, 'utf-8');
+      const lines = content.split('\n').filter(l => l.trim());
+
+      // Parse entities
+      const items: Array<{
+        id: string;
+        name: string;
+        description: string;
+        tier: 'vision' | 'architecture' | 'quality';
+        entityType: string;
+        observations: string[];
+        status: 'pending';
+      }> = [];
+
+      for (const line of lines) {
+        try {
+          const entity = JSON.parse(line);
+          if (!entity.name || !entity.entityType) continue;
+
+          // Map protectionTier to our tier categories
+          let tier: 'vision' | 'architecture' | 'quality' = 'quality';
+          const pt = (entity.protectionTier || '').toLowerCase();
+          if (pt === 'vision') tier = 'vision';
+          else if (pt === 'architecture') tier = 'architecture';
+
+          const observations: string[] = entity.observations || [];
+          const description = observations[0]?.slice(0, 120) || entity.entityType;
+
+          // Convert snake_case name to human-readable
+          const humanName = entity.name
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+          items.push({
+            id: entity.name,
+            name: humanName,
+            description,
+            tier,
+            entityType: entity.entityType,
+            observations,
+            status: 'pending' as const,
+          });
+        } catch {
+          // Skip malformed lines
+        }
+      }
+
+      this.postMessage({ type: 'bootstrapReviewLoaded', items });
+    } catch (err: any) {
+      console.error('Failed to load bootstrap review:', err);
+      this.postMessage({ type: 'bootstrapReviewLoaded', items: [] });
+    }
+  }
+
+  /**
+   * Finalize bootstrap review: delete rejected entities, update edited ones.
+   */
+  private async handleFinalizeBootstrapReview(items: Array<{
+    id: string;
+    status: string;
+    editedObservations?: string[];
+  }>): Promise<void> {
+    try {
+      const projectDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!projectDir) {
+        this.postMessage({
+          type: 'bootstrapReviewFinalized',
+          result: { success: false, approved: 0, rejected: 0, edited: 0, errors: ['No workspace folder'] },
+        });
+        return;
+      }
+
+      const jsonlPath = path.join(projectDir, '.avt', 'knowledge-graph.jsonl');
+      if (!fs.existsSync(jsonlPath)) {
+        this.postMessage({
+          type: 'bootstrapReviewFinalized',
+          result: { success: false, approved: 0, rejected: 0, edited: 0, errors: ['Knowledge graph file not found'] },
+        });
+        return;
+      }
+
+      // Build lookup maps from review items
+      const rejectSet = new Set<string>();
+      const editMap = new Map<string, string[]>();
+      let approved = 0;
+      let rejected = 0;
+      let edited = 0;
+
+      for (const item of items) {
+        if (item.status === 'rejected') {
+          rejectSet.add(item.id);
+          rejected++;
+        } else if (item.status === 'edited' && item.editedObservations) {
+          editMap.set(item.id, item.editedObservations);
+          edited++;
+        } else if (item.status === 'approved') {
+          approved++;
+        }
+        // 'pending' items are kept as-is
+      }
+
+      // Read and rewrite JSONL
+      const content = fs.readFileSync(jsonlPath, 'utf-8');
+      const lines = content.split('\n').filter(l => l.trim());
+      const outputLines: string[] = [];
+      const errors: string[] = [];
+
+      for (const line of lines) {
+        try {
+          const entity = JSON.parse(line);
+          const name = entity.name;
+
+          // Skip rejected entities
+          if (rejectSet.has(name)) continue;
+
+          // Update edited entities
+          if (editMap.has(name)) {
+            entity.observations = editMap.get(name);
+            outputLines.push(JSON.stringify(entity));
+          } else {
+            outputLines.push(line);
+          }
+        } catch {
+          // Keep malformed lines as-is (might be non-entity data)
+          outputLines.push(line);
+        }
+      }
+
+      // Write back
+      fs.writeFileSync(jsonlPath, outputLines.join('\n') + '\n', 'utf-8');
+
+      // Add activity entry
+      this.addActivity({
+        timestamp: new Date().toISOString(),
+        type: 'bootstrap',
+        agent: 'dashboard',
+        summary: `Bootstrap review finalized: ${approved} approved, ${edited} edited, ${rejected} rejected`,
+        tier: 'quality',
+      });
+
+      this.postMessage({
+        type: 'bootstrapReviewFinalized',
+        result: { success: true, approved, rejected, edited, errors },
+      });
+    } catch (err: any) {
+      console.error('Failed to finalize bootstrap review:', err);
+      this.postMessage({
+        type: 'bootstrapReviewFinalized',
+        result: { success: false, approved: 0, rejected: 0, edited: 0, errors: [String(err)] },
+      });
+    }
   }
 
   private async handleRequestUsageReport(period: string, groupBy: string): Promise<void> {
