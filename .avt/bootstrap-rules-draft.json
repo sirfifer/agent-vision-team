@@ -1,0 +1,104 @@
+[
+  {
+    "id": "R1",
+    "statement": "No em dashes in generated prose; use commas, semicolons, colons, or parentheses",
+    "level": "enforce",
+    "category": "code-quality",
+    "scope": [
+      "all"
+    ],
+    "source": "CLAUDE.md (Writing Style), all agent definitions"
+  },
+  {
+    "id": "R2",
+    "statement": "Use temp file I/O (not CLI args or pipes) for claude CLI invocations",
+    "level": "enforce",
+    "category": "patterns",
+    "scope": [
+      "worker",
+      "governance-reviewer"
+    ],
+    "source": "reviewer.py, DashboardWebviewProvider.ts, MEMORY.md"
+  },
+  {
+    "id": "R3",
+    "statement": "All quality gates must pass before task completion",
+    "level": "enforce",
+    "category": "testing",
+    "scope": [
+      "worker"
+    ],
+    "source": "CLAUDE.md, TaskCompleted hook"
+  },
+  {
+    "id": "R4",
+    "statement": "Workers must call submit_decision before implementing key decisions",
+    "level": "enforce",
+    "category": "workflow",
+    "scope": [
+      "worker"
+    ],
+    "source": "CLAUDE.md, governance server"
+  },
+  {
+    "id": "R5",
+    "statement": "MCP servers return error dicts rather than raising exceptions",
+    "level": "prefer",
+    "category": "patterns",
+    "scope": [
+      "worker",
+      "architect"
+    ],
+    "source": "All server.py files"
+  },
+  {
+    "id": "R6",
+    "statement": "Hook scripts must never crash; fail silently with logging",
+    "level": "enforce",
+    "category": "code-quality",
+    "scope": [
+      "all"
+    ],
+    "source": "All hook scripts"
+  },
+  {
+    "id": "R7",
+    "statement": "Run the build before reporting task completion",
+    "level": "enforce",
+    "category": "testing",
+    "scope": [
+      "worker"
+    ],
+    "source": "project-config.json, CLAUDE.md"
+  },
+  {
+    "id": "R8",
+    "statement": "Extension backend build: node esbuild.config.js (not npm run compile)",
+    "level": "enforce",
+    "category": "workflow",
+    "scope": [
+      "worker"
+    ],
+    "source": "MEMORY.md"
+  },
+  {
+    "id": "R9",
+    "statement": "Python uses uv for package management, not pip directly",
+    "level": "prefer",
+    "category": "workflow",
+    "scope": [
+      "worker"
+    ],
+    "source": "All pyproject.toml, Dockerfile"
+  },
+  {
+    "id": "R10",
+    "statement": "Access Pydantic alias fields by Python name (.entity_type), not alias (.entityType)",
+    "level": "enforce",
+    "category": "patterns",
+    "scope": [
+      "worker"
+    ],
+    "source": "MEMORY.md"
+  }
+]

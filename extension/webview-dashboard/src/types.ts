@@ -448,7 +448,12 @@ export type ExtensionMessage =
   | { type: 'showTutorial' }
   | { type: 'toggleDemo' }
   | { type: 'bootstrapScaleResult'; profile: BootstrapScaleProfile }
-  | { type: 'bootstrapStarted'; jobId?: string };
+  | { type: 'bootstrapStarted'; jobId?: string }
+  | { type: 'bootstrapProgress'; phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] }
+  | { type: 'bootstrapComplete'; success: boolean; reportPath?: string; error?: string }
+  | { type: 'bootstrapReviewLoaded'; items: BootstrapReviewItem[] }
+  | { type: 'bootstrapReviewFinalized'; result: BootstrapFinalizationResult }
+  | { type: 'usageReport'; report: unknown };
 
 export type WebviewMessage =
   | { type: 'connect' }
@@ -474,7 +479,10 @@ export type WebviewMessage =
   | { type: 'readResearchBrief'; briefPath: string }
   | { type: 'listResearchBriefs' }
   | { type: 'bootstrapScaleCheck' }
-  | { type: 'runBootstrap'; context: string; focusAreas: BootstrapFocusAreas };
+  | { type: 'runBootstrap'; context: string; focusAreas: BootstrapFocusAreas }
+  | { type: 'loadBootstrapReview' }
+  | { type: 'finalizeBootstrapReview'; items: BootstrapReviewItem[] }
+  | { type: 'requestUsageReport'; period: string; groupBy: string };
 
 export interface IngestionResult {
   tier: 'vision' | 'architecture';
@@ -507,4 +515,70 @@ export interface BootstrapFocusAreas {
   architectureDocs: boolean;
   conventions: boolean;
   projectRules: boolean;
+}
+
+export interface BootstrapActivity {
+  tool: string;
+  summary: string;
+  timestamp: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bootstrap Review Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type BootstrapReviewItemStatus = 'pending' | 'approved' | 'rejected' | 'edited';
+
+export interface BootstrapContradictionAlternative {
+  name: string;
+  description: string;
+  usage: string;
+  percentage: number;
+  fileCount: number;
+  qualitativeAssessment: string;
+}
+
+export interface BootstrapContradiction {
+  concern: string;
+  alternatives: BootstrapContradictionAlternative[];
+  recommendation: string;
+}
+
+export interface BootstrapReviewItem {
+  /** Unique ID: entity name (snake_case) */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** First observation line (truncated) */
+  description: string;
+  /** Protection tier */
+  tier: 'vision' | 'architecture' | 'quality';
+  /** Entity type (vision_standard, pattern, component, etc.) */
+  entityType: string;
+  /** Full observation list */
+  observations: string[];
+  /** Review status */
+  status: BootstrapReviewItemStatus;
+  /** Updated observations if user edited */
+  editedObservations?: string[];
+  /** Confidence level from bootstrapper */
+  confidence?: 'high' | 'medium' | 'low';
+  /** Source files that evidenced this discovery */
+  sourceFiles?: string[];
+  /** Evidence summary */
+  sourceEvidence?: string;
+  /** Whether this item represents an architectural contradiction */
+  isContradiction?: boolean;
+  /** Contradiction details */
+  contradiction?: BootstrapContradiction;
+  /** Whether this item was manually created by the user during review */
+  isUserCreated?: boolean;
+}
+
+export interface BootstrapFinalizationResult {
+  success: boolean;
+  approved: number;
+  rejected: number;
+  edited: number;
+  errors: string[];
 }

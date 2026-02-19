@@ -4,13 +4,22 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 from typing import Optional
 
-from .models import Decision, Finding, ReviewVerdict, Verdict
+from .models import Decision, Finding, ReviewVerdict, UsageRecord, Verdict
 
 
 class GovernanceReviewer:
     """Runs claude --print with governance-reviewer context for AI-powered review."""
+
+    def __init__(self) -> None:
+        self._last_usage: Optional[UsageRecord] = None
+
+    @property
+    def last_usage(self) -> Optional[UsageRecord]:
+        """Return the usage record from the most recent _run_claude call."""
+        return self._last_usage
 
     def review_decision(
         self,
@@ -20,7 +29,7 @@ class GovernanceReviewer:
     ) -> ReviewVerdict:
         """Review a single decision against vision and architecture standards."""
         prompt = self._build_decision_prompt(decision, vision_standards, architecture)
-        raw = self._run_claude(prompt, timeout=60)
+        raw = self._run_claude(prompt, timeout=60, operation="review_decision", related_id=decision.id)
         return self._parse_verdict(raw, decision_id=decision.id)
 
     def review_plan(
@@ -42,7 +51,7 @@ class GovernanceReviewer:
             vision_standards,
             architecture,
         )
-        raw = self._run_claude(prompt, timeout=120)
+        raw = self._run_claude(prompt, timeout=120, operation="review_plan", related_id=task_id)
         return self._parse_verdict(raw, plan_id=task_id)
 
     def review_task_group(
@@ -70,7 +79,7 @@ class GovernanceReviewer:
         prompt = self._build_group_review_prompt(
             tasks, transcript_excerpt, vision_standards, architecture
         )
-        raw = self._run_claude(prompt, timeout=120)
+        raw = self._run_claude(prompt, timeout=120, operation="review_task_group")
         return self._parse_verdict(raw)
 
     def review_completion(
@@ -86,26 +95,47 @@ class GovernanceReviewer:
         prompt = self._build_completion_prompt(
             summary_of_work, files_changed, decisions, reviews, vision_standards
         )
-        raw = self._run_claude(prompt, timeout=90)
+        raw = self._run_claude(prompt, timeout=90, operation="review_completion", related_id=task_id)
         return self._parse_verdict(raw, plan_id=task_id)
 
-    def _run_claude(self, prompt: str, timeout: int = 60) -> str:
+    def _run_claude(
+        self,
+        prompt: str,
+        timeout: int = 60,
+        operation: str = "",
+        related_id: str = "",
+    ) -> str:
         """Run claude --print and return the raw output.
 
         Uses temp files for input/output to avoid CLI argument length limits
-        and pipe buffering issues.
+        and pipe buffering issues. Tracks token usage estimates for every call.
 
         When the ``GOVERNANCE_MOCK_REVIEW`` environment variable is set,
         returns a deterministic "approved" verdict without invoking the
         ``claude`` binary.  Used by the E2E test harness.
         """
+        prompt_bytes = len(prompt.encode("utf-8"))
+        start_time = time.monotonic()
+
         if os.environ.get("GOVERNANCE_MOCK_REVIEW"):
-            return json.dumps({
+            mock_output = json.dumps({
                 "verdict": "approved",
                 "findings": [],
                 "guidance": "Mock review: auto-approved for E2E testing.",
                 "standards_verified": ["mock"],
             })
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
+            self._last_usage = UsageRecord(
+                agent="governance-reviewer",
+                operation=operation,
+                model="mock",
+                input_tokens=prompt_bytes // 4,
+                output_tokens=len(mock_output.encode("utf-8")) // 4,
+                duration_ms=elapsed_ms,
+                related_id=related_id,
+                prompt_bytes=prompt_bytes,
+            )
+            return mock_output
 
         input_fd, input_path = tempfile.mkstemp(prefix="avt-gov-", suffix="-input.md")
         output_fd, output_path = tempfile.mkstemp(prefix="avt-gov-", suffix="-output.md")
@@ -130,8 +160,10 @@ class GovernanceReviewer:
                     timeout=timeout,
                 )
 
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
+
             if result.returncode != 0:
-                return json.dumps(
+                error_output = json.dumps(
                     {
                         "verdict": "needs_human_review",
                         "findings": [
@@ -146,12 +178,47 @@ class GovernanceReviewer:
                         "standards_verified": [],
                     }
                 )
+                self._last_usage = UsageRecord(
+                    agent="governance-reviewer",
+                    operation=operation,
+                    model="sonnet",
+                    input_tokens=prompt_bytes // 4,
+                    output_tokens=0,
+                    duration_ms=elapsed_ms,
+                    related_id=related_id,
+                    prompt_bytes=prompt_bytes,
+                )
+                return error_output
 
             # Read output from temp file
             with open(output_path) as f:
-                return f.read()
+                output = f.read()
+
+            output_bytes = len(output.encode("utf-8"))
+            self._last_usage = UsageRecord(
+                agent="governance-reviewer",
+                operation=operation,
+                model="sonnet",
+                input_tokens=prompt_bytes // 4,
+                output_tokens=output_bytes // 4,
+                duration_ms=elapsed_ms,
+                related_id=related_id,
+                prompt_bytes=prompt_bytes,
+            )
+            return output
 
         except subprocess.TimeoutExpired:
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
+            self._last_usage = UsageRecord(
+                agent="governance-reviewer",
+                operation=operation,
+                model="sonnet",
+                input_tokens=prompt_bytes // 4,
+                output_tokens=0,
+                duration_ms=elapsed_ms,
+                related_id=related_id,
+                prompt_bytes=prompt_bytes,
+            )
             return json.dumps(
                 {
                     "verdict": "needs_human_review",
@@ -161,6 +228,17 @@ class GovernanceReviewer:
                 }
             )
         except FileNotFoundError:
+            elapsed_ms = int((time.monotonic() - start_time) * 1000)
+            self._last_usage = UsageRecord(
+                agent="governance-reviewer",
+                operation=operation,
+                model="sonnet",
+                input_tokens=0,
+                output_tokens=0,
+                duration_ms=elapsed_ms,
+                related_id=related_id,
+                prompt_bytes=prompt_bytes,
+            )
             return json.dumps(
                 {
                     "verdict": "needs_human_review",

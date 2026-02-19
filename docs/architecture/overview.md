@@ -1,0 +1,125 @@
+# Architecture Overview
+
+## Project Summary
+
+Agent Vision Team (AVT) is a collaborative intelligence platform that coordinates multiple AI agents for software development. It combines Claude Code's native capabilities (subagents, hooks, git worktrees, model routing) with three custom MCP servers (Knowledge Graph, Quality, Governance) to provide transparent, governed multi-agent development workflows.
+
+## System Context
+
+```mermaid
+graph TB
+    Human[Human Developer]
+    CC[Claude Code CLI]
+    VSCode[VS Code IDE]
+
+    Human --> CC
+    Human --> VSCode
+
+    subgraph AVT System
+        Ext[VS Code Extension]
+        GW[AVT Gateway]
+        Dashboard[React Dashboard]
+        KG[Knowledge Graph MCP]
+        QS[Quality MCP]
+        GOV[Governance MCP]
+        Hooks[Hook Scripts]
+        Agents[Agent Definitions]
+    end
+
+    CC --> Hooks
+    CC --> Agents
+    VSCode --> Ext
+    Ext --> Dashboard
+    Ext --> KG
+    Ext --> QS
+    Ext --> GOV
+    GW --> KG
+    GW --> QS
+    GW --> GOV
+    Dashboard --> GW
+
+    subgraph External
+        Git[Git Repository]
+        LLM[Claude API]
+        FS[File System]
+    end
+
+    CC --> Git
+    GOV --> LLM
+    KG --> FS
+    GOV --> FS
+    QS --> FS
+```
+
+## Component Map
+
+```mermaid
+graph LR
+    subgraph Presentation
+        Ext[VS Code Extension]
+        Dash[React Dashboard]
+    end
+
+    subgraph API
+        GW[AVT Gateway<br/>FastAPI]
+        PM[postMessage<br/>Bridge]
+    end
+
+    subgraph Services
+        KG[Knowledge Graph<br/>MCP Server]
+        QS[Quality<br/>MCP Server]
+        GOV[Governance<br/>MCP Server]
+    end
+
+    subgraph Persistence
+        JSONL[JSONL<br/>Knowledge Graph]
+        SQLite1[SQLite<br/>Governance DB]
+        SQLite2[SQLite<br/>Trust Engine DB]
+        JSON[JSON Files<br/>Tasks, Config]
+    end
+
+    subgraph Platform
+        Hooks[5 Lifecycle Hooks]
+        Agents[8 Agent Definitions]
+        Tasks[Task System]
+    end
+
+    Ext --> PM
+    Ext --> GW
+    Dash --> PM
+    Dash --> GW
+    GW --> KG
+    GW --> QS
+    GW --> GOV
+    PM --> Ext
+    KG --> JSONL
+    GOV --> SQLite1
+    QS --> SQLite2
+    Hooks --> GOV
+    Agents --> KG
+    Agents --> QS
+    Agents --> GOV
+    Tasks --> Hooks
+```
+
+## Component Inventory
+
+| Component | Responsibility | Language | Path | Key Patterns |
+|-----------|---------------|----------|------|-------------|
+| VS Code Extension | IDE integration, webview hosting, MCP client wrappers | TypeScript | `extension/src/` | Provider pattern, command registration |
+| React Dashboard | Real-time monitoring UI, dual-mode (VS Code + standalone) | React/TSX | `extension/webview-dashboard/src/` | Context providers, dual-mode transport |
+| Knowledge Graph MCP | Persistent institutional memory, tier-protected CRUD | Python | `mcp-servers/knowledge-graph/` | FastMCP, JSONL storage, tier protection |
+| Quality MCP | Deterministic quality gates, trust engine | Python | `mcp-servers/quality/` | FastMCP, tool wrapping, SQLite |
+| Governance MCP | Decision review, governed tasks, AI reviewer | Python | `mcp-servers/governance/` | FastMCP, SQLite, temp file I/O |
+| AVT Gateway | REST API, WebSocket push, job runner | Python | `server/avt_gateway/` | FastAPI, SSE MCP client, routers |
+| E2E Test Harness | 14 scenarios, 292+ assertions, parallel execution | Python | `e2e/` | BaseScenario, structural assertions |
+| Hook Scripts | Platform-level governance verification | Bash/Python | `scripts/hooks/` | JSON stdin/stdout, fast-path, exit codes |
+
+## Key Architectural Decisions
+
+1. **MCP over custom API**: Using Model Context Protocol for all agent-service communication rather than REST or GraphQL
+2. **Three-tier protection**: Vision/Architecture/Quality hierarchy enforced at the storage layer, not the API layer
+3. **Hook-based governance**: Using Claude Code lifecycle hooks for automatic governance rather than requiring explicit agent cooperation
+4. **Dual-mode transport**: Same React dashboard runs in VS Code (postMessage) and standalone (HTTP/WebSocket) with zero component duplication
+5. **Temp file I/O**: Claude CLI invocations use temp files instead of CLI args or pipes to avoid buffer limits
+6. **Session-scoped holistic review**: Groups of tasks reviewed collectively before any work begins, using timing-based settle detection

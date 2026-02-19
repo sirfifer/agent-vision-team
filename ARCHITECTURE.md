@@ -1,6 +1,6 @@
 # ARCHITECTURE.md v2 — Agent Vision Team
 
-This document is the authoritative architecture reference for the Agent Vision Team Collaborative Intelligence System. It describes the system as built: a Claude Code-based orchestration platform coordinating 6 custom subagents across 3 MCP servers, with transactional governance review, persistent institutional memory, deterministic quality verification, a VS Code extension providing setup, monitoring, and management capabilities, and a headless web mode with multi-project management via the AVT Gateway.
+This document is the authoritative architecture reference for the Agent Vision Team Collaborative Intelligence System. It describes the system as built: a Claude Code-based orchestration platform coordinating 8 specialized agents across 3 MCP servers, with transactional governance review, persistent institutional memory, deterministic quality verification, a VS Code extension providing setup, monitoring, and management capabilities, and a headless web mode with multi-project management via the AVT Gateway. Agent Teams is the primary orchestration mechanism, with teammates as full Claude Code sessions sharing a task list and governed by five lifecycle hooks.
 
 The system operates in two modes. In its **embedded mode**, the dashboard runs as a VS Code webview panel with MCP servers spawned as extension-managed child processes. In its **headless web mode**, an AVT Gateway (FastAPI on port 8080) serves the same React dashboard as a standalone web application, manages per-project MCP server instances with isolated port allocations, and pushes real-time updates over WebSocket. A transport abstraction layer makes dashboard code mode-agnostic. Both modes share the same persistent state (Knowledge Graph, governance database, trust engine) in the project directory. AI inference is cloud-based, handled by Anthropic's Claude models via Claude Code. Claude Code Max provides model access through a subscription (no API keys to manage), but an internet connection is required for all agent operations.
 
@@ -37,9 +37,10 @@ The system operates in two modes. In its **embedded mode**, the dashboard runs a
 |-----------|-------------|
 | **Knowledge Graph MCP Server** | Persistent institutional memory with tier-based access control (port 3101, 11 tools) |
 | **Quality MCP Server** | Deterministic quality verification with trust engine (port 3102, 8 tools) |
-| **Governance MCP Server** | Transactional review checkpoints and governed task lifecycle (port 3103, 10 tools) |
-| **6 Custom Subagents** | Worker, Quality Reviewer, KG Librarian, Governance Reviewer, Researcher, Project Steward |
-| **Governance Architecture** | PostToolUse hook on TaskCreate (automatic verification), PreToolUse checkpoint on Write/Edit/Bash/Task (holistic review coordination), governed tasks (verified before execution), holistic review (collective intent detection with settle/debounce), transactional decision review, multi-review stacking, AI-powered review via `claude --print` |
+| **Governance MCP Server** | Transactional review checkpoints and governed task lifecycle (port 3103, 11 tools) |
+| **8 Specialized Agents** | Worker, Quality Reviewer, KG Librarian, Governance Reviewer, Researcher, Project Steward, Architect, Project Bootstrapper |
+| **Agent Teams Orchestration** | Teammates are full Claude Code sessions with independent MCP access, shared task lists, self-claim, direct messaging, and hook enforcement |
+| **Governance Architecture** | Five lifecycle hooks (PostToolUse TaskCreate, PreToolUse ExitPlanMode, PreToolUse Write/Edit/Bash/Task, TeammateIdle, TaskCompleted), session-scoped holistic review with settle/debounce, governed tasks (verified before execution), transactional decision review, multi-review stacking, AI-powered review via `claude --print`, token usage tracking |
 | **Three-Tier Protection Hierarchy** | Vision > Architecture > Quality — lower tiers cannot modify higher tiers |
 | **Project Rules System** | Behavioral guidelines (enforce/prefer) injected into agent prompts from `.avt/project-config.json` |
 | **E2E Testing Harness** | 14 scenarios, 292+ structural assertions, parallel execution with full isolation |
@@ -65,14 +66,18 @@ The system operates in two modes. In its **embedded mode**, the dashboard runs a
 
 | Term | Definition |
 |------|------------|
-| **Orchestrator** | The primary Claude Code session (Opus 4.6) that decomposes tasks, spawns subagents, and coordinates work. Defined by `CLAUDE.md`. |
-| **Subagent** | A specialized Claude Code agent spawned via the Task tool, with a scoped system prompt from `.claude/agents/`. |
-| **Worker** | Subagent (Opus 4.6, 9 tools) that implements scoped tasks within governance constraints. |
-| **Quality Reviewer** | Subagent (Opus 4.6, 6 tools) that evaluates work through three ordered lenses: vision, architecture, quality. |
-| **KG Librarian** | Subagent (Sonnet 4.5, 5 tools) that curates institutional memory — consolidates, promotes patterns, syncs archival files. |
-| **Governance Reviewer** | Subagent (Sonnet 4.5, 4 tools) that evaluates decisions and plans for vision/architecture alignment. **Not spawned by the orchestrator** — called internally by the Governance Server via `claude --print`. |
-| **Researcher** | Subagent (Opus 4.6, 7 tools) that gathers intelligence in two modes: periodic/maintenance monitoring and exploratory/design research. |
-| **Project Steward** | Subagent (Sonnet 4.5, 7 tools) that maintains project hygiene: naming conventions, organization, documentation completeness, cruft detection. |
+| **Orchestrator (Lead)** | The primary Claude Code session (Opus 4.6) that decomposes tasks, spawns teammates, and coordinates work. Defined by `CLAUDE.md`. In Agent Teams mode, this is the "lead" session. |
+| **Teammate** | A full Claude Code session spawned via Agent Teams with independent MCP access, hook enforcement, and self-claim from a shared task list. System prompt embedded from `.claude/agents/`. |
+| **Subagent** | (Fallback) A specialized Claude Code agent spawned via the Task tool when Agent Teams is unavailable. |
+| **Worker** | Teammate (Opus 4.6, 9 tools) that implements scoped tasks within governance constraints. |
+| **Quality Reviewer** | Teammate (Sonnet 4.5, 6 tools) that evaluates work through three ordered lenses: vision, architecture, quality. |
+| **KG Librarian** | Teammate (Sonnet 4.5, 5 tools) that curates institutional memory: consolidates, promotes patterns, syncs archival files. |
+| **Governance Reviewer** | Agent (Sonnet 4.5, 4 tools) that evaluates decisions and plans for vision/architecture alignment. **Not spawned as a teammate**: called internally by the Governance Server via `claude --print`. Isolation is a security feature. |
+| **Researcher** | Teammate (Sonnet 4.5, 7 tools) that gathers intelligence in two modes: periodic/maintenance monitoring and exploratory/design research. |
+| **Project Steward** | Teammate (Sonnet 4.5, 7 tools) that maintains project hygiene: naming conventions, organization, documentation completeness, cruft detection. |
+| **Architect** | Teammate (Opus 4.6, 6 tools) that evaluates architectural decisions, reviews system design, and validates patterns against KG standards. |
+| **Project Bootstrapper** | Teammate (Sonnet 4.5, 7 tools) that initializes new projects with KG seeding, config scaffolding, and governance setup. Can spawn sub-tasks. |
+| **Agent Teams** | Claude Code experimental feature (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) enabling teammates as full independent sessions with shared task lists, self-claim, direct messaging, and hook inheritance. Primary orchestration mechanism. |
 | **MCP Server** | Model Context Protocol server providing tools to Claude Code sessions. Spawned as child processes via stdio transport. |
 | **Knowledge Graph (KG)** | Entity-relation graph stored in `.avt/knowledge-graph.jsonl`. Contains vision standards, architectural patterns, components, observations. |
 | **Protection Tier** | Access control level on KG entities: **vision** (human-only modification), **architecture** (human or orchestrator with approval), **quality** (any agent). |
@@ -82,7 +87,7 @@ The system operates in two modes. In its **embedded mode**, the dashboard runs a
 | **Project Rules** | Behavioral guidelines in `.avt/project-config.json` with enforcement levels (`enforce` = non-negotiable, `prefer` = explain if deviating). Injected into agent prompts at spawn time. |
 | **Research Prompt** | A structured research request defining topic, mode (periodic/exploratory), scope, model hint, and output format. Stored in `.avt/research-prompts/`. |
 | **Research Brief** | The output of exploratory research — options evaluated, tradeoff analysis, recommendations. Stored in `.avt/research-briefs/` and referenced by task briefs. |
-| **Governance Server** | MCP server (port 3103, 10 tools) providing transactional decision review, plan review, completion review, and governed task lifecycle management. |
+| **Governance Server** | MCP server (port 3103, 11 tools) providing transactional decision review, plan review, completion review, and governed task lifecycle management. |
 | **Quality Gate** | A deterministic check that must pass before work is accepted: build, lint, test, coverage, findings. Run via `check_all_gates()` on the Quality server. |
 | **Trust Engine** | Classification system within the Quality server that assigns findings a trust level (BLOCK, INVESTIGATE, TRACK) and maintains an audit trail for dismissals. |
 | **Verdict** | The outcome of a governance review: `approved` (proceed), `blocked` (revise the specific issue while preserving sound work; includes `strengths_summary` and `salvage_guidance`), or `needs_human_review` (escalate). |
@@ -95,7 +100,9 @@ The system operates in two modes. In its **embedded mode**, the dashboard runs a
 | **Checkpoint** | A git tag (`checkpoint-NNN`) marking a recovery point after a meaningful unit of work. |
 | **Holistic Review** | Collective evaluation of all tasks from a session before any work begins. Detects architectural shifts that individual reviews would miss. Stored in `holistic_reviews` table. |
 | **Settle Checker** | Background process (`_holistic-settle-check.py`) that implements debounce detection for task group boundaries. Waits 3 seconds, checks for newer tasks, triggers holistic review if it is the last checker. |
-| **Flag File** | `.avt/.holistic-review-pending` -- transient JSON file that coordinates work sequencing via the PreToolUse hook during holistic review. Contains status (`pending`, `blocked`, `needs_human_review`), guidance, and `strengths_summary` (for constructive feedback on blocks). |
+| **Flag File** | `.avt/.holistic-review-pending-{session_id}` -- session-scoped transient JSON file that coordinates work sequencing via the PreToolUse hook during holistic review. Each concurrent session gets its own flag. Contains status (`pending`, `blocked`, `needs_human_review`), guidance, and `strengths_summary`. Auto-cleared after 5 minutes (stale recovery). |
+| **Session ID** | Identifier linking tasks created in the same Claude Code session. Available in PostToolUse hook input. Used for session-scoped holistic review flags and governed task queries. |
+| **UsageRecord** | Token usage tracking for each AI review invocation. Records input/output tokens, cache tokens, duration, prompt size, and links to the related decision or task. |
 
 ---
 
@@ -115,21 +122,21 @@ The system operates in two modes. In its **embedded mode**, the dashboard runs a
 │                         ORCHESTRATOR                                     │
 │                                                                         │
 │  Governed by: CLAUDE.md                                                 │
-│  Capabilities: Task decomposition, subagent spawning,                   │
+│  Capabilities: Task decomposition, teammate spawning,                   │
 │                governance coordination, quality verification              │
 │  Context: 1M tokens (beta)                                              │
-└────┬──────┬──────┬──────┬──────┬──────┬─────────────────────────────────┘
-     │      │      │      │      │      │
-     │      │      │      │      │      │  Spawns via Task tool
-     ▼      ▼      ▼      ▼      ▼      ▼
-┌────────┐┌────────┐┌────────┐       ┌────────┐┌────────┐
-│Worker  ││Quality ││  KG    │       │Research││Project │
-│(Opus   ││Reviewer││Librar- │       │  -er   ││Steward │
-│4.6)    ││(Opus   ││ian     │       │(Opus   ││(Sonnet │
-│9 tools ││4.6)    ││(Sonnet │       │4.6)    ││4.5)    │
-│        ││6 tools ││4.5)    │       │7 tools ││7 tools │
-│        ││        ││5 tools │       │        ││        │
-└───┬────┘└───┬────┘└───┬────┘       └───┬────┘└───┬────┘
+└────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┬───────────────────┘
+     │      │      │      │      │      │      │      │
+     │      │      │      │      │      │      │      │  Spawns via Agent Teams
+     ▼      ▼      ▼      ▼      ▼      ▼      ▼      ▼
+┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐
+│Worker  ││Quality ││  KG    ││Archi-  ││Research││Project ││Project │
+│(Opus   ││Reviewer││Librar- ││tect    ││  -er   ││Steward ││Boot-   │
+│4.6)    ││(Sonnet ││ian     ││(Opus   ││(Sonnet ││(Sonnet ││strapper│
+│9 tools ││4.5)    ││(Sonnet ││4.6)    ││4.5)    ││4.5)    ││(Sonnet │
+│        ││6 tools ││4.5)    ││6 tools ││7 tools ││7 tools ││4.5)    │
+│        ││        ││5 tools ││        ││        ││        ││8 tools │
+└───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘
     │         │         │                │         │
     │         │         │                │         │
     ▼         ▼         ▼                ▼         ▼
@@ -138,7 +145,7 @@ The system operates in two modes. In its **embedded mode**, the dashboard runs a
 │                                                                         │
 │  ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────────────┐ │
 │  │ Knowledge Graph   │ │ Quality          │ │ Governance               │ │
-│  │ :3101 (11 tools)  │ │ :3102 (8 tools)  │ │ :3103 (10 tools)        │ │
+│  │ :3101 (11 tools)  │ │ :3102 (8 tools)  │ │ :3103 (11 tools)        │ │
 │  │                   │ │                  │ │                          │ │
 │  │ Entities, rels,   │ │ Format, lint,    │ │ Decisions, plans,        │ │
 │  │ observations,     │ │ test, coverage,  │ │ governed tasks,          │ │
@@ -155,7 +162,10 @@ The system operates in two modes. In its **embedded mode**, the dashboard runs a
 │  .avt/                                                                  │
 │  ├── knowledge-graph.jsonl      # KG entity/relation persistence        │
 │  ├── trust-engine.db            # Quality finding audit trails           │
-│  ├── governance.db              # Decision store with verdicts           │
+│  ├── governance.db              # 6 tables (decisions, reviews,          │
+│  │                              # governed_tasks, task_reviews,          │
+│  │                              # holistic_reviews, token_usage)         │
+│  ├── .holistic-review-pending-* # Session-scoped holistic review flags  │
 │  ├── session-state.md           # Current session progress               │
 │  ├── task-briefs/               # Worker assignments                     │
 │  ├── memory/                                                             │
@@ -282,18 +292,20 @@ Developer Machine (macOS / Linux)
 
 Claude Code is not a tool the system uses — it IS the orchestration platform. The system leverages Claude Code's native capabilities (subagents, Task tool, MCP integration, hooks, skills) and extends them with governance policy, institutional memory, and quality verification.
 
-### 3.1 Custom Subagents
+### 3.1 Agent Definitions
 
-Six custom subagent definitions live in `.claude/agents/`:
+Eight specialized agent definitions live in `.claude/agents/`:
 
 ```
 .claude/agents/
 ├── worker.md                # Opus 4.6  | 9 tools | KG + Quality + Governance
-├── quality-reviewer.md      # Opus 4.6  | 6 tools | KG + Quality
+├── quality-reviewer.md      # Sonnet 4.5 | 6 tools | KG + Quality
 ├── kg-librarian.md          # Sonnet 4.5 | 5 tools | KG
 ├── governance-reviewer.md   # Sonnet 4.5 | 4 tools | KG (called via claude --print)
-├── researcher.md            # Opus 4.6  | 7 tools | KG + Governance + WebSearch + WebFetch
-└── project-steward.md       # Sonnet 4.5 | 7 tools | KG + Write + Edit + Bash
+├── researcher.md            # Sonnet 4.5 | 7 tools | KG + Governance + WebSearch + WebFetch
+├── project-steward.md       # Sonnet 4.5 | 7 tools | KG + Write + Edit + Bash
+├── architect.md             # Opus 4.6  | 6 tools | KG + Governance
+└── project-bootstrapper.md  # Sonnet 4.5 | 8 tools | KG + Governance + Task
 ```
 
 Each definition contains:
@@ -308,28 +320,19 @@ Model routing is configured in `.claude/settings.json`:
 {
   "agents": {
     "defaultModel": "sonnet",
-    "worker": {
-      "model": "opus",
-      "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep",
-                "mcp:collab-kg", "mcp:collab-quality", "mcp:collab-governance"]
-    },
-    "quality-reviewer": {
-      "model": "opus",
-      "tools": ["Read", "Glob", "Grep", "Bash", "mcp:collab-kg", "mcp:collab-quality"]
-    },
-    "kg-librarian": {
-      "model": "sonnet",
-      "tools": ["Read", "Write", "Glob", "Grep", "mcp:collab-kg"]
-    },
-    "governance-reviewer": {
-      "model": "sonnet",
-      "tools": ["Read", "Glob", "Grep", "mcp:collab-kg"]
-    }
+    "worker": { "model": "opus", "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp:collab-kg", "mcp:collab-quality", "mcp:collab-governance"] },
+    "quality-reviewer": { "model": "sonnet", "tools": ["Read", "Glob", "Grep", "Bash", "mcp:collab-kg", "mcp:collab-quality"] },
+    "kg-librarian": { "model": "sonnet", "tools": ["Read", "Write", "Glob", "Grep", "mcp:collab-kg"] },
+    "governance-reviewer": { "model": "sonnet", "tools": ["Read", "Glob", "Grep", "mcp:collab-kg"] },
+    "project-bootstrapper": { "model": "sonnet", "tools": ["Read", "Write", "Glob", "Grep", "Bash", "Task", "mcp:collab-kg", "mcp:collab-governance"] },
+    "architect": { "model": "opus", "tools": ["Read", "Glob", "Grep", "Bash", "mcp:collab-kg", "mcp:collab-governance"] },
+    "researcher": { "model": "sonnet", "tools": ["Read", "Glob", "Grep", "Bash", "WebSearch", "WebFetch", "mcp:collab-kg", "mcp:collab-governance"] },
+    "project-steward": { "model": "sonnet", "tools": ["Read", "Write", "Glob", "Grep", "Bash", "mcp:collab-kg"] }
   }
 }
 ```
 
-Note: The `researcher` and `project-steward` agents define their tools in YAML frontmatter within their `.md` files. They are not duplicated in `settings.json` because the frontmatter definition is authoritative.
+All 8 agents are listed in `settings.json` with explicit model and tool assignments. The `defaultModel: "sonnet"` applies as fallback.
 
 ### 3.2 Task Tool Patterns
 
@@ -427,9 +430,11 @@ Hooks are configured in `.claude/settings.json` and execute shell scripts at spe
 
 | Hook Type | Matcher | Script | Purpose |
 |-----------|---------|--------|---------|
-| `PostToolUse` | `TaskCreate` | `scripts/hooks/governance-task-intercept.py` | **Core verification**: intercepts every task creation, pairs it with a governance review, creates holistic review flag, spawns settle checker |
+| `PostToolUse` | `TaskCreate` | `scripts/hooks/governance-task-intercept.py` | **Core verification**: intercepts every task creation, pairs it with a governance review, creates session-scoped holistic review flag, spawns settle checker |
 | `PreToolUse` | `Write\|Edit\|Bash\|Task` | `scripts/hooks/holistic-review-gate.sh` | **Holistic checkpoint**: coordinates work sequencing while holistic review completes (~1ms fast path when no review pending) |
 | `PreToolUse` | `ExitPlanMode` | `scripts/hooks/verify-governance-review.sh` | Safety net: ensures plans are verified before presentation |
+| `TeammateIdle` | *(all)* | `scripts/hooks/teammate-idle-gate.sh` | Prevents teammates from going idle with pending governance obligations |
+| `TaskCompleted` | *(all)* | `scripts/hooks/task-completed-gate.sh` | Prevents task completion if governance review is still pending or blocked |
 
 #### PostToolUse Hook on TaskCreate (Core Verification)
 
@@ -467,7 +472,7 @@ Agent receives the context and continues working
 **Why this approach is essential:**
 
 - **100% interception**: The hook fires on every `TaskCreate` call, regardless of which agent made it or whether the agent followed governance instructions. There is no way to create an ungoverned task.
-- **Subagent inheritance**: Subagents spawned via the Task tool inherit PostToolUse hooks from the parent session. This has been empirically verified: a subagent's `TaskCreate` calls fire the same hook as the parent's. Full coverage across the entire agent hierarchy is guaranteed.
+- **Hook inheritance**: All hooks fire for all participants. Subagents inherit PostToolUse hooks from the parent session. Agent Teams teammates load hooks from `.claude/settings.json` independently. Both paths provide full coverage across the entire agent hierarchy.
 - **No protocol dependency**: Unlike the MCP-based `create_governed_task()` approach (which requires agents to call the right tool), the hook works even if an agent uses native `TaskCreate` directly. Governance is provided by the platform, not by agent compliance.
 - **Transparent to agents**: Agents use `TaskCreate` normally. They do not need special instructions or awareness of governance. The hook adds governance transparently.
 
@@ -482,10 +487,11 @@ export CLAUDE_CODE_TASK_LIST_ID="<name>"     # Enables cross-session persistence
 
 Without `CLAUDE_CODE_ENABLE_TASKS="true"`, the native task tools (`TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet`) are not available. Claude Code falls back to the legacy `TodoWrite` tool, which is in-memory only, has no dependency tracking, and cannot be hooked for governance. Setting this variable replaces `TodoWrite` entirely with the native task system.
 
-**Verified in live testing** (2026-02-08):
+**Verified in live testing** (2026-02-15):
 - Level 1 (mock review): 11/11 tasks, 12/12 checks PASSED (settle detection, holistic review, flag lifecycle)
 - Level 2 (real AI review): 10/10 tasks, 13/13 checks PASSED (holistic review approved in ~7s, flag removed, individual reviews queued)
 - Level 3 (subagent delegation): 13/13 tasks (10 main + 3 subagent), 13/13 checks PASSED (subagent flag re-creation handled)
+- Level 4 (session-scoped flags): 17/17 checks PASSED (session-scoped flag verified, old flag absent, session ID matches DB)
 - E2E: 14 scenarios, 292 assertions, no regression
 
 #### ExitPlanMode Hook (Safety Net)
@@ -608,17 +614,35 @@ Available with Opus 4.6 (beta). Enables:
 - Longer orchestrator sessions without context overflow
 - Larger research contexts for the researcher agent
 
-#### Agent Teams (MONITORING ONLY)
+#### Agent Teams (PRIMARY MECHANISM)
 
-Experimental Claude Code feature providing native multi-agent coordination:
-- **Delegate mode**: Restricts lead to coordination-only tools (maps to our orchestrator pattern)
-- **Shared task list**: Teammates share tasks via DAG (maps to our governed tasks)
-- **Plan approval**: Lead approves/rejects teammate plans (maps to our governance review)
-- **Peer messaging**: Teammates message each other directly (not available in current subagent model)
+Claude Code Agent Teams is the primary orchestration mechanism. Enabled via `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in `.claude/settings.json` env block.
 
-**Status**: Experimental with significant limitations (no session resumption with in-process teammates, one team per session, no nested teams).
+**How Agent Teams works:**
+- **Teammates are full Claude Code sessions**: Each teammate loads CLAUDE.md, MCP servers, hooks, and skills independently
+- **Shared task list**: All teammates share a task list (set via `CLAUDE_CODE_TASK_LIST_ID`). Teammates self-claim unassigned, unblocked tasks
+- **Direct messaging**: Teammates can message each other, not just report to the lead
+- **Hook enforcement**: All five hooks (PostToolUse, PreToolUse, TeammateIdle, TaskCompleted) fire for all teammates
+- **Session-scoped governance**: Each teammate gets its own session_id and holistic review flag
 
-**Assessment**: Aligns conceptually with our orchestration model. When stable, may replace custom subagent coordination while governance remains the policy layer. Potential future use: worker swarm teams for parallelizable implementation work. The system's governance guarantees (blocked-from-birth, multi-blocker, transactional review) are not provided by Agent Teams — governance remains essential regardless of coordination mechanism.
+**Agent-to-mechanism mapping:**
+
+| Agent | Mechanism | Why |
+|-------|-----------|-----|
+| Worker | **Teammate** | Needs MCP for KG, Quality, Governance |
+| Quality Reviewer | **Teammate** | Needs MCP for KG, Quality |
+| Architect | **Teammate** | Needs MCP for KG, Governance |
+| KG Librarian | **Teammate** | Needs MCP for KG |
+| Researcher | **Teammate** | Needs MCP for KG, Governance; uses WebSearch |
+| Project Steward | **Teammate** | Needs MCP for KG |
+| Project Bootstrapper | **Teammate** | Needs MCP for KG, Governance; spawns sub-tasks |
+| Governance Reviewer | **`claude --print`** | Text-only, no MCP needed; isolation is a security feature |
+
+**Spawning teammates**: Since `.claude/agents/` definitions cannot yet be used directly when spawning teammates (Issue #24316), the lead reads the agent file and embeds the full system prompt in the spawn instruction.
+
+**Fallback**: If Agent Teams is unavailable or disabled, fall back to Task-tool subagents. The `.claude/agents/` definitions and `agents` section in `.claude/settings.json` remain in place for this purpose.
+
+**Governance layer separation**: Agent Teams provides coordination (shared task list, self-claim, messaging). The governance system provides policy (blocked-from-birth, multi-blocker, transactional review, holistic review). These are complementary layers, not alternatives.
 
 #### Plugins and Marketplaces (PLANNED FOR LATER)
 
@@ -626,25 +650,32 @@ Claude Code supports bundling skills, hooks, subagents, and MCP servers into dis
 
 **Natural plugin boundaries in this system**:
 - 3 MCP servers (Python packages)
-- 6 agent definitions (markdown files)
-- Skills (`/e2e`) and commands (`/project-overview`)
-- Lifecycle hooks (governance review verification)
+- 8 agent definitions (markdown files)
+- 8 skills in `.claude/skills/` (protocol docs + E2E runner)
+- 5 lifecycle hooks (governance verification + teammate gates)
 - VS Code extension (separate distribution channel)
 
 **Status**: APIs still maturing (Quality server has partial stubs, governance protocol may evolve). Document as a milestone in the system's evolution path. Packaging should wait until the system's interfaces stabilize.
 
 #### Skills (ACTIVE)
 
-Skills (`.claude/skills/`) and commands (`.claude/commands/`) are unified — both create `/<name>` invocations. Skills take precedence if both exist for the same name.
+Skills live in `.claude/skills/` and create `/<name>` invocations. They are **model-invocable** by default, meaning Claude auto-loads them based on task relevance without manual invocation. Seven sections were extracted from CLAUDE.md into on-demand skills to reduce base context from ~963 to ~284 lines.
 
-**Current skills and commands**:
+**Current skills** (`.claude/skills/`):
 
-| Name | Type | Purpose |
-|------|------|---------|
-| `/e2e` | Skill | Run E2E testing harness |
-| `/project-overview` | Command | Display project context summary |
+| Name | Purpose |
+|------|---------|
+| `/bootstrap-protocol` | Project initialization protocol details |
+| `/architect-protocol` | Architecture review protocol details |
+| `/research-protocol` | Research system protocol details |
+| `/project-steward-protocol` | Project hygiene protocol details |
+| `/e2e-testing` | E2E testing harness documentation |
+| `/end-to-end-example` | Complete workflow example walkthrough |
+| `/file-organization` | File and directory structure reference |
+| `/e2e` | Run E2E testing harness (executable) |
+| `/project-overview` | Display project context summary |
 
-Skills are **model-invocable** by default — Claude auto-loads them based on task relevance, reducing manual invocation overhead. Common orchestrator workflows are candidates for conversion to auto-loaded skills.
+The extraction strategy keeps CLAUDE.md focused on the orchestrator's core loop (task decomposition, spawning, governance) while protocol details are loaded on demand.
 
 #### Setup Hooks (OPPORTUNITY)
 
@@ -1000,7 +1031,7 @@ All 8 tools are implemented and operational:
 
 **Storage**: SQLite at `.avt/governance.db` for decisions, reviews, governed tasks, and task review records. Task files are stored in Claude Code's native task directory (`~/.claude/tasks/<CLAUDE_CODE_TASK_LIST_ID>/`).
 
-### 6.1 Tool Interface (10 tools)
+### 6.1 Tool Interface (11 tools)
 
 #### Decision Review Tools
 
@@ -1158,6 +1189,19 @@ get_pending_reviews() -> {
                           type, context, created_at}],
   count: int
 }
+
+get_usage_report(
+  period: str | None = None,       # "1h" | "24h" | "7d" | "30d" | None (all time)
+  group_by: str | None = None,     # "agent" | "operation" | "session" | None
+  session_id: str | None = None    # Filter to specific session
+) -> {
+  records: list[{id, timestamp, session_id, agent, operation, model,
+                  input_tokens, output_tokens, cache_read_tokens,
+                  cache_creation_tokens, duration_ms, related_id, prompt_bytes}],
+  summary: {total_input, total_output, total_cache_read, total_cache_creation,
+             total_duration_ms, record_count},
+  groups: dict | None              # Aggregated by group_by field if specified
+}
 ```
 
 ### 6.2 Decision Categories
@@ -1227,6 +1271,9 @@ class Decision(BaseModel):
     category: DecisionCategory
     summary: str
     detail: str
+    intent: str                      # WHY this decision is being made
+    expected_outcome: str            # WHAT measurable result is expected
+    vision_references: list[str]     # Which vision standards this serves
     components_affected: list[str]
     alternatives_considered: list[Alternative]
     confidence: Confidence
@@ -1260,6 +1307,7 @@ class GovernedTaskRecord(BaseModel):
     context: str
     reviews: list[str]               # TaskReviewRecord IDs
     current_status: str              # "pending_review" | "approved" | "blocked"
+    session_id: str                  # Links tasks created in the same session
     created_at: str
     released_at: str | None
 
@@ -1277,6 +1325,36 @@ class TaskReviewRecord(BaseModel):
     created_at: str
     completed_at: str | None
     reviewer: str                    # Default: "governance-reviewer"
+
+class UsageRecord(BaseModel):
+    id: str                          # Auto-generated 12-char hex
+    timestamp: str                   # ISO 8601 UTC
+    session_id: str                  # Links to session that triggered the review
+    agent: str                       # e.g., "governance-reviewer"
+    operation: str                   # review_decision | review_plan |
+                                     # review_completion | review_task_group | hook_review
+    model: str                       # sonnet | opus | haiku
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    cache_creation_tokens: int
+    duration_ms: int
+    related_id: str                  # Links to decision/review/task
+    prompt_bytes: int
+
+class HolisticReviewRecord(BaseModel):
+    id: str                          # Auto-generated 12-char hex
+    session_id: str                  # Session that created the task group
+    task_ids: list[str]              # IDs of tasks reviewed collectively
+    task_subjects: list[str]         # Subjects of tasks reviewed
+    collective_intent: str           # AI-generated summary of collective intent
+    verdict: Verdict | None
+    findings: list[Finding]
+    guidance: str
+    strengths_summary: str           # PIN: what's sound about the task group
+    standards_verified: list[str]
+    reviewer: str                    # Default: "governance-reviewer"
+    created_at: str
 ```
 
 ### 6.5 AI Review Pipeline
@@ -1370,6 +1448,8 @@ The `KGClient` class (`kg_client.py`) reads the Knowledge Graph JSONL file direc
 | `get_architecture_entities()` | All architecture-tier entities | `entityType in ("architectural_standard", "pattern", "component")` |
 | `search_entities(names)` | Entities matching component names | Case-insensitive substring match on name and observations |
 | `record_decision(...)` | *(writes)* | Appends a `solution_pattern` entity to the JSONL file |
+
+**TTL Cache**: KGClient caches `get_vision_standards()` and `get_architecture_entities()` results with a 5-minute TTL using `time.monotonic()`. This avoids repeated JSONL parsing during review bursts (common when the settle checker triggers multiple individual reviews after a holistic approval). Cache is instance-level (not global) for test isolation. No automatic invalidation on writes (vision standards are immutable; 5-minute staleness for architecture entities is acceptable). Explicit `invalidate_cache()` for programmatic control.
 
 **Design choice**: Direct JSONL file reads avoid the latency and complexity of an MCP round-trip during synchronous governance review. Since the governance server runs on the same machine as the KG server, they share the same filesystem. The tradeoff is that KG writes during a governance review could produce stale reads, but governance reviews are short-lived (60-120 seconds) and standards change rarely.
 
@@ -1477,7 +1557,7 @@ The `task_integration.py` module manipulates Claude Code's native task file syst
 
 ### 6.9 SQLite Schema
 
-The governance database (`.avt/governance.db`) contains four tables:
+The governance database (`.avt/governance.db`) contains six tables:
 
 ```sql
 -- Decisions submitted by agents
@@ -1489,6 +1569,9 @@ CREATE TABLE decisions (
     category TEXT NOT NULL,          -- DecisionCategory enum value
     summary TEXT NOT NULL,
     detail TEXT,
+    intent TEXT DEFAULT '',          -- WHY this decision is being made
+    expected_outcome TEXT DEFAULT '',-- WHAT measurable result is expected
+    vision_references TEXT DEFAULT '',-- JSON array: which vision standards this serves
     components_affected TEXT,        -- JSON array of strings
     alternatives TEXT,               -- JSON array of {option, reason_rejected}
     confidence TEXT,                 -- "high" | "medium" | "low"
@@ -1517,6 +1600,7 @@ CREATE TABLE governed_tasks (
     description TEXT,
     context TEXT,
     current_status TEXT NOT NULL DEFAULT 'pending_review',
+    session_id TEXT DEFAULT '',      -- Links tasks created in the same session
     created_at TEXT NOT NULL,
     released_at TEXT                 -- Set when all review blockers are resolved
 );
@@ -1539,6 +1623,40 @@ CREATE TABLE task_reviews (
     completed_at TEXT
 );
 
+-- Holistic review records (collective task group reviews)
+CREATE TABLE holistic_reviews (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,        -- Session that created the task group
+    task_ids TEXT NOT NULL,          -- JSON array of task IDs reviewed
+    task_subjects TEXT NOT NULL,     -- JSON array of task subjects
+    collective_intent TEXT,
+    verdict TEXT,
+    findings TEXT,                   -- JSON array of Finding objects
+    guidance TEXT,
+    strengths_summary TEXT DEFAULT '',
+    standards_verified TEXT,         -- JSON array of standard names
+    reviewer TEXT NOT NULL DEFAULT 'governance-reviewer',
+    created_at TEXT NOT NULL
+);
+
+-- Token usage tracking per AI review invocation
+CREATE TABLE token_usage (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    session_id TEXT DEFAULT '',
+    agent TEXT NOT NULL,             -- e.g., "governance-reviewer"
+    operation TEXT NOT NULL,         -- review_decision | review_plan |
+                                    -- review_completion | review_task_group | hook_review
+    model TEXT DEFAULT '',           -- sonnet | opus | haiku
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    cache_read_tokens INTEGER DEFAULT 0,
+    cache_creation_tokens INTEGER DEFAULT 0,
+    duration_ms INTEGER DEFAULT 0,
+    related_id TEXT DEFAULT '',      -- Links to decision/review/task
+    prompt_bytes INTEGER DEFAULT 0
+);
+
 -- Indexes for common query patterns
 CREATE INDEX idx_decisions_task ON decisions(task_id);
 CREATE INDEX idx_reviews_decision ON reviews(decision_id);
@@ -1546,37 +1664,43 @@ CREATE INDEX idx_reviews_plan ON reviews(plan_id);
 CREATE INDEX idx_governed_tasks_impl ON governed_tasks(implementation_task_id);
 CREATE INDEX idx_task_reviews_impl ON task_reviews(implementation_task_id);
 CREATE INDEX idx_task_reviews_review ON task_reviews(review_task_id);
+CREATE INDEX idx_holistic_reviews_session ON holistic_reviews(session_id);
+CREATE INDEX idx_token_usage_timestamp ON token_usage(timestamp);
+CREATE INDEX idx_token_usage_session ON token_usage(session_id);
+CREATE INDEX idx_token_usage_agent ON token_usage(agent);
 ```
 
 ### 6.10 Current Implementation Status
 
-All 10 tools are implemented and operational:
+All 11 tools are implemented and operational:
 
-- `server.py`: FastMCP server exposing all tools on port 3103, including both decision review (5 tools) and task governance (5 tools) groups
-- `store.py`: Full SQLite persistence with 4 tables, connection pooling via `sqlite3.Row`, and comprehensive CRUD for decisions, reviews, governed tasks, and task reviews
-- `reviewer.py`: AI review engine with three review modes (decision, plan, completion), temp file I/O pattern, JSON parsing with multiple extraction strategies, and mock mode for testing
-- `kg_client.py`: Direct JSONL reader with `get_vision_standards()`, `get_architecture_entities()`, `search_entities()`, and `record_decision()` for institutional memory
+- `server.py`: FastMCP server exposing all tools on port 3103, including decision review (5 tools), task governance (5 tools), and token usage reporting (1 tool: `get_usage_report`)
+- `store.py`: Full SQLite persistence with 6 tables (decisions, reviews, governed_tasks, task_reviews, holistic_reviews, token_usage), connection pooling via `sqlite3.Row`, and comprehensive CRUD including session-scoped queries and usage aggregation
+- `reviewer.py`: AI review engine with four review modes (decision, plan, completion, task_group), temp file I/O pattern, JSON parsing with multiple extraction strategies, mock mode for testing, and UsageRecord tracking for every AI invocation
+- `kg_client.py`: Direct JSONL reader with `get_vision_standards()`, `get_architecture_entities()`, `search_entities()`, and `record_decision()` for institutional memory. **5-minute TTL cache** on vision standards and architecture entities using `time.monotonic()` for accurate expiry
 - `task_integration.py`: Claude Code task file manipulation with `fcntl` file locking, atomic governed task pair creation, blocker add/remove, and task release on approval
-- `models.py`: Complete Pydantic model hierarchy for decisions, reviews, findings, verdicts, governed tasks, and task review records
+- `models.py`: Complete Pydantic model hierarchy: Decision (with intent/expected_outcome/vision_references), ReviewVerdict, Finding (with strengths/salvage_guidance), GovernedTaskRecord (with session_id), TaskReviewRecord, UsageRecord, HolisticReviewRecord
 
 **Extension point**: The `_queue_governance_review()` function in `server.py` is currently a pass-through placeholder. It records the review request (already stored in the `task_reviews` table) and serves as the extension point for future async job queue integration. Currently, reviews for governed tasks are triggered manually via `complete_task_review()` or processed by a governance-reviewer agent polling `get_pending_reviews()`.
 
 ## 7. Custom Subagent Definitions
 
-The system defines six specialized subagents in `.claude/agents/`. Each is a Markdown file with YAML frontmatter declaring the model, tool access, and MCP server bindings. The orchestrator spawns subagents via the Claude Code Task tool, injecting task-specific context and project rules into each invocation.
+The system defines eight specialized agents in `.claude/agents/`. Each is a Markdown file with YAML frontmatter declaring the model, tool access, and MCP server bindings. In Agent Teams mode, the lead spawns teammates with embedded system prompts from these files. In fallback mode, the orchestrator spawns subagents via the Task tool.
 
 ### Agent Comparison Table
 
-| Agent | Model | Tool Count | MCP Access | Role | Spawned By |
-|-------|-------|------------|------------|------|------------|
-| **Worker** | Opus 4.6 | 9 | KG + Quality + Governance | Implement scoped tasks with full governance integration | Orchestrator |
-| **Quality Reviewer** | Opus 4.6 | 6 | KG + Quality | Three-lens review (vision, architecture, quality) | Orchestrator |
-| **KG Librarian** | Sonnet 4.5 | 5 | KG | Curate institutional memory, consolidate observations | Orchestrator |
-| **Governance Reviewer** | Sonnet 4.5 | 4 | KG | AI-powered decision review against vision/architecture standards | Governance Server (via `claude --print`) |
-| **Researcher** | Opus 4.6 | 7 | KG + Governance | Periodic monitoring + exploratory design research | Orchestrator |
-| **Project Steward** | Sonnet 4.5 | 7 | KG | Project hygiene, naming conventions, cruft detection | Orchestrator |
+| Agent | Model | Tool Count | MCP Access | Mechanism | Role |
+|-------|-------|------------|------------|-----------|------|
+| **Worker** | Opus 4.6 | 9 | KG + Quality + Governance | Teammate | Implement scoped tasks with full governance integration |
+| **Quality Reviewer** | Sonnet 4.5 | 6 | KG + Quality | Teammate | Three-lens review (vision, architecture, quality) |
+| **KG Librarian** | Sonnet 4.5 | 5 | KG | Teammate | Curate institutional memory, consolidate observations |
+| **Governance Reviewer** | Sonnet 4.5 | 4 | KG | `claude --print` | AI-powered decision review against standards |
+| **Researcher** | Sonnet 4.5 | 7 | KG + Governance | Teammate | Periodic monitoring + exploratory design research |
+| **Project Steward** | Sonnet 4.5 | 7 | KG | Teammate | Project hygiene, naming conventions, cruft detection |
+| **Architect** | Opus 4.6 | 6 | KG + Governance | Teammate | Architecture review, system design, pattern validation |
+| **Project Bootstrapper** | Sonnet 4.5 | 7 | KG + Governance | Teammate | Project initialization, KG seeding, config scaffolding |
 
-> **Note on Governance Reviewer**: Unlike the other five agents, the governance-reviewer is NOT spawned by the orchestrator. It is invoked internally by the Governance MCP server via `claude --print` when `submit_decision()`, `submit_plan_for_review()`, or `submit_completion_review()` are called. It runs as a headless subprocess, not a Task tool subagent.
+> **Note on Governance Reviewer**: Unlike the other seven agents, the governance-reviewer is NOT spawned as a teammate. It is invoked internally by the Governance MCP server via `claude --print` when `submit_decision()`, `submit_plan_for_review()`, or `submit_completion_review()` are called. It runs as a headless subprocess. Isolation is a security feature.
 
 ---
 
@@ -1913,6 +2037,52 @@ tools:
 - Respect existing conventions even if different ones would be preferred
 - Always explain rationale behind naming/organization recommendations
 
+### 7.7 Architect
+
+**File**: `.claude/agents/architect.md`
+**Model**: Opus 4.6 | **Tools**: 6 (Read, Glob, Grep, Bash, collab-kg, collab-governance)
+
+**Role**: Designs architecture driven by vision standards, articulating clear intent and measurable outcomes for every decision. Every architectural decision must answer three questions: (1) Intent: WHY is this decision being made? (2) Expected Outcome: WHAT measurable result is expected? (3) Vision Reference: WHICH vision standards does this outcome serve?
+
+**Two Operating Modes**:
+- **Upfront Design** (project bootstrap): Full architecture for a project or major feature. Produces design documents in `.avt/task-briefs/`.
+- **Ongoing Decisions** (feature evolution): Individual architectural decisions during active development.
+
+**Startup Protocol**:
+1. Read design brief from task prompt or `.avt/task-briefs/`
+2. Check project rules (ENFORCE/PREFER)
+3. Load all vision standards: `get_entities_by_tier("vision")`
+4. Load existing architecture: `get_entities_by_tier("architecture")`
+5. Search for related patterns: `search_nodes("<topic>")`
+6. Check past decisions: `search_nodes("governance decision")`
+
+**Governance Integration**:
+- Submits decisions via `submit_decision` with `intent`, `expected_outcome`, and `vision_references`
+- Waits for governance verdict before finalizing
+- Submits complete plans via `submit_plan_for_review`
+
+---
+
+### 7.8 Project Bootstrapper
+
+**File**: `.claude/agents/project-bootstrapper.md`
+**Model**: Sonnet 4.5 | **Tools**: 8 (Read, Write, Glob, Grep, Bash, Task, collab-kg, collab-governance)
+
+**Role**: Investigates an existing codebase and produces draft governance artifacts for human approval: vision standards, architecture documentation, components, project rules, and coding conventions. Core principle: discoverer, not creator. Never directly creates vision-tier or architecture-tier KG entities.
+
+**Key Capabilities**:
+- **Scale Assessment Protocol**: CLI-based metrics collection (file counts, LOC, documentation files, directory structure) in under 5 seconds for 500K+ LOC codebases
+- **Partition Map**: Divides codebase into logical partitions for analysis by sub-agents (via Task tool)
+- **Multi-Level Architecture Docs**: Generates C4-style documentation with Mermaid diagrams (system context, containers, data flow)
+
+**Output**: Bootstrap report in `.avt/task-briefs/` with discovered vision standards, architecture patterns, components, naming conventions, and project rules. All artifacts are drafts pending human review.
+
+**Constraints**:
+- Never create vision or architecture tier entities directly
+- All standards are draft proposals for human approval
+- Use `callerRole: "quality"` for all KG operations
+- Delegate partition analysis to sub-agents via Task tool
+
 ---
 
 ## 8. Governance Architecture
@@ -2159,14 +2329,16 @@ The holistic review system addresses this with a two-layer assurance pattern:
 
 When the PostToolUse hook fires for each `TaskCreate`, it:
 1. Records the task with `session_id` in the governance DB
-2. Creates/updates the flag file `.avt/.holistic-review-pending`
+2. Creates the session-scoped flag file `.avt/.holistic-review-pending-{session_id}`
 3. Spawns a background settle checker (`scripts/hooks/_holistic-settle-check.py`)
 
-The settle checker implements a debounce pattern: it waits 3 seconds, then checks the DB for newer tasks. If newer tasks exist, it exits silently (a later checker handles it). If it is the last checker, it triggers the holistic review.
+The settle checker implements a debounce pattern: it waits 3 seconds, then checks the DB for newer tasks with the same session_id. If newer tasks exist, it exits silently (a later checker handles it). If it is the last checker, it triggers the holistic review.
+
+**Session-scoped flags**: Each concurrent session (lead, each teammate) gets its own flag file. Teammate "worker-1" creating tasks triggers a holistic review scoped to worker-1's session, without blocking worker-2's session. The `session_id` is extracted from the PostToolUse hook input JSON.
 
 **Layer 2: Coordination (PreToolUse on Write|Edit|Bash|Task)**
 
-The checkpoint hook (`scripts/hooks/holistic-review-gate.sh`) fires before every mutation or delegation tool. Its fast path (~1ms) checks whether `.avt/.holistic-review-pending` exists. If absent, it exits 0 immediately. If present, it reads the flag status and returns exit 2 with feedback:
+The checkpoint hook (`scripts/hooks/holistic-review-gate.sh`) fires before every mutation or delegation tool. Its fast path (~1ms) globs for `.avt/.holistic-review-pending-*`. If no flags exist, it exits 0 immediately. If a flag matching the current session exists, it reads the flag status and returns exit 2 with feedback:
 
 - `pending`: "Holistic review in progress, please wait"
 - `blocked`: "WHAT IS SOUND: [strengths_summary]. WHAT NEEDS CHANGE: [guidance]. Preserve sound tasks, revise only problematic ones."
@@ -2195,6 +2367,22 @@ GovernanceReviewer.review_task_group(
 - **Stale flag recovery**: Gate auto-removes flags older than 5 minutes
 - **Subagent handling**: If a subagent creates tasks after the session was already approved, the settle checker detects the existing approved review and cleans up the re-created flag
 - **Session tracking**: `session_id` from the hook stdin JSON links all tasks from the same session. The `HolisticReviewRecord` model stores the review result in `governance.db`
+
+**Settle/Debounce Timing:**
+
+```
+Time:  0ms    50ms    100ms   3100ms   3150ms   6150ms
+       |       |       |       |        |        |
+Task 1 +------>|       |       |        |        |
+       |  Task 2 +---->|       |        |        |
+       |       |  Task 3 +---->|        |        |
+       |       |       |       |        |        |
+Check 1 ........[wait 3s]......X (newer exists, exit)
+       Check 2 .........[wait 3s].......X (newer exists, exit)
+              Check 3 ..........[wait 3s]........+ (I'm last -> review)
+```
+
+Each `TaskCreate` spawns a background checker that waits 3 seconds. When it wakes, it queries the DB for any tasks with the same session_id created after it. If newer tasks exist, it exits silently. Only the checker for the last task proceeds to run the holistic review.
 
 **Data model additions:**
 
@@ -2225,14 +2413,16 @@ The system separates concerns into three distinct layers that compose cleanly:
 
 ```
 +---------------------------------------------------------------+
-|                    VERIFICATION LAYER                           |
+|                    VERIFICATION LAYER (5 Hooks)                 |
 |                                                                |
-|  PostToolUse hook on TaskCreate (Section 3.3)                  |
-|  Guarantees: every task is governed, no exceptions              |
-|  100% interception, subagent inheritance, transparent           |
+|  PostToolUse(TaskCreate): governance pairing, holistic flag    |
+|  PreToolUse(Write|Edit|Bash|Task): holistic review gate        |
+|  PreToolUse(ExitPlanMode): plan review safety net              |
+|  TeammateIdle: pending governance obligation check             |
+|  TaskCompleted: governance review completion check             |
 |                                                                |
-|  Script: scripts/hooks/governance-task-intercept.py            |
-|  Config: .claude/settings.json (PostToolUse matcher)           |
+|  Scripts: scripts/hooks/*.{py,sh}                              |
+|  Config: .claude/settings.json (hook matchers)                 |
 +---------------------------------------------------------------+
 |                      GOVERNANCE LAYER                          |
 |                                                                |
@@ -2303,9 +2493,41 @@ The `TaskFileManager` class in `mcp-servers/governance/collab_governance/task_in
 
 **Strategic Value**: This three-layer separation keeps each concern independent. The Verification Layer (PostToolUse hook) guarantees coverage without depending on agent behavior. The Governance Layer can evolve its review policies (new review types, different verdict logic, additional checks) without touching task infrastructure. The Infrastructure Layer can adapt to Claude Code Task system changes (file format, storage location) by modifying only `task_integration.py` and the hook's discovery logic. Each layer can be tested, updated, and reasoned about independently.
 
+### 8.8 Concurrency Model
+
+With Agent Teams, multiple teammates run as independent Claude Code sessions. Concurrency is managed through shared state and session-scoped governance:
+
+```
+Lead Session
+  |
+  +-- Teammate "architect-1" (full Claude Code session)
+  |     +-- Own MCP connections (KG, Quality, Governance)
+  |     +-- Own hook enforcement (all 5 hooks)
+  |     +-- Own session_id for holistic review
+  |
+  +-- Teammate "worker-1" (full Claude Code session)
+  |     +-- Shared task list (self-claim)
+  |     +-- Direct messaging to/from other teammates
+  |
+  +-- Teammate "worker-2" (full Claude Code session)
+  |     +-- Can work in parallel with worker-1
+  |     +-- Separate git worktree for isolation
+  |
+  +-- Teammate "quality-reviewer-1" (full Claude Code session)
+        +-- Reviews worker diffs after completion
+```
+
+**Task list concurrency**: All teammates share a task list. Self-claim uses Claude Code's native task locking; two teammates cannot claim the same task. Tasks transition: `pending` -> `in_progress` -> `completed`.
+
+**Session-scoped holistic review**: Each session (lead, each teammate) gets its own holistic review flag file. Teammate "worker-1" creating tasks triggers a holistic review scoped to worker-1's session, without blocking worker-2's session.
+
+**SQLite concurrency**: The governance store uses SQLite's WAL mode for concurrent reads. Write serialization is handled by SQLite's file locking. Hook scripts that write to the DB use short transactions to minimize lock contention.
+
+---
+
 ## 9. CLAUDE.md Orchestration
 
-The root `CLAUDE.md` is the orchestrator's instruction set. Claude Code reads it at session start and follows it as the primary directive for coordinating subagents, maintaining governance, and managing institutional memory. This section summarizes the key protocols it defines.
+The root `CLAUDE.md` is the orchestrator's instruction set. Claude Code reads it at session start and follows it as the primary directive for coordinating teammates, maintaining governance, and managing institutional memory. This section summarizes the key protocols it defines.
 
 ### 9.1 Task Decomposition
 
@@ -2808,24 +3030,32 @@ The following layout is verified against the actual filesystem:
 ```
 agent-vision-team/
 ├── .claude/
-│   ├── agents/                              # 6 custom subagent definitions
+│   ├── agents/                              # 8 specialized agent definitions
 │   │   ├── worker.md
 │   │   ├── quality-reviewer.md
 │   │   ├── kg-librarian.md
 │   │   ├── governance-reviewer.md
 │   │   ├── researcher.md
-│   │   └── project-steward.md
-│   ├── commands/
-│   │   └── project-overview.md              # Slash command definition
-│   ├── skills/
-│   │   └── e2e.md                           # /e2e skill definition
-│   ├── settings.json                        # Hooks (PostToolUse on TaskCreate, PreToolUse on ExitPlanMode), MCP servers, model routing
+│   │   ├── project-steward.md
+│   │   ├── architect.md
+│   │   └── project-bootstrapper.md
+│   ├── skills/                              # On-demand protocol docs + executable skills
+│   │   ├── bootstrap-protocol.md            # /bootstrap-protocol
+│   │   ├── architect-protocol.md            # /architect-protocol
+│   │   ├── research-protocol.md             # /research-protocol
+│   │   ├── project-steward-protocol.md      # /project-steward-protocol
+│   │   ├── e2e-testing.md                   # /e2e-testing
+│   │   ├── end-to-end-example.md            # /end-to-end-example
+│   │   ├── file-organization.md             # /file-organization
+│   │   └── e2e.md                           # /e2e (executable runner)
+│   ├── settings.json                        # 5 hooks, MCP servers, Agent Teams config, model routing, 8 agent definitions
 │   └── settings.local.json                  # Permission allowlist (synced by wizard)
 │
 ├── .avt/                                    # Agent Vision Team system config
 │   ├── knowledge-graph.jsonl                # KG entity/relation persistence
 │   ├── trust-engine.db                      # Quality finding audit trails
-│   ├── governance.db                        # Decision store with verdicts
+│   ├── governance.db                        # Decision store (6 tables: decisions, reviews, governed_tasks, task_reviews, holistic_reviews, token_usage)
+│   ├── .holistic-review-pending-{session_id}# Session-scoped holistic review flags (transient)
 │   ├── task-briefs/
 │   │   └── example-001-add-feature.md
 │   ├── session-state.md                     # Current session progress
@@ -3491,7 +3721,7 @@ The researcher subagent gathers intelligence to inform development decisions. It
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  Orchestrator                                                            │
-│  Spawns researcher subagent via Task tool                                │
+│  Spawns researcher teammate (or subagent via Task tool)                  │
 │  prompt: "Execute research prompt in .avt/research-prompts/rp-xxx.md"   │
 └──────────────────────────┬───────────────────────────────────────────────┘
                            │
@@ -3555,7 +3785,7 @@ The project-steward subagent maintains project organization, naming conventions,
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  Orchestrator                                                            │
-│  Spawns project-steward subagent via Task tool                           │
+│  Spawns project-steward teammate (or subagent via Task tool)             │
 │  prompt: "Perform a full project hygiene review"                         │
 └──────────────────────────┬───────────────────────────────────────────────┘
                            │
@@ -4081,7 +4311,7 @@ Rules live in `.avt/project-config.json` and are distinct from vision standards 
 
 ### 16.2 Rule Injection Protocol
 
-When the orchestrator spawns a subagent, it compiles applicable rules into a compact preamble prepended to the task prompt:
+When the orchestrator spawns a teammate (or subagent), it compiles applicable rules into a compact preamble prepended to the task prompt:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -4203,8 +4433,8 @@ This separation ensures:
 
 | Component | Technology | Version | Rationale |
 |-----------|-----------|---------|-----------|
-| **Orchestration** | Claude Code CLI + subagents | Latest | Native orchestration platform |
-| **AI Models** | Opus 4.6 (worker, quality-reviewer, researcher), Sonnet 4.5 (kg-librarian, governance-reviewer, project-steward), Haiku 4.5 (mechanical tasks) | Feb 2026 | Per-agent model routing based on task complexity |
+| **Orchestration** | Claude Code Agent Teams + fallback subagents | Latest | Native orchestration platform with teammate sessions |
+| **AI Models** | Opus 4.6 (worker, architect), Sonnet 4.5 (quality-reviewer, kg-librarian, governance-reviewer, project-steward, researcher, project-bootstrapper), Haiku 4.5 (mechanical tasks) | Feb 2026 | Per-agent model routing based on task complexity |
 | **MCP Servers** | Python + FastMCP | Python >=3.12, FastMCP >=2.0.0 | Consistent language across all three servers; FastMCP simplifies server creation |
 | **KG Storage** | JSONL | — | Simple, portable, matches Anthropic's KG Memory format |
 | **Quality Storage** | SQLite | — | Trust engine history, quality gate state |
@@ -4237,13 +4467,15 @@ Claude Code provides the execution environment for the entire system. The follow
 
 | Feature | Status | How Used |
 |---------|--------|----------|
-| Custom subagents | **Active** | 6 agents defined in `.claude/agents/`: worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward |
+| Custom agents | **Active** | 8 agents defined in `.claude/agents/`: worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward, architect, project-bootstrapper |
+| Agent Teams | **Active** | Primary orchestration mechanism. Teammates are full Claude Code sessions with independent MCP access, shared task list, self-claim, direct messaging, and hook enforcement. Enabled via `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` |
 | MCP servers (SSE) | **Active** | 3 servers registered in `.claude/settings.json`: collab-kg (port 3101), collab-quality (port 3102), collab-governance (port 3103) |
 | PostToolUse hooks | **Active** | `TaskCreate` hook runs `scripts/hooks/governance-task-intercept.py` to maintain "governed from creation" invariant on every task creation (core verification mechanism) |
 | PreToolUse hooks | **Active** | `ExitPlanMode` hook runs `scripts/hooks/verify-governance-review.sh` as safety net for plan review; `Write\|Edit\|Bash\|Task` hook runs `scripts/hooks/holistic-review-gate.sh` to coordinate work sequencing during collective review |
-| Model routing | **Active** | Per-agent model assignment in `.claude/settings.json` agents block: Opus 4.6 for worker/quality-reviewer, Sonnet 4.5 (default) for kg-librarian/governance-reviewer |
-| Skills | **Active** | `/e2e` skill for E2E test harness execution |
-| Commands | **Active** | `/project-overview` command for project context |
+| TeammateIdle hook | **Active** | Prevents teammates from going idle with pending governance obligations |
+| TaskCompleted hook | **Active** | Prevents task completion if governance review is still pending or blocked |
+| Model routing | **Active** | Per-agent model assignment in `.claude/settings.json` agents block: Opus 4.6 for worker/architect, Sonnet 4.5 (default) for others |
+| Skills | **Active** | 8 skills in `.claude/skills/`: 7 protocol/doc skills (extracted from CLAUDE.md) + `/e2e` runner + `/project-overview` |
 | Task List (native) | **Active** | `CLAUDE_CODE_ENABLE_TASKS=true` + `CLAUDE_CODE_TASK_LIST_ID` for native task system with cross-session persistence; PostToolUse hook writes governance pairs to native task files |
 | Git worktrees | **Active** | Worker isolation via `git worktree add ../project-worker-N -b task/NNN-description` |
 | MCP Tool Search | **Planned (immediate)** | 85% context reduction for MCP tool loading. Config-only change: set `ENABLE_TOOL_SEARCH=auto:5`. Requires Sonnet 4+ or Opus 4+ (not Haiku) |
@@ -4251,8 +4483,7 @@ Claude Code provides the execution environment for the entire system. The follow
 | Context compaction | **Available** | Automatic with Opus 4.6 for long-running orchestrator sessions. No configuration needed |
 | 1M context window | **Available** | Automatic with Opus 4.6. Enables extended code reviews and larger session contexts without truncation |
 | Setup hooks | **Planned (short-term)** | `--init` for project initialization (KG seeding, config validation), `--maintenance` for periodic tasks (cruft detection, dependency monitoring) |
-| Agent Teams | **Monitoring** | Experimental platform feature. Aligns conceptually with our orchestration model (delegate mode, shared task list, plan approval). May replace custom subagent coordination when stable. Potential use: worker swarm teams for parallel implementation. Current blockers: no session resumption for teammates, one team per session, no nested teams |
-| Plugins | **Planned (later)** | Natural plugin boundaries exist (3 MCP servers, 6 agents, 1 skill, 1 command, 1 hook). APIs still maturing. Will evaluate after Quality server gate stubs are replaced and governance review protocol stabilizes |
+| Plugins | **Planned (later)** | Natural plugin boundaries exist (3 MCP servers, 8 agents, 8 skills, 5 hooks). APIs still maturing. Will evaluate after governance review protocol stabilizes |
 
 ---
 
@@ -4265,28 +4496,32 @@ This section replaces the v1 "Implementation Phases" checklist, which listed unc
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Knowledge Graph Server | **Operational** | 11 tools, JSONL persistence with load-on-startup/append-on-write, three-tier protection (vision/architecture/quality), document ingestion pipeline, full test coverage |
-| Quality Server | **Operational (partial gate stubs)** | 8 tools exposed. Trust engine with SQLite persistence is fully functional. `auto_format`, `run_lint`, `run_tests`, and `check_coverage` make real subprocess calls (ruff, prettier, pytest, eslint). The **build gate** and **findings gate** in `check_all_gates()` are stubs returning `passed: true` |
-| Governance Server | **Operational** | 10 tools, SQLite persistence, AI-powered review via `claude --print` with governance-reviewer agent, governed task lifecycle with multi-blocker support, KG integration for standard loading |
+| Quality Server | **Operational** | 8 tools exposed. Trust engine with SQLite persistence fully functional. All 5 gates in `check_all_gates()` make real checks (build, lint, test, coverage, findings) |
+| Governance Server | **Operational** | 11 tools (including `get_usage_report`), 6 SQLite tables (including holistic_reviews, token_usage), AI-powered review via `claude --print`, session-scoped holistic review, governed task lifecycle with multi-blocker support, KGClient TTL caching, token usage tracking |
 | Worker Agent | **Operational** | Full governance integration: reads task brief, checks project rules from `.avt/project-config.json`, queries KG for context (`search_nodes`, `get_entities_by_tier`), submits decisions via `submit_decision` (blocks until verdict), implements within task brief scope, runs `check_all_gates()`, calls `submit_completion_review` before reporting done |
-| Quality Reviewer Agent | **Operational** | Three-lens review protocol (vision > architecture > quality). Model: Opus 4.6. 6 tools including KG and Quality server access |
+| Quality Reviewer Agent | **Operational** | Three-lens review protocol (vision > architecture > quality). Model: Sonnet 4.5. 6 tools including KG and Quality server access |
 | KG Librarian Agent | **Operational** | Memory curation: consolidation, promotion, stale entry removal, archival file sync to `.avt/memory/`. Model: Sonnet 4.5. 5 tools |
 | Governance Reviewer Agent | **Operational** | AI review called internally by governance server via `claude --print`. Reviews decisions and plans through vision alignment and architectural conformance lenses. Model: Sonnet 4.5. 4 tools |
-| Researcher Agent | **Operational** | Dual-mode research: periodic/maintenance (dependency monitoring, breaking change detection) and exploratory/design (technology evaluation, architectural decisions). Model: Opus 4.6. 7 tools |
+| Researcher Agent | **Operational** | Dual-mode research: periodic/maintenance (dependency monitoring, breaking change detection) and exploratory/design (technology evaluation, architectural decisions). Model: Sonnet 4.5. 7 tools |
 | Project Steward Agent | **Operational** | Project hygiene: naming conventions, folder organization, documentation completeness, cruft detection. Periodic cadence: weekly/monthly/quarterly. Model: Sonnet 4.5. 7 tools |
+| Architect Agent | **Operational** | Architecture design with intent/outcome/vision reference chain. Two modes: upfront design and ongoing decisions. Model: Opus 4.6. 6 tools |
+| Project Bootstrapper Agent | **Operational** | Codebase investigation, draft governance artifacts, scale assessment, partition-based analysis. Model: Sonnet 4.5. 8 tools |
 | VS Code Extension | **Operational** | Dashboard webview, 9-step setup wizard, 10-step workflow tutorial, 6-step VS Code walkthrough, governance panel, research prompts panel, 3 MCP clients (KG, Quality, Governance), 4 TreeViews, 15 commands (12 user-facing, 3 internal) |
 | E2E Test Harness | **Operational** | 14 scenarios (s01-s14), 292+ structural domain-agnostic assertions, parallel execution with full isolation, random domain generation from 8 templates, mock review mode |
-| CLAUDE.md Orchestration | **Operational** | All protocols documented: task decomposition, governance checkpoints, quality review, memory curation, research, project hygiene, drift detection |
+| CLAUDE.md Orchestration | **Operational** | Core orchestrator instructions (~284 lines after skills extraction). 8 on-demand skills in `.claude/skills/` for detailed protocol docs. Agent Teams as primary mechanism with fallback to Task-tool subagents |
 | AVT Gateway (Web Mode) | **Operational** | FastAPI HTTP/WebSocket gateway, dual-mode transport abstraction, multi-project management with per-project MCP isolation, API-key authentication, Docker containerization with Nginx TLS proxy |
 
 ### 18.2 Known Gaps
 
 These are known deficiencies in the current implementation. They do not block operation but represent incomplete or inconsistent areas.
 
-**Quality server gates fully connected.** All five gates in `check_all_gates()` now make real checks. The **build gate** reads configured build commands from `.avt/project-config.json` (`quality.buildCommands`) and runs them via `subprocess.run()` with a 300-second timeout. The **findings gate** queries the trust engine for unresolved critical/high-severity findings. The `auto_format`, `run_lint`, `run_tests`, and `check_coverage` tools continue to make real subprocess calls (ruff, prettier, eslint, pytest).
-
 **Extension-system state drift.** The extension dashboard was built incrementally as the system evolved. Some UI components may reference patterns or display states that have since changed. The gap analysis (February 2026) identified that the extension's scope has grown far beyond "observability only" but some internal state representations have not kept pace with governance and research system evolution.
 
-**Agent definitions outside settings.json.** The researcher and project-steward agents are defined in `.claude/agents/` but are not listed in the `agents` block of `.claude/settings.json`. They inherit the `defaultModel: sonnet` setting. The researcher should be explicitly configured for Opus 4.6 to match its documented model assignment.
+**Agent definition loading (Issue #24316).** `.claude/agents/` definitions cannot yet be used directly when spawning Agent Teams teammates. The lead must read the agent file and embed the full system prompt in the spawn instruction. This is a Claude Code platform limitation expected to be resolved.
+
+**KGClient compact race condition.** `KGClient.record_decision()` appends directly to JSONL, bypassing the `KnowledgeGraph` in-memory cache. If `compact()` runs before a reload, it rewrites from memory and silently drops KGClient-appended records. Workaround: `kg._load_from_storage()` after KGClient writes. Permanent fix: route KGClient writes through the KG API.
+
+**Nested session detection (Claude Code 2.1.42+).** Running `claude -p` inside a Claude Code session fails unless `unset CLAUDECODE` is called first. Affects governance reviewer's `claude --print` invocations.
 
 **v1 scaffolding remnants.** Code from the v1 architecture (Communication Hub server scaffolding, extension session management) is preserved in the codebase and in `docs/v1-full-architecture/`. This is intentional (available for reactivation) but adds cognitive load for new contributors.
 
@@ -4299,13 +4534,13 @@ Items are ordered by priority. Effort and dependency information is included to 
 | **Immediate** | Enable MCP Tool Search | Config only | — | Set `ENABLE_TOOL_SEARCH=auto:5` in settings. 85% context reduction for tool loading |
 | **Immediate** | Set effort controls per agent | Config only | — | Add effort levels to agent definitions in `.claude/settings.json` |
 | **Immediate** | Update model references to Opus 4.6 | Trivial | — | Replace Opus 4.5 references in documentation. Code references are model-agnostic |
-| **Immediate** | Add researcher/steward to settings.json agents | Config only | — | Explicitly configure model and tools for researcher (Opus 4.6) and project-steward (Sonnet 4.5) |
+| **Done** | ~~Add all agents to settings.json~~ | Config only | — | All 8 agents now listed in `.claude/settings.json` agents block with explicit model and tool assignments |
 | **Done** | ~~Replace Quality server gate stubs~~ | Medium | — | Build gate reads `.avt/project-config.json` build commands, findings gate queries trust engine for unresolved critical/high findings. Completed February 2026 |
 | **Short-term** | Convert common workflows to model-invocable skills | Low | — | Identify orchestrator patterns that repeat across sessions. Candidates: governance review flow, worker spawn-and-review cycle, KG curation trigger |
 | **Short-term** | Add setup hooks (`--init`, `--maintenance`) | Low | — | `--init`: validate project config, seed KG with vision/architecture docs, verify MCP server connectivity. `--maintenance`: run cruft detection, check dependency updates |
 | **Short-term** | Align extension UI with current system state | Medium | Architecture doc v2 | Audit dashboard components against current MCP server APIs. Update state representations, add missing governance/research views, remove stale references |
 | **Medium-term** | Plugin packaging evaluation | Medium | API stability | Assess whether MCP server APIs, agent definitions, and hook contracts are stable enough to package. Define plugin boundaries. Prototype single-plugin extraction |
-| **Medium-term** | Agent Teams evaluation | Evaluate | Platform maturation | Monitor experimental status. When session resumption is supported and nested teams are available, prototype worker swarm team alongside governance policy layer |
+| **Done** | ~~Agent Teams adoption~~ | Config + code | — | Agent Teams is now the primary orchestration mechanism. All 7 teammate-eligible agents work as full Claude Code sessions with independent MCP, shared task lists, self-claim, and hook enforcement |
 | **Future** | Cross-project memory | High | KG design | KG entities that travel between projects. Requires namespace design, conflict resolution, tier portability rules |
 | **Future** | Multi-team coordination | High | Agent Teams stabilization | Multiple teams with different specializations (implementation team, review team, research team) coordinating on the same project |
 | **Future** | Plugin distribution | Medium | Plugin packaging | Publish to Claude Code plugin marketplace. Requires stable APIs, documentation, versioning strategy |
@@ -4317,7 +4552,7 @@ For historical context, the following summarizes what the v1 "Implementation Pha
 | v1 Phase | What Was Planned | What Shipped |
 |----------|-----------------|-------------|
 | **Phase 1: Make MCP Servers Real** | KG: JSONL persistence, delete tools, compaction. Quality: real subprocess calls, SQLite trust engine | KG: fully operational with 11 tools (3 beyond plan), JSONL persistence, tier protection. Quality: 8 tools operational with real subprocess calls, trust engine with SQLite complete. All 5 quality gates now fully connected |
-| **Phase 2: Create Subagents + Validate E2E** | 3 agents (worker, quality-reviewer, kg-librarian), CLAUDE.md orchestration, settings.json hooks, end-to-end validation | 6 agents (added governance-reviewer, researcher, project-steward), full CLAUDE.md orchestration with governance/research/hygiene protocols, PostToolUse + PreToolUse hooks, end-to-end workflow validated |
+| **Phase 2: Create Subagents + Validate E2E** | 3 agents (worker, quality-reviewer, kg-librarian), CLAUDE.md orchestration, settings.json hooks, end-to-end validation | 8 agents (added governance-reviewer, researcher, project-steward, architect, project-bootstrapper), full CLAUDE.md orchestration with Agent Teams primary, 5 lifecycle hooks, session-scoped holistic review, on-demand skills extraction, end-to-end workflow validated |
 | **Phase 3: Build Extension as Monitoring Layer** | MCP clients, TreeView wiring, file watchers, diagnostics, dashboard, status bar | 3 MCP clients, 4 TreeViews, dashboard webview with React 19, 9-step wizard, 10-step tutorial, VS Code walkthrough, governance panel, research prompts panel, 15 commands (12 user-facing, 3 internal). Scope significantly exceeded plan |
 | **Phase 4: Expand and Harden** | Event logging, cross-project memory, multi-worker parallelism, FastMCP 3.0 migration, installation script | E2E test harness (14 scenarios, 292+ assertions), full governance system (not in original plan), research system (not in original plan), project hygiene system (not in original plan), AVT Gateway with headless web mode and multi-project management (not in original plan). Cross-project memory and FastMCP migration remain future items |
 

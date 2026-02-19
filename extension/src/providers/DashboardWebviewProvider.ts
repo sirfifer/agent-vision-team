@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { spawn } from 'child_process';
+import { createInterface } from 'readline';
 import { Entity } from '../models/Entity';
 import { AgentStatus, ActivityEntry, GovernedTask, GovernanceStats } from '../models/Activity';
 import { ProjectConfig, SetupReadiness } from '../models/ProjectConfig';
@@ -127,6 +128,11 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     governedTasks: [],
     governanceStats: { totalDecisions: 0, approved: 0, blocked: 0, pending: 0, pendingReviews: 0, totalGovernedTasks: 0 },
   };
+
+  // Bootstrap streaming state
+  private bootstrapActivities: Array<{ tool: string; summary: string; timestamp: number }> = [];
+  private currentBootstrapPhase: string = 'Starting';
+  private subAgentCount: number = 0;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -341,6 +347,18 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         case 'runBootstrap':
           this.handleRunBootstrap(message.context, message.focusAreas);
+          break;
+
+        case 'loadBootstrapReview':
+          this.handleLoadBootstrapReview();
+          break;
+
+        case 'finalizeBootstrapReview':
+          this.handleFinalizeBootstrapReview(message.items);
+          break;
+
+        case 'requestUsageReport':
+          this.handleRequestUsageReport(message.period, message.groupBy);
           break;
       }
     });
@@ -835,7 +853,12 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       prompt += `\n\nProject context from user:\n${context.trim()}`;
     }
 
-    // Notify webview that bootstrap has started
+    // Reset bootstrap streaming state
+    this.bootstrapActivities = [];
+    this.currentBootstrapPhase = 'Starting';
+    this.subAgentCount = 0;
+
+    // Notify webview that bootstrap has started (transitions dialog to progress view)
     this.postMessage({ type: 'bootstrapStarted' });
 
     // Add activity entry
@@ -848,39 +871,98 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       detail: areas.length < 4 ? `Focus: ${areas.join(', ')}` : 'Full bootstrap (all focus areas)',
     });
 
-    // Execute via claude CLI with project-bootstrapper agent
-    try {
-      const stamp = `avt-bootstrap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const inputPath = path.join(os.tmpdir(), `${stamp}-input.md`);
-      const outputPath = path.join(os.tmpdir(), `${stamp}-output.md`);
+    this.postMessage({ type: 'bootstrapProgress', phase: 'Initializing', detail: 'Preparing bootstrap agent...', activities: [] });
 
+    // Write prompt to temp file for stdin
+    const stamp = `avt-bootstrap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const inputPath = path.join(os.tmpdir(), `${stamp}-input.md`);
+
+    try {
       fs.writeFileSync(inputPath, prompt, 'utf-8');
+
+      let finalResult = '';
 
       await new Promise<void>((resolve, reject) => {
         const inputFd = fs.openSync(inputPath, 'r');
-        const outputFd = fs.openSync(outputPath, 'w');
+
+        // Build env: inherit process.env but remove CLAUDECODE to avoid nested session detection
+        const env = { ...process.env };
+        delete env.CLAUDECODE;
 
         const proc = spawn('claude', [
           '--print',
+          '--output-format', 'stream-json',
+          '--verbose',
           '--model', 'opus',
           '--agent', 'project-bootstrapper',
         ], {
-          stdio: [inputFd, outputFd, 'pipe'],
+          stdio: [inputFd, 'pipe', 'pipe'],
           cwd: root,
+          env,
           timeout: 3600000, // 1 hour timeout for large projects
         });
 
         fs.closeSync(inputFd);
-        fs.closeSync(outputFd);
 
+        // Parse stdout as stream-json: one JSON object per line
+        const rl = createInterface({ input: proc.stdout! });
+        rl.on('line', (line: string) => {
+          try {
+            const event = JSON.parse(line);
+            this.handleBootstrapStreamEvent(event);
+            // Capture the final result text
+            if (event.type === 'result' && event.result) {
+              finalResult = event.result;
+            }
+          } catch {
+            // Skip non-JSON lines (e.g., blank lines, warnings)
+          }
+        });
+
+        // Capture stderr for error reporting
         let stderr = '';
-        proc.stderr!.on('data', (data: Buffer) => { stderr += data.toString(); });
+        proc.stderr!.on('data', (data: Buffer) => {
+          stderr += data.toString();
+        });
+
+        // Heartbeat: if no stream events for 30s, send a pulse so UI doesn't look frozen
+        let lastEventTime = Date.now();
+        const heartbeat = setInterval(() => {
+          if (Date.now() - lastEventTime > 30000) {
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+            this.postMessage({
+              type: 'bootstrapProgress',
+              phase: this.currentBootstrapPhase,
+              detail: `Agent is thinking... (${timeStr} elapsed)`,
+              activities: this.bootstrapActivities.slice(0, 8),
+            });
+          }
+        }, 10000);
+        const startTime = Date.now();
+
+        // Patch lastEventTime on each stream event
+        const origHandler = this.handleBootstrapStreamEvent.bind(this);
+        this.handleBootstrapStreamEvent = (event: any) => {
+          lastEventTime = Date.now();
+          origHandler(event);
+        };
 
         proc.on('error', (err: NodeJS.ErrnoException) => {
-          reject(new Error(`Bootstrap failed to start: ${err.message}`));
+          clearInterval(heartbeat);
+          this.handleBootstrapStreamEvent = origHandler; // restore
+          if (err.code === 'ENOENT') {
+            reject(new Error('Claude CLI not found. Ensure "claude" is installed and on your PATH.'));
+          } else {
+            reject(new Error(`Bootstrap failed to start: ${err.message}`));
+          }
         });
 
         proc.on('close', (code: number | null) => {
+          clearInterval(heartbeat);
+          this.handleBootstrapStreamEvent = origHandler; // restore
           if (code !== 0) {
             reject(new Error(`Bootstrap exited with code ${code}${stderr ? `: ${stderr.trim().slice(0, 500)}` : ''}`));
           } else {
@@ -889,18 +971,26 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         });
       });
 
+      // Check if bootstrap report was created
+      const reportPath = path.join(root, '.avt', 'bootstrap-report.md');
+      const hasReport = fs.existsSync(reportPath);
+
       this.addActivity({
         id: `activity-${Date.now()}`,
         timestamp: new Date().toISOString(),
         agent: 'project-bootstrapper',
         type: 'status',
         summary: 'Bootstrap completed',
-        detail: 'Review the bootstrap report in .avt/bootstrap-report.md',
+        detail: hasReport
+          ? 'Review the bootstrap report in .avt/bootstrap-report.md'
+          : 'Bootstrap completed. Check .avt/ for generated artifacts.',
       });
 
-      // Clean up temp files
-      try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
-      try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
+      this.postMessage({
+        type: 'bootstrapComplete',
+        success: true,
+        reportPath: hasReport ? '.avt/bootstrap-report.md' : undefined,
+      });
 
       // Refresh config data to pick up any new docs
       this.refreshConfigData();
@@ -913,7 +1003,350 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         summary: 'Bootstrap failed',
         detail: String(err),
       });
-      vscode.window.showErrorMessage(`Bootstrap failed: ${err}`);
+      this.postMessage({
+        type: 'bootstrapComplete',
+        success: false,
+        error: String(err),
+      });
+    } finally {
+      // Clean up temp files
+      try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
+    }
+  }
+
+  /**
+   * Handle a single stream-json event from the bootstrap claude CLI process.
+   * Parses tool calls and text to send real-time progress to the webview.
+   */
+  private handleBootstrapStreamEvent(event: any): void {
+    switch (event.type) {
+      case 'system':
+        this.currentBootstrapPhase = 'Analyzing';
+        this.postMessage({
+          type: 'bootstrapProgress',
+          phase: 'Analyzing',
+          detail: 'Bootstrap agent initialized',
+          activities: [],
+        });
+        break;
+
+      case 'assistant':
+        for (const block of event.message?.content || []) {
+          if (block.type === 'tool_use') {
+            const summary = this.summarizeToolCall(block.name, block.input);
+            this.bootstrapActivities.unshift({ tool: block.name, summary, timestamp: Date.now() });
+            if (this.bootstrapActivities.length > 20) this.bootstrapActivities.pop();
+
+            const phase = this.deriveBootstrapPhase(block.name, block.input);
+            this.currentBootstrapPhase = phase;
+
+            this.postMessage({
+              type: 'bootstrapProgress',
+              phase,
+              detail: summary,
+              activities: this.bootstrapActivities.slice(0, 8),
+            });
+          }
+          if (block.type === 'text' && block.text?.trim()) {
+            const snippet = block.text.trim().slice(0, 120);
+            this.postMessage({
+              type: 'bootstrapProgress',
+              phase: this.currentBootstrapPhase || 'Working',
+              detail: snippet,
+              activities: this.bootstrapActivities.slice(0, 8),
+            });
+          }
+        }
+        break;
+
+      // 'user' events (tool results) and 'result' events are ignored for progress display
+    }
+  }
+
+  /**
+   * Translate a raw tool call into a human-readable summary.
+   */
+  private summarizeToolCall(tool: string, input: any): string {
+    try {
+      switch (tool) {
+        case 'Read': return `Reading ${this.shortenPath(input?.file_path)}`;
+        case 'Glob': return `Searching for ${input?.pattern || 'files'}`;
+        case 'Grep': return `Searching for "${(input?.pattern || '').slice(0, 40)}"`;
+        case 'Bash': return `Running: ${(input?.command || '').slice(0, 60)}`;
+        case 'Write': return `Writing ${this.shortenPath(input?.file_path)}`;
+        case 'Edit': return `Editing ${this.shortenPath(input?.file_path)}`;
+        case 'Task': return `Sub-agent: ${input?.description || 'analysis task'}`;
+        case 'TodoWrite': return 'Updating task list';
+        default:
+          if (tool.startsWith('mcp__')) {
+            const parts = tool.split('__');
+            return `MCP: ${parts.slice(1).join('.')}`;
+          }
+          return `Using ${tool}`;
+      }
+    } catch {
+      return `Using ${tool}`;
+    }
+  }
+
+  /**
+   * Derive the current bootstrap phase from the tool being called.
+   */
+  private deriveBootstrapPhase(tool: string, input: any): string {
+    try {
+      if (tool === 'Bash') {
+        const cmd = input?.command || '';
+        if (cmd.includes('find') || cmd.includes('wc') || cmd.includes('ls')) return 'Scanning';
+      }
+      if (tool === 'Task') {
+        this.subAgentCount++;
+        return `Working (${this.subAgentCount} sub-agents)`;
+      }
+      if (tool === 'Write') {
+        const fp = input?.file_path || '';
+        if (fp.includes('docs/architecture') || fp.includes('docs/vision') || fp.includes('docs/style')) return 'Writing Docs';
+        if (fp.includes('bootstrap-report')) return 'Writing Report';
+        return 'Writing';
+      }
+      if (tool === 'Glob' || tool === 'Grep') return 'Analyzing';
+      if (tool === 'Read') return 'Reading';
+      if (tool.startsWith('mcp__')) return 'Recording';
+    } catch { /* ignore */ }
+    return this.currentBootstrapPhase || 'Working';
+  }
+
+  /**
+   * Shorten a file path for display (show last 2-3 segments).
+   */
+  private shortenPath(filePath: string | undefined): string {
+    if (!filePath) return 'file';
+    const parts = filePath.replace(/\\/g, '/').split('/');
+    return parts.length <= 3 ? parts.join('/') : '...' + '/' + parts.slice(-3).join('/');
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Bootstrap Review Handlers
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Load bootstrap discoveries for review. Reads from the structured
+   * bootstrap-discoveries.json staging file (preferred) or falls back
+   * to the legacy knowledge-graph.jsonl path for backward compatibility.
+   */
+  private async handleLoadBootstrapReview(): Promise<void> {
+    try {
+      const projectDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!projectDir) {
+        this.postMessage({ type: 'bootstrapReviewLoaded', items: [] });
+        return;
+      }
+
+      // Preferred: structured discoveries file (staging, not yet in KG)
+      const discoveriesPath = path.join(projectDir, '.avt', 'bootstrap-discoveries.json');
+      if (fs.existsSync(discoveriesPath)) {
+        const data = JSON.parse(fs.readFileSync(discoveriesPath, 'utf-8'));
+        const items = (data.discoveries || []).map((d: any) => ({
+          id: d.id || '',
+          name: d.name || d.id || '',
+          description: d.description || (d.observations?.[0]?.slice(0, 120)) || d.entityType || '',
+          tier: d.tier || 'quality',
+          entityType: d.entityType || 'observation',
+          observations: d.observations || [],
+          status: 'pending' as const,
+          confidence: d.confidence,
+          sourceFiles: d.sourceFiles,
+          sourceEvidence: d.sourceEvidence,
+          isContradiction: d.isContradiction || false,
+          contradiction: d.contradiction,
+        }));
+        this.postMessage({ type: 'bootstrapReviewLoaded', items });
+        return;
+      }
+
+      // Fallback: legacy JSONL path (backward compatibility)
+      const jsonlPath = path.join(projectDir, '.avt', 'knowledge-graph.jsonl');
+      if (!fs.existsSync(jsonlPath)) {
+        this.postMessage({ type: 'bootstrapReviewLoaded', items: [] });
+        return;
+      }
+
+      const content = fs.readFileSync(jsonlPath, 'utf-8');
+      const lines = content.split('\n').filter(l => l.trim());
+
+      const items: Array<{
+        id: string;
+        name: string;
+        description: string;
+        tier: 'vision' | 'architecture' | 'quality';
+        entityType: string;
+        observations: string[];
+        status: 'pending';
+      }> = [];
+
+      for (const line of lines) {
+        try {
+          const entity = JSON.parse(line);
+          if (!entity.name || !entity.entityType) continue;
+
+          let tier: 'vision' | 'architecture' | 'quality' = 'quality';
+          const pt = (entity.protectionTier || '').toLowerCase();
+          if (pt === 'vision') tier = 'vision';
+          else if (pt === 'architecture') tier = 'architecture';
+
+          const observations: string[] = entity.observations || [];
+          const description = observations[0]?.slice(0, 120) || entity.entityType;
+
+          const humanName = entity.name
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+          items.push({
+            id: entity.name,
+            name: humanName,
+            description,
+            tier,
+            entityType: entity.entityType,
+            observations,
+            status: 'pending' as const,
+          });
+        } catch {
+          // Skip malformed lines
+        }
+      }
+
+      this.postMessage({ type: 'bootstrapReviewLoaded', items });
+    } catch (err: any) {
+      console.error('Failed to load bootstrap review:', err);
+      this.postMessage({ type: 'bootstrapReviewLoaded', items: [] });
+    }
+  }
+
+  /**
+   * Finalize bootstrap review: write approved/edited items to the Knowledge Graph.
+   * Rejected items are simply not written. This is the moment items become permanent.
+   */
+  private async handleFinalizeBootstrapReview(items: Array<{
+    id: string;
+    name: string;
+    tier: string;
+    entityType: string;
+    observations: string[];
+    status: string;
+    editedObservations?: string[];
+    isUserCreated?: boolean;
+  }>): Promise<void> {
+    try {
+      const projectDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!projectDir) {
+        this.postMessage({
+          type: 'bootstrapReviewFinalized',
+          result: { success: false, approved: 0, rejected: 0, edited: 0, errors: ['No workspace folder'] },
+        });
+        return;
+      }
+
+      let approved = 0;
+      let rejected = 0;
+      let edited = 0;
+      const newLines: string[] = [];
+
+      for (const item of items) {
+        if (item.status === 'rejected') {
+          rejected++;
+          continue;
+        }
+
+        // Approved, edited, and pending items all get written
+        if (item.status === 'approved' || item.status === 'edited' || item.status === 'pending') {
+          if (item.status === 'edited') edited++;
+          else approved++;
+
+          const observations = item.editedObservations || item.observations;
+
+          // Ensure protection_tier observation exists
+          if (!observations.some(o => o.startsWith('protection_tier:'))) {
+            observations.unshift(`protection_tier: ${item.tier}`);
+          }
+
+          const entity: Record<string, unknown> = {
+            type: 'entity',
+            name: item.id,
+            entityType: item.entityType,
+            observations,
+          };
+
+          // Preserve protectionTier for KG server compatibility
+          if (item.tier) {
+            entity.protectionTier = item.tier;
+          }
+
+          newLines.push(JSON.stringify(entity));
+        }
+      }
+
+      // Append approved items to the Knowledge Graph JSONL
+      const avtDir = path.join(projectDir, '.avt');
+      if (!fs.existsSync(avtDir)) {
+        fs.mkdirSync(avtDir, { recursive: true });
+      }
+
+      const jsonlPath = path.join(avtDir, 'knowledge-graph.jsonl');
+      if (newLines.length > 0) {
+        fs.appendFileSync(jsonlPath, newLines.join('\n') + '\n', 'utf-8');
+      }
+
+      // Archive the discoveries staging file
+      const discoveriesPath = path.join(avtDir, 'bootstrap-discoveries.json');
+      if (fs.existsSync(discoveriesPath)) {
+        const archivePath = path.join(avtDir, 'bootstrap-discoveries.finalized.json');
+        fs.renameSync(discoveriesPath, archivePath);
+      }
+
+      // Add activity entry
+      this.addActivity({
+        timestamp: new Date().toISOString(),
+        type: 'bootstrap',
+        agent: 'dashboard',
+        summary: `Bootstrap review finalized: ${approved} approved, ${edited} edited, ${rejected} rejected`,
+        tier: 'quality',
+      });
+
+      this.postMessage({
+        type: 'bootstrapReviewFinalized',
+        result: { success: true, approved, rejected, edited, errors: [] },
+      });
+    } catch (err: any) {
+      console.error('Failed to finalize bootstrap review:', err);
+      this.postMessage({
+        type: 'bootstrapReviewFinalized',
+        result: { success: false, approved: 0, rejected: 0, edited: 0, errors: [String(err)] },
+      });
+    }
+  }
+
+  private async handleRequestUsageReport(period: string, groupBy: string): Promise<void> {
+    try {
+      const response = await fetch('http://localhost:3103/tools/call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'get_usage_report',
+          arguments: { period, group_by: groupBy },
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // FastMCP wraps tool results in content array
+        const report = result?.content?.[0]?.text
+          ? JSON.parse(result.content[0].text)
+          : result;
+        this.postMessage({ type: 'usageReport', report });
+      } else {
+        this.postMessage({ type: 'usageReport', report: null });
+      }
+    } catch {
+      this.postMessage({ type: 'usageReport', report: null });
     }
   }
 

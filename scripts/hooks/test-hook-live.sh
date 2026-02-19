@@ -10,6 +10,7 @@
 #   ./scripts/hooks/test-hook-live.sh                 # Level 1 (mock review)
 #   ./scripts/hooks/test-hook-live.sh --level 2       # Full governance review
 #   ./scripts/hooks/test-hook-live.sh --level 3       # Full + subagents
+#   ./scripts/hooks/test-hook-live.sh --level 4       # Session-scoped flags
 #   ./scripts/hooks/test-hook-live.sh --keep           # Preserve workspace
 #   ./scripts/hooks/test-hook-live.sh --model opus     # Use a specific model
 #
@@ -17,6 +18,7 @@
 #   1  Mock review (GOVERNANCE_MOCK_REVIEW=true). Tests interception only.
 #   2  Real governance review with real criteria. Tests approve + block paths.
 #   3  Real review + subagent delegation. Tests hook inheritance.
+#   4  Mock review + session-scoped flag file verification.
 # ============================================================================
 set -uo pipefail
 
@@ -46,7 +48,7 @@ TASK_DIR="${HOME}/.claude/tasks/${LIST_ID}"
 LOG_FILE="${PROJECT_DIR}/.avt/hook-governance.log"
 HOLISTIC_LOG_FILE="${PROJECT_DIR}/.avt/hook-holistic.log"
 DB_FILE="${PROJECT_DIR}/.avt/governance.db"
-FLAG_FILE="${PROJECT_DIR}/.avt/.holistic-review-pending"
+FLAG_PATTERN="${PROJECT_DIR}/.avt/.holistic-review-pending-*"
 CLAUDE_OUTPUT="${WORKSPACE}/claude-output.txt"
 
 mkdir -p "$WORKSPACE"
@@ -72,9 +74,9 @@ DB_GOVERNED_BEFORE=0
 DB_REVIEWS_BEFORE=0
 DB_HOLISTIC_BEFORE=0
 if [[ -f "$DB_FILE" ]]; then
-    DB_GOVERNED_BEFORE=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM governed_tasks;" 2>/dev/null || echo 0)
-    DB_REVIEWS_BEFORE=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM task_reviews;" 2>/dev/null || echo 0)
-    DB_HOLISTIC_BEFORE=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM holistic_reviews;" 2>/dev/null || echo 0)
+    DB_GOVERNED_BEFORE=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM governed_tasks;" || true)
+    DB_REVIEWS_BEFORE=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM task_reviews;" || true)
+    DB_HOLISTIC_BEFORE=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM holistic_reviews;" || true)
 fi
 
 HOLISTIC_LOG_BEFORE=0
@@ -92,11 +94,14 @@ fi
 PROMPT=$(cat "$PROMPT_FILE")
 
 # ── Environment ─────────────────────────────────────────────────────────────
+# Prevent "nested session" error when running from inside Claude Code (2.1.42+)
+unset CLAUDECODE 2>/dev/null || true
+
 export CLAUDE_CODE_TASK_LIST_ID="$LIST_ID"
 export CLAUDE_CODE_ENABLE_TASKS="true"
 export CLAUDE_PROJECT_DIR="$PROJECT_DIR"
 
-if [[ "$LEVEL" -eq 1 ]]; then
+if [[ "$LEVEL" -eq 1 || "$LEVEL" -eq 4 ]]; then
     export GOVERNANCE_MOCK_REVIEW=true
     echo "  Mock review: ENABLED (auto-approve)"
 else
@@ -108,8 +113,8 @@ echo ""
 # ── Ensure .avt directory exists ────────────────────────────────────────────
 mkdir -p "${PROJECT_DIR}/.avt"
 
-# Clean up any stale holistic review flag from previous runs
-rm -f "$FLAG_FILE" 2>/dev/null || true
+# Clean up any stale holistic review flags from previous runs (session-scoped)
+rm -f ${FLAG_PATTERN} 2>/dev/null || true
 
 # ── Run Claude ──────────────────────────────────────────────────────────────
 echo "--- Running Claude Code session ---"
@@ -169,7 +174,10 @@ check() {
 check_gte() {
     local label="$1"
     local min="$2"
-    local actual="$3"
+    local actual="${3:-0}"
+    # Sanitize: strip whitespace/newlines, default to 0 if non-numeric
+    actual=$(echo "$actual" | tr -d '[:space:]')
+    [[ "$actual" =~ ^[0-9]+$ ]] || actual=0
 
     if [[ "$actual" -ge "$min" ]]; then
         echo "  PASS  $label (expected>=$min, got=$actual)"
@@ -301,10 +309,10 @@ if [[ -f "$LOG_FILE" ]]; then
     echo "  New log entries since test start: $NEW_LOG_LINES"
 
     if [[ "$NEW_LOG_LINES" -gt 0 ]]; then
-        INTERCEPT_LOG_COUNT=$(tail -n "$NEW_LOG_LINES" "$LOG_FILE" | grep -c "Intercepting task:" 2>/dev/null || echo 0)
-        SKIP_LOG_COUNT=$(tail -n "$NEW_LOG_LINES" "$LOG_FILE" | grep -c "Skipping review task:" 2>/dev/null || echo 0)
-        PAIR_LOG_COUNT=$(tail -n "$NEW_LOG_LINES" "$LOG_FILE" | grep -c "Governance pair created:" 2>/dev/null || echo 0)
-        POSTTOOL_COUNT=$(tail -n "$NEW_LOG_LINES" "$LOG_FILE" | grep -c "PostToolUse fired" 2>/dev/null || echo 0)
+        INTERCEPT_LOG_COUNT=$(tail -n "$NEW_LOG_LINES" "$LOG_FILE" | grep -c "Intercepting task:" || true)
+        SKIP_LOG_COUNT=$(tail -n "$NEW_LOG_LINES" "$LOG_FILE" | grep -c "Skipping review task:" || true)
+        PAIR_LOG_COUNT=$(tail -n "$NEW_LOG_LINES" "$LOG_FILE" | grep -c "Governance pair created:" || true)
+        POSTTOOL_COUNT=$(tail -n "$NEW_LOG_LINES" "$LOG_FILE" | grep -c "PostToolUse fired" || true)
 
         echo "  PostToolUse fired: $POSTTOOL_COUNT"
         echo "  Interceptions logged: $INTERCEPT_LOG_COUNT"
@@ -331,8 +339,8 @@ fi
 # --- 3. Governance DB ---
 echo "-- Governance Database --"
 if [[ -f "$DB_FILE" ]]; then
-    DB_GOVERNED_AFTER=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM governed_tasks;" 2>/dev/null || echo 0)
-    DB_REVIEWS_AFTER=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM task_reviews;" 2>/dev/null || echo 0)
+    DB_GOVERNED_AFTER=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM governed_tasks;" || true)
+    DB_REVIEWS_AFTER=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM task_reviews;" || true)
 
     NEW_GOVERNED=$((DB_GOVERNED_AFTER - DB_GOVERNED_BEFORE))
     NEW_REVIEWS=$((DB_REVIEWS_AFTER - DB_REVIEWS_BEFORE))
@@ -383,6 +391,21 @@ if [[ "$LEVEL" -eq 1 ]]; then
         echo "  --- Test files ---"
         find "$WORKSPACE" -path "*/tests/test_*.py" -exec basename {} \; 2>/dev/null | sort
     fi
+elif [[ "$LEVEL" -eq 4 ]]; then
+    # Level 4: Haiku files
+    HAIKU_COUNT=$(find "$WORKSPACE" -name "haiku-*.txt" 2>/dev/null | wc -l | tr -d ' ')
+    TOTAL_FILES=$(find "$WORKSPACE" -type f -not -name ".*" 2>/dev/null | wc -l | tr -d ' ')
+
+    echo "  Total files created: $TOTAL_FILES"
+    echo "  Haiku files (haiku-*.txt): $HAIKU_COUNT"
+
+    check_gte "At least 1 work output file created" "1" "$TOTAL_FILES"
+
+    if [[ "$HAIKU_COUNT" -gt 0 ]]; then
+        echo ""
+        echo "  --- Haiku files ---"
+        find "$WORKSPACE" -name "haiku-*.txt" -exec basename {} \; 2>/dev/null | sort
+    fi
 else
     # Level 2/3: Poem anthology
     POEM_COUNT=$(find "$WORKSPACE" -path "*/poems/*.txt" 2>/dev/null | wc -l | tr -d ' ')
@@ -406,11 +429,11 @@ if [[ "$LEVEL" -ge 2 ]]; then
     echo "-- Governance Review Verdicts (Level 2+) --"
     if [[ -f "$DB_FILE" ]]; then
         APPROVED=$(sqlite3 "$DB_FILE" \
-            "SELECT count(*) FROM task_reviews WHERE status='approved';" 2>/dev/null || echo 0)
+            "SELECT count(*) FROM task_reviews WHERE status='approved';" || true)
         BLOCKED=$(sqlite3 "$DB_FILE" \
-            "SELECT count(*) FROM task_reviews WHERE status='blocked';" 2>/dev/null || echo 0)
+            "SELECT count(*) FROM task_reviews WHERE status='blocked';" || true)
         PENDING=$(sqlite3 "$DB_FILE" \
-            "SELECT count(*) FROM task_reviews WHERE status='pending';" 2>/dev/null || echo 0)
+            "SELECT count(*) FROM task_reviews WHERE status='pending';" || true)
 
         echo "  Approved: $APPROVED"
         echo "  Blocked: $BLOCKED"
@@ -444,7 +467,7 @@ if [[ -f "$DB_FILE" && "$CLAUDE_TASK_FILES" -gt 0 ]]; then
     WITH_SESSION=$(sqlite3 "$DB_FILE" \
         "SELECT count(*) FROM governed_tasks
          WHERE session_id != '' AND session_id IS NOT NULL
-         AND implementation_task_id LIKE '${LIST_ID}/%';" 2>/dev/null || echo 0)
+         AND implementation_task_id LIKE '${LIST_ID}/%';" || true)
 
     if [[ "$WITH_SESSION" -gt 0 ]]; then
         HOLISTIC_ACTIVATED="true"
@@ -465,11 +488,11 @@ if [[ "$HOLISTIC_ACTIVATED" == "true" ]]; then
         echo "  New holistic log entries: $NEW_HOLISTIC_LINES"
 
         if [[ "$NEW_HOLISTIC_LINES" -gt 0 ]]; then
-            SETTLE_STARTED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Settle checker started" 2>/dev/null || echo 0)
-            SETTLE_DEFERRED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "deferring" 2>/dev/null || echo 0)
-            SETTLE_LATEST=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "I'm the latest" 2>/dev/null || echo 0)
-            REVIEW_COMPLETED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Holistic review complete\|Mock holistic" 2>/dev/null || echo 0)
-            FLAG_REMOVED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Flag.*removed\|Flag file removed" 2>/dev/null || echo 0)
+            SETTLE_STARTED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Settle checker started" || true)
+            SETTLE_DEFERRED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "deferring" || true)
+            SETTLE_LATEST=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "I'm the latest" || true)
+            REVIEW_COMPLETED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Holistic review complete\|Mock holistic" || true)
+            FLAG_REMOVED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Flag.*removed\|Flag file removed" || true)
 
             echo "  Settle checkers started: $SETTLE_STARTED"
             echo "  Settle checkers deferred (newer tasks existed): $SETTLE_DEFERRED"
@@ -481,7 +504,7 @@ if [[ "$HOLISTIC_ACTIVATED" == "true" ]]; then
             check_gte "Holistic review completed" "1" "$REVIEW_COMPLETED"
 
             # If holistic review completed, verify individual reviews were queued
-            INDIVIDUAL_QUEUED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Individual review queued\|Individual reviews queued" 2>/dev/null || echo 0)
+            INDIVIDUAL_QUEUED=$(tail -n "$NEW_HOLISTIC_LINES" "$HOLISTIC_LOG_FILE" | grep -c "Individual review queued\|Individual reviews queued" || true)
             echo "  Individual reviews queued after holistic: $INDIVIDUAL_QUEUED"
 
             echo ""
@@ -497,7 +520,8 @@ if [[ "$HOLISTIC_ACTIVATED" == "true" ]]; then
 
     echo ""
 
-    # 7c. Flag file lifecycle
+    # 7c. Flag file lifecycle (session-scoped)
+    # Flag files are now session-scoped: .holistic-review-pending-{session_id}
     # After approved holistic review (mock or real), flag should be removed.
     # After blocked review, flag should exist with status=blocked.
     # Determine expected state from holistic review DB verdict
@@ -510,21 +534,32 @@ if [[ "$HOLISTIC_ACTIVATED" == "true" ]]; then
         fi
     fi
 
-    if [[ -f "$FLAG_FILE" ]]; then
+    # Discover session-scoped flag files
+    FLAG_COUNT=0
+    ACTIVE_FLAG=""
+    FLAG_SESSION_ID=""
+    for f in ${FLAG_PATTERN}; do
+        [[ -f "$f" ]] || continue
+        FLAG_COUNT=$((FLAG_COUNT + 1))
+        ACTIVE_FLAG="$f"
+    done
+
+    if [[ "$FLAG_COUNT" -gt 0 && -n "$ACTIVE_FLAG" ]]; then
         FLAG_STATUS=$(python3 -c "
 import json, sys
 try:
-    data = json.load(open('$FLAG_FILE'))
+    data = json.load(open('$ACTIVE_FLAG'))
     print(data.get('status', 'unknown'))
 except:
     print('unknown')
 " 2>/dev/null || echo "unknown")
-        echo "  Flag file: EXISTS (status=$FLAG_STATUS)"
+        FLAG_SESSION_ID=$(basename "$ACTIVE_FLAG" | sed 's/.holistic-review-pending-//')
+        echo "  Flag file(s): $FLAG_COUNT found (status=$FLAG_STATUS, session=$FLAG_SESSION_ID)"
         if [[ "$FLAG_STATUS" == "blocked" ]]; then
             echo "  WARN: Holistic review blocked. Tasks collectively violated standards."
             FLAG_GUIDANCE=$(python3 -c "
 import json
-data = json.load(open('$FLAG_FILE'))
+data = json.load(open('$ACTIVE_FLAG'))
 print(data.get('guidance', '(no guidance)'))
 " 2>/dev/null || echo "(could not read)")
             echo "  Guidance: $FLAG_GUIDANCE"
@@ -544,9 +579,40 @@ print(data.get('guidance', '(no guidance)'))
         fi
     fi
 
+    # 7c-extra. Verify session-scoped flag pattern (Level 4+)
+    if [[ "$LEVEL" -ge 4 ]]; then
+        # Check that old single flag file was NOT created
+        OLD_FLAG="${PROJECT_DIR}/.avt/.holistic-review-pending"
+        OLD_FLAG_STATE="absent"
+        [[ -f "$OLD_FLAG" ]] && OLD_FLAG_STATE="present"
+        check "Old single flag file NOT created" "absent" "$OLD_FLAG_STATE"
+
+        # Check that session-scoped flag was created (from hook log)
+        SCOPED_FLAG_CREATED=$(tail -n "$NEW_LOG_LINES" "$LOG_FILE" | grep -c "Flag file created/updated: session=" || true)
+        check_gte "Session-scoped flag file was created (from log)" "1" "$SCOPED_FLAG_CREATED"
+
+        # Verify flag session ID matches DB session IDs
+        # If flag was cleaned up (approved), extract session ID from hook log
+        if [[ -z "$FLAG_SESSION_ID" || "$FLAG_SESSION_ID" == "*" ]]; then
+            FLAG_SESSION_ID=$(tail -n "$NEW_LOG_LINES" "$LOG_FILE" | grep -o "session=[a-f0-9-]*" | head -1 | sed 's/session=//')
+        fi
+        if [[ -n "$FLAG_SESSION_ID" && "$FLAG_SESSION_ID" != "*" ]]; then
+            SESSION_IN_DB=$(sqlite3 "$DB_FILE" \
+                "SELECT COUNT(*) FROM governed_tasks
+                 WHERE session_id = '$FLAG_SESSION_ID'
+                 AND implementation_task_id LIKE '${LIST_ID}/%';" || true)
+            check_gte "Flag session_id matches DB records" "1" "$SESSION_IN_DB"
+        fi
+
+        # Verify governance log references session-scoped flag path
+        SCOPED_LOG_REFS=$(tail -n "$NEW_LOG_LINES" "$LOG_FILE" | grep -c "Flag file created/updated: session=" || true)
+        [[ -z "$SCOPED_LOG_REFS" ]] && SCOPED_LOG_REFS=0
+        check_gte "Governance log references session-scoped flag" "1" "$SCOPED_LOG_REFS"
+    fi
+
     # 7d. Holistic review DB record
     if [[ -f "$DB_FILE" ]]; then
-        DB_HOLISTIC_AFTER=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM holistic_reviews;" 2>/dev/null || echo 0)
+        DB_HOLISTIC_AFTER=$(sqlite3 "$DB_FILE" "SELECT count(*) FROM holistic_reviews;" || true)
         NEW_HOLISTIC=$((DB_HOLISTIC_AFTER - DB_HOLISTIC_BEFORE))
         echo "  Holistic review DB records (new): $NEW_HOLISTIC"
 
@@ -576,9 +642,9 @@ print(data.get('guidance', '(no guidance)'))
     echo ""
 
     # 7e. Gate feedback in Claude output (informational)
-    GATE_BLOCKS=$(grep -c "HOLISTIC GOVERNANCE REVIEW" "$CLAUDE_OUTPUT" 2>/dev/null || echo 0)
-    GATE_IN_PROGRESS=$(grep -c "HOLISTIC GOVERNANCE REVIEW IN PROGRESS" "$CLAUDE_OUTPUT" 2>/dev/null || echo 0)
-    GATE_BLOCKED=$(grep -c "HOLISTIC GOVERNANCE REVIEW BLOCKED" "$CLAUDE_OUTPUT" 2>/dev/null || echo 0)
+    GATE_BLOCKS=$(grep -c "HOLISTIC GOVERNANCE REVIEW" "$CLAUDE_OUTPUT" || true); GATE_BLOCKS=${GATE_BLOCKS:-0}
+    GATE_IN_PROGRESS=$(grep -c "HOLISTIC GOVERNANCE REVIEW IN PROGRESS" "$CLAUDE_OUTPUT" || true); GATE_IN_PROGRESS=${GATE_IN_PROGRESS:-0}
+    GATE_BLOCKED=$(grep -c "HOLISTIC GOVERNANCE REVIEW BLOCKED" "$CLAUDE_OUTPUT" || true); GATE_BLOCKED=${GATE_BLOCKED:-0}
     echo "  Gate block messages in Claude output: $GATE_BLOCKS"
     echo "    - In progress (waiting): $GATE_IN_PROGRESS"
     echo "    - Blocked (violation): $GATE_BLOCKED"
@@ -611,6 +677,8 @@ echo "  Holistic log entries:       $NEW_HOLISTIC_LINES"
 if [[ "$LEVEL" -eq 1 ]]; then
     echo "  Python module files:        ${PY_MODULE_COUNT:-0}"
     echo "  Python test files:          ${PY_TEST_COUNT:-0}"
+elif [[ "$LEVEL" -eq 4 ]]; then
+    echo "  Haiku files:                ${HAIKU_COUNT:-0}"
 else
     echo "  Poem files:                 ${POEM_COUNT:-0}"
 fi

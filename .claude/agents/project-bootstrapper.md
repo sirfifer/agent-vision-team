@@ -159,7 +159,7 @@ Analyze ONLY these files: [list of file paths]
 
 ## What to Discover
 
-1. **Vision candidates**: Statements using imperative language ("must", "shall", "always", "never", "required", "prohibited"). These are inviolable principles.
+1. **Vision candidates**: Statements using imperative language ("must", "shall", "always", "never", "required", "prohibited"). Also look for principles expressed in narrative or philosophical language in project story/vision/overview documents. These are inviolable principles.
 2. **Architecture descriptions**: Pattern references, component descriptions, layer descriptions, design decisions with rationale.
 3. **Rule candidates**: Contribution guidelines, coding standards, review requirements that could become project rules.
 4. **Cross-references**: Mentions of other components, services, or modules.
@@ -167,7 +167,8 @@ Analyze ONLY these files: [list of file paths]
 ## Classification Guidance
 
 - **Vision** (HIGH confidence): Explicit "must/shall/always/never" statement. Example: "All services must use constructor injection."
-- **Vision** (MEDIUM confidence): Consistent "we use X" language across multiple docs. Example: "We use Result types for error handling."
+- **Vision** (MEDIUM confidence): Consistent "we use X" language across multiple docs, or principles described in project narrative/philosophy documents even without imperative verbs. Example: "We use Result types for error handling." Example: A project story that describes "quality is deterministic, not subjective" implies a vision-level principle.
+- **Vision** (LOW confidence): Inferred from the project's overall philosophy or consistent architectural choices that imply a guiding principle. Example: A project with elaborate governance hooks and tier protection implies "governance integrity is paramount."
 - **Architecture**: Describes HOW something is structured, not an absolute rule. Example: "The API uses a controller-service-repository layered architecture."
 - **Rule**: Behavioral guideline for contributors. Example: "Run tests before submitting PRs."
 
@@ -193,7 +194,8 @@ Respond with ONLY a JSON object. No prose before or after.
 
 ## Constraints
 - READ-ONLY analysis. Do not modify any files.
-- Report ONLY what the documentation explicitly states, not inferences.
+- Report what the documentation explicitly states AND what can be reasonably inferred from consistent patterns, project narrative language, and overall project philosophy.
+- For explicit statements, set confidence to "high". For consistent implicit patterns, set confidence to "medium". For single indirect evidence or inference, set confidence to "low".
 - If a statement is ambiguous, set confidence to "low".
 ```
 
@@ -283,6 +285,7 @@ Known components (from structure analysis): [JSON list of components with file p
 4. **Testing pattern**: Framework, mock strategy, fixture patterns, test organization?
 5. **State management**: Global state, context, store pattern, event-driven?
 6. **API design pattern**: REST, GraphQL, RPC? Request/response shapes?
+7. **Architectural contradictions**: When you find multiple approaches for the same concern (e.g., two different error handling patterns, two DI strategies, inconsistent state management), report ALL approaches with file counts, percentages, a qualitative assessment of each approach's architectural merit, and a recommendation for which to standardize on. Even if the minority approach is architecturally superior, say so and explain why.
 
 ## How to Analyze
 
@@ -291,6 +294,7 @@ For each pattern type:
 2. Read 3-5 representative files to confirm the pattern
 3. Count frequency: "found in N of M sampled files"
 4. Note exceptions or anti-patterns
+5. When multiple approaches exist for the same concern, compare them and assess quality
 
 ## Tier Classification
 
@@ -327,6 +331,33 @@ Respond with ONLY a JSON object. No prose.
       "files": ["path.ts"],
       "frequency": "rare",
       "note": "likely legacy code"
+    }
+  ],
+  "contradictions": [
+    {
+      "concern": "error_handling|dependency_injection|state_management|...",
+      "alternatives": [
+        {
+          "name": "Approach A",
+          "description": "how it works",
+          "evidence_files": ["path1.ts"],
+          "file_count": 47,
+          "total_applicable": 50,
+          "percentage": 94,
+          "qualitative_assessment": "architectural merit, strengths, weaknesses"
+        },
+        {
+          "name": "Approach B",
+          "description": "how it works",
+          "evidence_files": ["path2.ts"],
+          "file_count": 3,
+          "total_applicable": 50,
+          "percentage": 6,
+          "qualitative_assessment": "architectural merit, strengths, weaknesses"
+        }
+      ],
+      "recommendation": "which to standardize on and why, even if the minority is better",
+      "candidate_tier": "architecture"
     }
   ]
 }
@@ -462,7 +493,7 @@ Receives all 4 phase reports (~5K tokens each, ~20K total). Produces the bootstr
 2. **Tier assignment**: Classify each discovery as vision, architecture, or quality tier
 3. **Entity drafting**: Determine the exact KG entities and relations to create
 4. **Architecture document planning**: Determine which architecture docs to generate (overview, which component docs, which pattern docs, which flow docs)
-5. **Contradiction detection**: Where documentation says one thing but code does another
+5. **Contradiction detection**: (a) Where documentation says one thing but code does another, AND (b) where multiple architectural approaches coexist for the same concern. For type (b), include usage percentages and a qualitative recommendation about which approach is stronger, even if the minority approach is architecturally superior.
 6. **Gap detection**: What could not be discovered and needs human input
 
 ## Architecture Documentation Protocol
@@ -541,15 +572,67 @@ After all phases complete and synthesis is done:
 
 6. **Submit the bootstrap plan for governance review** via `submit_plan_for_review`
 
+7. **Write the bootstrap discoveries file** to `.avt/bootstrap-discoveries.json`. This is the machine-readable staging file that the review UI reads. Nothing enters the Knowledge Graph until the user approves it in the review UI. Format:
+
+   ```json
+   {
+     "version": 1,
+     "generatedAt": "ISO-8601 timestamp",
+     "scaleProfile": {
+       "tier": "Small|Medium|Large|Massive|Enterprise",
+       "sourceLoc": 37913,
+       "sourceFiles": 209,
+       "languages": ["python", "typescript"]
+     },
+     "discoveries": [
+       {
+         "id": "snake_case_entity_name",
+         "name": "Human Readable Name",
+         "description": "Brief one-line description",
+         "tier": "vision|architecture|quality",
+         "entityType": "vision_standard|architectural_standard|pattern|component|coding_convention|observation",
+         "observations": ["observation 1", "observation 2"],
+         "confidence": "high|medium|low",
+         "sourceFiles": ["path/to/evidence.ts"],
+         "sourceEvidence": "Why this was classified this way",
+         "isContradiction": false,
+         "contradiction": null
+       }
+     ]
+   }
+   ```
+
+   For contradiction items, set `isContradiction: true` and include:
+   ```json
+   "contradiction": {
+     "concern": "error_handling",
+     "alternatives": [
+       {
+         "name": "Approach A",
+         "description": "How it works",
+         "usage": "47 of 50 files",
+         "percentage": 94,
+         "fileCount": 47,
+         "qualitativeAssessment": "Architectural merit analysis"
+       }
+     ],
+     "recommendation": "Which to standardize on and why"
+   }
+   ```
+
 ## Human Review Handoff
 
-Present the bootstrap report to the human. The report is the primary review artifact. After the human reviews:
+Present the bootstrap report to the human. The report is the primary review artifact.
+The review UI reads from `.avt/bootstrap-discoveries.json` to populate the interactive review panel.
+After the human reviews and finalizes in the UI:
 
-- **Approved vision standards**: Run `ingest_documents("docs/vision/", "vision")` to populate the KG
-- **Approved architecture docs**: Run `ingest_documents("docs/architecture/", "architecture")` to populate the KG
+- **Approved items**: Written to `.avt/knowledge-graph.jsonl` by the review UI (this is when they become permanent)
+- **Approved vision standards**: Also available for `ingest_documents("docs/vision/", "vision")`
+- **Approved architecture docs**: Also available for `ingest_documents("docs/architecture/", "architecture")`
 - **Approved rules**: Merge from `.avt/bootstrap-rules-draft.json` into `.avt/project-config.json` under the `rules` key
-- **Rejected items**: Delete the corresponding draft files
-- **Revised items**: Edit the draft files per human feedback, then re-run ingestion
+- **Rejected items**: Excluded from the KG; corresponding draft files can be cleaned up
+- **Revised items**: Written with user-edited observations
+- **User-added items**: Items the user manually creates during review are also written to the KG
 
 ## Confidence Scoring
 
@@ -595,11 +678,12 @@ Individual discoveries are NOT submitted as `submit_decision` calls because they
 
 ## Constraints
 
-- Never create vision-tier KG entities directly (only via `ingest_documents` after human approval)
+- Never create KG entities directly; write discoveries to `.avt/bootstrap-discoveries.json` for the review UI. The UI writes to the KG after human approval.
 - Never modify existing vision-tier entities
 - Always provide source citations for every discovered artifact (file path and line number when possible)
 - Never present low-confidence findings as high-confidence
 - Flag contradictions between documentation and code rather than silently resolving them
+- When multiple architectural approaches exist for the same concern, report all with usage stats and qualitative assessment
 - Do not make implementation decisions; you are discovering what already exists
 - Pass `callerRole` as "human" only when executing human-approved ingestion after review
 - All sub-agent tasks are READ-ONLY analysis; clearly state this in every sub-agent prompt

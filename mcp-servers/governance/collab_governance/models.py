@@ -141,6 +141,25 @@ class GovernedTaskRecord(BaseModel):
     released_at: Optional[str] = None
 
 
+class UsageRecord(BaseModel):
+    """Token usage tracking for AI review invocations."""
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    timestamp: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+    session_id: str = ""
+    agent: str = "governance-reviewer"
+    operation: str = ""  # review_decision, review_plan, review_completion, review_task_group, hook_review
+    model: str = ""  # sonnet, opus, haiku
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_creation_tokens: int = 0
+    duration_ms: int = 0
+    related_id: str = ""  # decision_id, review_id, or task_id
+    prompt_bytes: int = 0
+
+
 class HolisticReviewRecord(BaseModel):
     """Record of a holistic review evaluating multiple tasks collectively."""
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])

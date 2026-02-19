@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, ResearchBriefInfo, BootstrapScaleProfile } from '../types';
+import type { DashboardData, WebviewMessage, ProjectConfig, SetupReadiness, DocumentInfo, IngestionResult, ResearchPrompt, ResearchBriefInfo, BootstrapScaleProfile, BootstrapActivity, BootstrapReviewItem, BootstrapFinalizationResult } from '../types';
 import { useTransport } from '../hooks/useTransport';
 import { DEMO_DATA } from '../data/demoData';
 
@@ -52,6 +52,12 @@ interface DashboardContextValue {
   showBootstrap: boolean;
   setShowBootstrap: (show: boolean) => void;
   bootstrapScaleProfile: BootstrapScaleProfile | null;
+  bootstrapRunning: boolean;
+  bootstrapProgress: { phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] } | null;
+  bootstrapResult: { success: boolean; reportPath?: string; error?: string } | null;
+  // Bootstrap review
+  bootstrapReviewItems: BootstrapReviewItem[] | null;
+  bootstrapReviewResult: BootstrapFinalizationResult | null;
   // Demo mode
   demoMode: boolean;
 }
@@ -104,6 +110,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   // Bootstrap state
   const [showBootstrap, setShowBootstrap] = useState(false);
   const [bootstrapScaleProfile, setBootstrapScaleProfile] = useState<BootstrapScaleProfile | null>(null);
+  const [bootstrapRunning, setBootstrapRunning] = useState(false);
+  const [bootstrapProgress, setBootstrapProgress] = useState<{ phase: string; detail: string; percent?: number; activities?: BootstrapActivity[] } | null>(null);
+  const [bootstrapResult, setBootstrapResult] = useState<{ success: boolean; reportPath?: string; error?: string } | null>(null);
+
+  // Bootstrap review state
+  const [bootstrapReviewItems, setBootstrapReviewItems] = useState<BootstrapReviewItem[] | null>(null);
+  const [bootstrapReviewResult, setBootstrapReviewResult] = useState<BootstrapFinalizationResult | null>(null);
 
   // Demo mode state
   const [demoMode, setDemoMode] = useState(false);
@@ -247,7 +260,23 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           setBootstrapScaleProfile(msg.profile);
           break;
         case 'bootstrapStarted':
-          setShowBootstrap(false);
+          setBootstrapRunning(true);
+          setBootstrapResult(null);
+          setBootstrapProgress({ phase: 'Starting', detail: 'Initializing bootstrap agent...' });
+          break;
+        case 'bootstrapProgress':
+          setBootstrapProgress({ phase: msg.phase, detail: msg.detail, percent: msg.percent, activities: msg.activities });
+          break;
+        case 'bootstrapComplete':
+          setBootstrapRunning(false);
+          setBootstrapResult({ success: msg.success, reportPath: msg.reportPath, error: msg.error });
+          setBootstrapProgress(null);
+          break;
+        case 'bootstrapReviewLoaded':
+          setBootstrapReviewItems(msg.items);
+          break;
+        case 'bootstrapReviewFinalized':
+          setBootstrapReviewResult(msg.result);
           break;
       }
     };
@@ -293,6 +322,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       showTutorial, setShowTutorial,
       showBootstrap, setShowBootstrap,
       bootstrapScaleProfile,
+      bootstrapRunning,
+      bootstrapProgress,
+      bootstrapResult,
+      bootstrapReviewItems,
+      bootstrapReviewResult,
       demoMode,
     }}>
       {children}
