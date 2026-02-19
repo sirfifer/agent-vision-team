@@ -1,8 +1,0 @@
-{
-  "session_id": "8544804d-30f0-47ce-b9b1-acdd073663e8",
-  "transcript_path": "/Users/ramerman/.claude/projects/-private-tmp-avt-stop-hook-exp-uRpkPK/8544804d-30f0-47ce-b9b1-acdd073663e8.jsonl",
-  "cwd": "/private/tmp/avt-stop-hook-exp-uRpkPK",
-  "permission_mode": "bypassPermissions",
-  "hook_event_name": "Stop",
-  "stop_hook_active": false
-}
