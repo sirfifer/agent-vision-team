@@ -188,10 +188,14 @@ Hooks are configured in `.claude/settings.json`:
 #### 1. Install Dependencies
 
 ```bash
+# Everything at once (recommended)
+npm run setup
+
+# Or manually:
 # MCP Servers
-cd mcp-servers/knowledge-graph && uv sync
-cd mcp-servers/quality && uv sync
-cd mcp-servers/governance && uv sync
+cd mcp-servers/knowledge-graph && uv sync --dev
+cd mcp-servers/quality && uv sync --dev
+cd mcp-servers/governance && uv sync --dev
 
 # Gateway (optional, for remote mode)
 cd server && uv sync
@@ -203,13 +207,19 @@ cd extension && npm install
 #### 2. Run Tests
 
 ```bash
-# Unit tests
-cd mcp-servers/knowledge-graph && uv run pytest   # 18 tests, 74% coverage
-cd mcp-servers/quality && uv run pytest            # 26 tests, 48% coverage
-cd extension && npm test                           # 9 unit tests
+# All tests via unified script
+npm test
+
+# Or individually:
+npm run test -- --component knowledge-graph   # 18 tests
+npm run test -- --component quality           # 26 tests
+npm run test -- --component hooks             # 37 assertions
 
 # E2E (exercises all 3 servers, 14 scenarios, 292 assertions)
-./e2e/run-e2e.sh
+npm run test:e2e
+
+# Full quality check (lint + typecheck + build + test + coverage)
+npm run check
 ```
 
 See [E2E Testing Harness documentation](e2e/README.md) for details, options, and debugging guidance.
@@ -283,6 +293,16 @@ agent-vision-team/
 │   ├── entrypoint.sh           # Multi-service startup script
 │   └── nginx.conf              # Reverse proxy configuration
 ├── scripts/
+│   ├── ci/                     # CI/CD and local quality scripts (backbone of all checks)
+│   │   ├── setup.sh            # Install all dependencies (npm + uv)
+│   │   ├── lint.sh             # ESLint + Prettier + Ruff (--fix flag supported)
+│   │   ├── typecheck.sh        # tsc --noEmit for extension + webview
+│   │   ├── build.sh            # Build extension + webview dashboard
+│   │   ├── test.sh             # Run unit tests (--component flag for individual)
+│   │   ├── coverage.sh         # Coverage with threshold enforcement (--skip-extension)
+│   │   ├── test-e2e.sh         # E2E test wrapper
+│   │   ├── test-hooks.sh       # Hook unit test wrapper
+│   │   └── check-all.sh        # Full pipeline: lint → typecheck → build → test → coverage
 │   └── hooks/                  # Claude Code lifecycle hooks
 │       ├── governance-task-intercept.py  # PostToolUse: auto-governance on task creation
 │       ├── holistic-review-gate.sh      # PreToolUse: coordinate work during holistic review
@@ -304,12 +324,19 @@ agent-vision-team/
 │   ├── governance.db           # Governance decisions + holistic reviews (SQLite)
 │   ├── .holistic-review-pending # Flag file (transient, coordinates work during review)
 │   └── seen-todos.json         # TodoWrite hash tracking (for hook diffing)
+├── .github/workflows/ci.yml    # GitHub Actions CI pipeline
+├── .husky/                     # Git hooks (Husky v9)
+│   ├── pre-commit              # Lint + format staged files via lint-staged (~2-5s)
+│   └── pre-push                # Typecheck + build + test + coverage (~30-60s)
 ├── .devcontainer/              # GitHub Codespaces configuration
 ├── extension/                  # VS Code extension (local mode, optional)
 ├── templates/                  # Installation templates for target projects
 ├── docs/
 │   ├── project-overview.md     # Project overview
 │   └── v1-full-architecture/   # Archived v1 design documents
+├── .eslintrc.json              # ESLint config for TypeScript (in extension/)
+├── .prettierrc.json            # Prettier config (root)
+├── ruff.toml                   # Ruff config for Python (root)
 ├── docker-compose.yml          # Container deployment config
 ├── COLLABORATIVE_INTELLIGENCE_VISION.md  # System vision (principles, topology)
 ├── ARCHITECTURE.md             # Technical architecture specification
@@ -406,6 +433,15 @@ Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governa
 - API-key authentication (auto-generated bearer token)
 - Zero changes to MCP servers, hooks, or agents
 
+### CI/CD and Local Quality (Complete)
+
+- Unified CI scripts (`scripts/ci/`) as the backbone for all checks
+- ESLint + Prettier (TypeScript) and Ruff (Python) for linting/formatting
+- Pre-commit hooks (Husky + lint-staged) for lint on commit
+- Pre-push hooks for typecheck + build + test + coverage on push
+- GitHub Actions CI pipeline on every push to every branch
+- Coverage enforcement (30% threshold, target 80%)
+
 ### Phase 6: Expand
 
 - [ ] Cross-project memory
@@ -466,51 +502,98 @@ Dashboard webview, 9-step wizard, 10-step tutorial, VS Code walkthrough, governa
 
 See [e2e/README.md](e2e/README.md) for complete documentation.
 
+## CI/CD and Local Quality Infrastructure
+
+The same scripts run locally and in CI. Pre-commit hooks catch lint/format issues before they leave your machine. Pre-push hooks run the full quality pipeline. GitHub Actions mirrors everything on every push.
+
+```
+Developer writes code
+  → Pre-commit (lint + format on staged files, ~2-5s)
+  → Pre-push (typecheck + build + test + coverage, ~30-60s)
+  → GitHub Actions CI on every push (same scripts + E2E)
+  → PR review (should have minimal issues by this point)
+```
+
+### Local Quality Scripts
+
+All scripts live in `scripts/ci/` and are aliased in `package.json`:
+
+| Command | What It Does |
+|---------|-------------|
+| `npm run setup` | Install all dependencies (npm ci + uv sync --dev) |
+| `npm run lint` | ESLint (TypeScript) + Prettier + Ruff (Python) |
+| `npm run lint:fix` | Auto-fix lint and format issues |
+| `npm run typecheck` | tsc --noEmit for extension + webview |
+| `npm run build` | Build webview dashboard + extension |
+| `npm test` | Run all unit tests (Python + hooks) |
+| `npm run coverage` | Coverage with threshold enforcement |
+| `npm run check` | Full pipeline: lint, typecheck, build, test, coverage |
+| `npm run test:e2e` | E2E test suite (14 scenarios, 292+ assertions) |
+
+### Git Hooks (Husky + lint-staged)
+
+- **Pre-commit**: Runs `lint-staged` on staged files only. ESLint + Prettier for TypeScript, Ruff for Python. Fast (~2-5s).
+- **Pre-push**: Runs typecheck, build, Python tests, hook tests, and coverage. Blocks push on failure with clear error reporting. Extension tests are skipped locally (require xvfb) and run in CI.
+
+### GitHub Actions
+
+The CI pipeline (`.github/workflows/ci.yml`) runs on every push to every branch:
+- **Parallel jobs**: lint, typecheck, test-python (matrix: 3 servers), test-hooks
+- **Sequential**: build (after typecheck), extension tests (after build, with xvfb), coverage (after all tests), E2E (after build + Python tests)
+- Coverage artifacts uploaded with 30-day retention
+
+### Linting and Formatting
+
+| Tool | Scope | Config |
+|------|-------|--------|
+| ESLint | `extension/src/**/*.ts` | `extension/.eslintrc.json` |
+| Prettier | TypeScript, JSON | `.prettierrc.json` |
+| Ruff | All Python code | `ruff.toml` (target py312, line-length 120) |
+
 ## Test Coverage
 
 ### Summary
 
 | Component | Tests | Coverage | Status |
 |-----------|-------|----------|--------|
-| Knowledge Graph | 18 | 74% | All passing |
-| Quality Server | 26 | 48% | All passing |
-| Extension (Unit) | 9 | N/A | All passing |
+| Knowledge Graph | 18 | 36% | All passing |
+| Quality Server | 26 | 41% | All passing |
+| Hook Unit Tests | 37 assertions | N/A | All passing |
 | E2E Harness | 14 scenarios / 292 assertions | N/A | All passing |
-| **Total** | **53 unit + 14 E2E scenarios** | -- | **All passing** |
+| **Total** | **44 unit + 37 hook + 14 E2E scenarios** | -- | **All passing** |
 
 ### Detailed Coverage
 
-**Knowledge Graph (74% overall)**:
+**Knowledge Graph (36% overall)**:
 - graph.py: 98% (core logic)
 - storage.py: 98% (persistence)
 - models.py: 100%
 - tier_protection.py: 84%
-- server.py: 0% (MCP integration points, expected)
+- server.py, ingestion.py, archival.py, curation.py: 0% (MCP integration/CLI entry points)
 
-**Quality Server (48% overall)**:
-- trust_engine.py: 100%
+**Quality Server (41% overall)**:
+- trust_engine.py: 89%
 - models.py: 100%
 - formatting.py: 72%
 - linting.py: 58%
+- config.py: 41%
 - testing.py: 13% (branches requiring external tools)
-- coverage.py: 18% (branches requiring external tools)
-- server.py: 0% (MCP integration points, expected)
-- gates.py: 0% (would require pytest recursion)
+- coverage.py: 22% (branches requiring external tools)
+- server.py, gates.py, storage.py: 0% (MCP integration points)
 
-**Extension (Unit Tests)**:
-- McpClientService: 3 unit tests + 3 integration (skipped)
-- MemoryTreeProvider: 4 tests (100% coverage)
-- KnowledgeGraphClient: 1 unit + 7 integration (skipped)
-- QualityClient: 1 unit + 8 integration (skipped)
-
-**Integration Tests**: 18 integration tests defined but skipped by default (require live servers).
+**Hook Unit Tests (37 assertions)**:
+- teammate-idle-gate.sh: 7 checks
+- task-completed-gate.sh: 9 checks
+- holistic-review-gate.sh: 12 checks
+- verify-governance-review.sh: 4 checks
+- governance-task-intercept.py parsing: 5 checks
 
 ### Coverage Notes
 
-- **Server.py files**: 0% coverage is expected - these are MCP FastMCP server entry points tested via integration tests
-- **Tool execution branches**: Lower coverage for quality tools is due to branches requiring external tools (ruff, eslint, pytest) to be installed
-- **Gates.py**: 0% coverage to avoid pytest recursion in tests
-- **Core Business Logic**: 98%+ coverage for graph logic, storage, trust engine, and models
+- **Current threshold**: 30% (enforced in CI and pre-push hook). Target: 80%.
+- **Server.py files**: 0% coverage is expected; these are MCP FastMCP server entry points tested via E2E
+- **Governance server**: 0% unit test coverage; tested exclusively via E2E scenarios (s02, s03, s05, s08, s09, s10, s12)
+- **Core Business Logic**: 98%+ coverage for graph logic, storage, and models
 
 See individual server READMEs for detailed test documentation:
 - [Knowledge Graph Testing](mcp-servers/knowledge-graph/README.md#testing)
@@ -524,23 +607,18 @@ Complete end-to-end validation guide: [.claude/VALIDATION.md](.claude/VALIDATION
 ### Quick Validation
 
 ```bash
-# 1. Run unit tests
-cd mcp-servers/knowledge-graph && uv run pytest
-cd mcp-servers/quality && uv run pytest
-cd extension && npm test
+# Full quality pipeline (lint + typecheck + build + test + coverage)
+npm run check
 
-# 2. Run E2E tests (exercises all 3 MCP servers via library import)
-./e2e/run-e2e.sh
+# Or step by step:
+npm run lint          # ESLint + Prettier + Ruff
+npm run typecheck     # tsc --noEmit
+npm run build         # Build extension + webview
+npm test              # Unit tests + hook tests
+npm run coverage      # Coverage with threshold enforcement
 
-# 3. Start MCP servers (for live usage)
-cd mcp-servers/knowledge-graph && uv run python -m collab_kg.server &
-cd mcp-servers/quality && uv run python -m collab_quality.server &
-cd mcp-servers/governance && uv run python -m collab_governance.server &
-
-# 4. Verify server health
-curl http://localhost:3101/health
-curl http://localhost:3102/health
-curl http://localhost:3103/health
+# E2E tests (exercises all 3 MCP servers via library import)
+npm run test:e2e
 ```
 
 ## Contributing

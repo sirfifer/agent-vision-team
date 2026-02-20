@@ -48,6 +48,7 @@ The system operates in two modes. In its **embedded mode**, the dashboard runs a
 | **AVT Gateway (Web Mode)** | FastAPI HTTP/WebSocket gateway serving the dashboard as a standalone web application, with dual-mode transport abstraction, API-key authentication, and real-time event push |
 | **Multi-Project Management** | Per-project MCP server isolation with dynamic port allocation, global project registry (`~/.avt/projects.json`), project lifecycle management (add/start/stop/remove) |
 | **Docker Deployment** | Containerized stack: Python 3.12, Node.js 22, Claude Code CLI, Nginx reverse proxy with TLS, auto-start MCP servers and Gateway |
+| **CI/CD and Local Quality** | Unified script layer (`scripts/ci/`), pre-commit hooks (Husky + lint-staged for lint/format), pre-push hooks (typecheck + build + test + coverage), GitHub Actions CI pipeline on every push, ESLint + Prettier (TypeScript), Ruff (Python), coverage enforcement |
 | **CLAUDE.md Orchestration Protocol** | Orchestrator instructions defining task decomposition, governance checkpoints, quality review, memory curation |
 | **Research System** | Research prompts, researcher agent (dual-mode), research briefs |
 | **Session Management** | Checkpoints via git tags, session state in `.avt/session-state.md`, worktree isolation |
@@ -56,8 +57,7 @@ The system operates in two modes. In its **embedded mode**, the dashboard runs a
 
 | Exclusion | Rationale |
 |-----------|-----------|
-| External CI/CD pipelines | All quality gates run locally via MCP servers |
-| External cloud services (beyond Claude) | AI inference uses Anthropic's cloud via Claude Code Max; no additional cloud services |
+| External cloud services (beyond Claude and GitHub) | AI inference uses Anthropic's cloud via Claude Code Max; CI uses GitHub Actions; no additional cloud services |
 | API key management | No API keys required (Claude Code Max subscription model) |
 | External authentication | Single-developer workflow; Gateway uses auto-generated API key, not external auth providers |
 | Multi-user collaboration | Gateway serves one developer at a time per project; no concurrent multi-user sessions |
@@ -4449,6 +4449,13 @@ This separation ensures:
 | **Containerization** | Docker | — | Single-image deployment with Python, Node.js, MCP servers, Gateway, Nginx |
 | **E2E Testing** | Python + ThreadPoolExecutor + Pydantic | Python >=3.12, Pydantic >=2.0.0 | Parallel scenario execution with isolation and typed assertions |
 | **Build System** | Hatchling | Latest | Python package builds for all MCP servers and E2E harness |
+| **CI/CD** | GitHub Actions | — | Runs on every push to every branch; parallel jobs with matrix strategy |
+| **Git Hooks** | Husky v9 + lint-staged | Husky >=9.0.0, lint-staged >=15.0.0 | Pre-commit (lint/format staged files), pre-push (typecheck + build + test + coverage) |
+| **TS Linting** | ESLint + @typescript-eslint | ESLint >=8.57.0 | TypeScript lint with recommended rules |
+| **TS Formatting** | Prettier | >=3.0.0 | Consistent code formatting for TypeScript and JSON |
+| **Python Linting/Formatting** | Ruff | Latest | Lint (E, F, W, I rules) + format (py312, line-length 120) |
+| **TS Coverage** | c8 | >=10.0.0 | V8-based code coverage for extension tests |
+| **Python Coverage** | pytest-cov | >=6.0.0 | Coverage enforcement for MCP server tests |
 | **Version Control** | Git + worktrees | — | Code state management, worker isolation via branches |
 | **Package Management** | npm (extension + webview), uv (Python servers + E2E + Gateway) | — | Standard per ecosystem |
 | **OS** | macOS (Darwin) | — | Primary developer platform |
@@ -4510,6 +4517,7 @@ This section replaces the v1 "Implementation Phases" checklist, which listed unc
 | E2E Test Harness | **Operational** | 14 scenarios (s01-s14), 292+ structural domain-agnostic assertions, parallel execution with full isolation, random domain generation from 8 templates, mock review mode |
 | CLAUDE.md Orchestration | **Operational** | Core orchestrator instructions (~284 lines after skills extraction). 8 on-demand skills in `.claude/skills/` for detailed protocol docs. Agent Teams as primary mechanism with fallback to Task-tool subagents |
 | AVT Gateway (Web Mode) | **Operational** | FastAPI HTTP/WebSocket gateway, dual-mode transport abstraction, multi-project management with per-project MCP isolation, API-key authentication, Docker containerization with Nginx TLS proxy |
+| CI/CD Pipeline | **Operational** | Unified scripts (`scripts/ci/`), pre-commit hooks (Husky + lint-staged), pre-push hooks (typecheck + build + test + coverage with clear error reporting), GitHub Actions on every push (parallel jobs, matrix strategy for Python tests, xvfb for extension tests), ESLint + Prettier (TypeScript), Ruff (Python), coverage enforcement at 30% (target 80%) |
 
 ### 18.2 Known Gaps
 
@@ -4555,6 +4563,7 @@ For historical context, the following summarizes what the v1 "Implementation Pha
 | **Phase 2: Create Subagents + Validate E2E** | 3 agents (worker, quality-reviewer, kg-librarian), CLAUDE.md orchestration, settings.json hooks, end-to-end validation | 8 agents (added governance-reviewer, researcher, project-steward, architect, project-bootstrapper), full CLAUDE.md orchestration with Agent Teams primary, 5 lifecycle hooks, session-scoped holistic review, on-demand skills extraction, end-to-end workflow validated |
 | **Phase 3: Build Extension as Monitoring Layer** | MCP clients, TreeView wiring, file watchers, diagnostics, dashboard, status bar | 3 MCP clients, 4 TreeViews, dashboard webview with React 19, 9-step wizard, 10-step tutorial, VS Code walkthrough, governance panel, research prompts panel, 15 commands (12 user-facing, 3 internal). Scope significantly exceeded plan |
 | **Phase 4: Expand and Harden** | Event logging, cross-project memory, multi-worker parallelism, FastMCP 3.0 migration, installation script | E2E test harness (14 scenarios, 292+ assertions), full governance system (not in original plan), research system (not in original plan), project hygiene system (not in original plan), AVT Gateway with headless web mode and multi-project management (not in original plan). Cross-project memory and FastMCP migration remain future items |
+| **CI/CD Pipeline** | Not in original plan | Unified CI scripts (`scripts/ci/`), pre-commit hooks (Husky + lint-staged), pre-push hooks with clear error reporting, GitHub Actions on every push, ESLint + Prettier + Ruff, coverage enforcement. "Same scripts locally and in CI" philosophy |
 
 ---
 
@@ -4574,17 +4583,25 @@ The E2E test harness is the primary verification mechanism for all three MCP ser
 **How to run:**
 
 ```bash
+# Via CI script (recommended):
+npm run test:e2e              # Wrapper around e2e/run-e2e.sh
+
+# Or directly:
 ./e2e/run-e2e.sh              # Standard run (workspace cleaned up after)
 ./e2e/run-e2e.sh --keep       # Preserve workspace for debugging
 ./e2e/run-e2e.sh --seed 42    # Reproducible project generation
 ./e2e/run-e2e.sh --verbose    # Enable debug logging
+
+# Full local quality pipeline (lint + typecheck + build + test + coverage):
+npm run check
 ```
 
 Or use the `/e2e` skill from within Claude Code.
 
 **When to run:**
+- The pre-push hook runs unit tests and coverage automatically on every push
+- E2E tests run in CI on every push via GitHub Actions
 - After modifying any MCP server code (catches contract drift)
-- Before significant releases (confirms all three servers work together)
 - After governance or task system changes (scenarios s03, s08, s10 specifically test the governed task flow)
 - Periodically (random domain selection means each run is a genuine uniqueness test)
 

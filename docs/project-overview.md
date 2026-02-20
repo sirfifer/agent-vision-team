@@ -2,7 +2,7 @@
 
 > A platform-native multi-agent system for software development built on Claude Code, providing tier-protected institutional memory, transactional governance, and deterministic quality verification through three MCP servers, eight specialized agents, Agent Teams orchestration, a five-hook verification layer, and a standalone web gateway for remote operation.
 
-**Last Updated**: 2026-02-14
+**Last Updated**: 2026-02-19
 
 ---
 
@@ -631,6 +631,10 @@ The KG Librarian syncs important graph entries to human-readable files:
 | E2E Testing | Python + Pydantic + ThreadPoolExecutor | Autonomous scenario-based testing |
 | Quality Tools | ruff, eslint, prettier, swiftlint, clippy, pytest | Deterministic verification |
 | AI Models | Opus 4.6 (judgment), Sonnet 4.5 (routine) | Capability-first model routing |
+| CI/CD | GitHub Actions + Husky + lint-staged | Same scripts locally and in CI; pre-commit lint, pre-push test |
+| TS Linting | ESLint + Prettier | TypeScript lint and format (`extension/.eslintrc.json`, `.prettierrc.json`) |
+| Python Linting | Ruff | Lint + format (`ruff.toml`, target py312, line-length 120) |
+| Coverage | pytest-cov (Python), c8 (TypeScript) | Threshold enforcement (30% current, 80% target) |
 | Container | Docker + docker-compose | Standalone deployment, GitHub Codespaces support |
 | Package Management | npm (extension), uv (Python servers + gateway) | Standard per ecosystem |
 | Version Control | Git + worktrees | Code state, worker isolation, checkpoints |
@@ -650,9 +654,13 @@ The KG Librarian syncs important graph entries to human-readable files:
 #### Install Dependencies
 
 ```bash
-cd mcp-servers/knowledge-graph && uv sync
-cd mcp-servers/quality && uv sync
-cd mcp-servers/governance && uv sync
+# Everything at once (recommended)
+npm run setup
+
+# Or manually:
+cd mcp-servers/knowledge-graph && uv sync --dev
+cd mcp-servers/quality && uv sync --dev
+cd mcp-servers/governance && uv sync --dev
 
 # Optional: extension
 cd extension && npm install
@@ -718,15 +726,20 @@ Deploy on any machine with Docker (DigitalOcean, Hetzner, AWS Lightsail). Use `d
 ### Run Tests
 
 ```bash
-# Unit tests
-cd mcp-servers/knowledge-graph && uv run pytest   # 18 tests
-cd mcp-servers/quality && uv run pytest            # 19 tests
-cd extension && npm test                           # 9 unit tests
+# Full quality pipeline (recommended)
+npm run check           # lint + typecheck + build + test + coverage
+
+# Or individually:
+npm run lint            # ESLint + Prettier + Ruff
+npm run typecheck       # tsc --noEmit
+npm run build           # Build extension + webview
+npm test                # All unit tests + hook tests
+npm run coverage        # Coverage with threshold enforcement
 
 # E2E (exercises all 3 servers, 14 scenarios, 292+ assertions)
-./e2e/run-e2e.sh
+npm run test:e2e
 
-# Hook live tests
+# Hook live tests (integration, requires Claude Code)
 ./scripts/hooks/test-hook-live.sh --level 1       # mock interception
 ./scripts/hooks/test-hook-live.sh --level 4       # session-scoped flags
 
@@ -753,7 +766,7 @@ These principles, drawn from the system's development, govern how it's built and
 
 ## Current Status
 
-All five implementation phases are complete, plus an Agent Teams adaptation:
+All five implementation phases are complete, plus an Agent Teams adaptation and CI/CD infrastructure:
 
 - **Phase 1** (MCP Servers): KG with JSONL persistence and tier protection, Quality with trust engine and multi-language tool wrapping, Governance with transactional review and governed tasks
 - **Phase 2** (Subagents + Validation): Eight agent definitions, orchestrator CLAUDE.md, settings and hooks
@@ -761,8 +774,9 @@ All five implementation phases are complete, plus an Agent Teams adaptation:
 - **Phase 4** (Governance + E2E): Governance server, governed task system, AI-powered review, holistic collective-intent review with two-layer assurance, E2E harness with 14 scenarios and 292+ assertions
 - **Phase 5** (Remote Operation): AVT Gateway (FastAPI, 35 REST endpoints, WebSocket push, job runner), dual-mode React dashboard, container packaging (Docker, Codespaces), mobile-responsive layout
 - **Agent Teams Adaptation**: Five-hook verification layer (PostToolUse, PreToolUse, TeammateIdle, TaskCompleted), session-scoped holistic review flag files, token usage tracking with dashboard panel, CLAUDE.md skills refactor (963 -> 284 lines), KG client TTL caching
+- **CI/CD Pipeline**: Unified script layer (`scripts/ci/`), pre-commit hooks (Husky + lint-staged for lint/format), pre-push hooks (typecheck + build + test + coverage with clear error reporting), GitHub Actions on every push to every branch (parallel jobs, matrix strategy), ESLint + Prettier (TypeScript), Ruff (Python), coverage enforcement
 
-**Total test assertions**: 37 unit + 15 MCP + 13 capability + 292 E2E = 357 assertions
+**Total test assertions**: 44 unit + 37 hook + 15 MCP + 13 capability + 292 E2E = 401 assertions
 
 **Planned**: Cross-project memory, multi-worker parallelism patterns, installation script for target projects, native `.claude/agents/` teammate loading (blocked on Issue #24316).
 
