@@ -26,7 +26,9 @@ graph LR
 |------|-------|--------|---------|
 | PostToolUse:TaskCreate | TaskCreate | `governance-task-intercept.py` | Pair tasks with governance review |
 | PreToolUse:Write,Edit,Bash,Task | Mutation tools | `holistic-review-gate.sh` | Block during holistic review |
+| PreToolUse:Write,Edit,Bash,Task | Mutation tools | `context-reinforcement.py` | Inject session context and vision/architecture reminders after tool call threshold |
 | PreToolUse:ExitPlanMode | ExitPlanMode | `verify-governance-review.sh` | Verify plans before presentation |
+| SessionStart:compact | Compaction | `post-compaction-reinject.sh` | Restore session context and vision standards after context compaction |
 | TeammateIdle | Teammate idle | `teammate-idle-gate.sh` | Prevent idle with pending obligations |
 | TaskCompleted | Task completion | `task-completed-gate.sh` | Enforce governance gates |
 
@@ -35,4 +37,6 @@ graph LR
 - Fast-path exit when not applicable (~1ms overhead)
 - Never crash; fail silently with best-effort logging
 - Session-scoped via session_id from hook input
-- All state in SQLite (governance.db)
+- All governance state in SQLite (governance.db)
+- Context reinforcement state in session-scoped files (`.avt/.session-context-{session_id}.json`, `.avt/.session-calls-{session_id}`, `.avt/.injection-history-{session_id}`)
+- Context reinforcement and post-compaction hooks use `additionalContext` (advise); governance hooks use exit code 2 (block/redirect)

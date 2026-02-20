@@ -51,6 +51,11 @@ htmlcov/
 *.log
 .avt/hook-governance.log
 .avt/hook-holistic.log
+.avt/hook-context-reinforcement.log
+.avt/.session-calls-*
+.avt/.injection-history-*
+.avt/context-router.json
+.avt/.session-context-*
 
 # Session state (transient, not committed)
 .claude/settings.local.json

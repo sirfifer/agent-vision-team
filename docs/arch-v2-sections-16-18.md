@@ -40,7 +40,11 @@ Claude Code provides the execution environment for the entire system. The follow
 |---------|--------|----------|
 | Custom subagents | **Active** | 6 agents defined in `.claude/agents/`: worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward |
 | MCP servers (SSE) | **Active** | 3 servers registered in `.claude/settings.json`: collab-kg (port 3101), collab-quality (port 3102), collab-governance (port 3103) |
-| PreToolUse hooks | **Active** | `ExitPlanMode` hook runs `scripts/hooks/verify-governance-review.sh` to enforce governance review before plan presentation |
+| PreToolUse hooks | **Active** | `ExitPlanMode` → `verify-governance-review.sh`; `Write\|Edit\|Bash\|Task` → `holistic-review-gate.sh` (governance gate) + `context-reinforcement.py` (three-layer context injection: session context, static router, background distillation) |
+| PostToolUse hooks | **Active** | `TaskCreate` → `governance-task-intercept.py` (task governance pairing, session tracking, context pipeline integration) |
+| SessionStart hooks | **Active** | `compact` → `post-compaction-reinject.sh` (restores session context + vision standards after context compaction) |
+| TeammateIdle hooks | **Active** | `teammate-idle-gate.sh` (prevents idle with pending governance obligations) |
+| TaskCompleted hooks | **Active** | `task-completed-gate.sh` (enforces governance gates before task completion) |
 | Model routing | **Active** | Per-agent model assignment in `.claude/settings.json` agents block: Opus 4.6 for worker/quality-reviewer, Sonnet 4.5 (default) for kg-librarian/governance-reviewer |
 | Skills | **Active** | `/e2e` skill for E2E test harness execution |
 | Commands | **Active** | `/project-overview` command for project context |
@@ -77,7 +81,8 @@ This section replaces the v1 "Implementation Phases" checklist, which listed unc
 | AVT Gateway | **Operational** | FastAPI backend with 35 REST endpoints, WebSocket push, job runner with Claude CLI integration, API-key auth, 8 router modules. Ports of ProjectConfigService and McpClientService from TypeScript to Python |
 | Container Packaging | **Operational** | Dockerfile (python:3.12-slim + Node.js 22 + Claude CLI + Nginx), docker-compose.yml, entrypoint.sh, nginx.conf, .devcontainer/devcontainer.json for GitHub Codespaces |
 | Dual-Mode Dashboard | **Operational** | React dashboard runs in VS Code (postMessage) or standalone browser (HTTP + WebSocket) via transport abstraction. Web build outputs to `server/static/` with hashed filenames. Mobile-responsive layout |
-| E2E Test Harness | **Operational** | 13 scenarios (s01-s13), 221 structural domain-agnostic assertions, parallel execution with full isolation, random domain generation from 8 templates, mock review mode |
+| E2E Test Harness | **Operational** | 14 scenarios (s01-s14), 292+ structural domain-agnostic assertions, parallel execution with full isolation, random domain generation from 8 templates, mock review mode |
+| Context Drift Prevention | **Operational** | Three-layer injection (session context, static router, post-compaction), session context distillation via background haiku calls, goal tracking through governance review pipeline, 13 tunable settings with dashboard UI controls, 120 hook-level unit tests across 10 test groups |
 | CLAUDE.md Orchestration | **Operational** | All protocols documented: task decomposition, governance checkpoints, quality review, memory curation, research, project hygiene, drift detection |
 
 ### 17.2 Known Gaps
@@ -133,11 +138,17 @@ For historical context, the following summarizes what the v1 "Implementation Pha
 The E2E test harness is the primary verification mechanism for all three MCP servers. It exercises the Python library APIs directly with structural, domain-agnostic assertions.
 
 **Characteristics:**
-- 13 scenarios covering KG, Quality, and Governance servers
-- 221 assertions that are structural (not domain-specific)
+- 14 scenarios covering KG, Quality, and Governance servers
+- 292+ assertions that are structural (not domain-specific)
 - Parallel execution via `ThreadPoolExecutor` with full isolation per scenario (separate JSONL, SQLite, task directories)
 - Each run generates a unique project from 8 domain templates (Pet Adoption, Restaurant Reservation, Fitness Tracking, etc.)
 - `GOVERNANCE_MOCK_REVIEW` environment variable enables deterministic testing without a live `claude` binary
+
+**Additional test suites:**
+- **Hook unit tests**: 120 assertions across 10 groups in `scripts/hooks/test-hook-unit.sh`, covering governance hooks (Groups 1-5) and context reinforcement (Groups 6-10: session context injection, distillation, update, post-compaction, governance pipeline integration)
+- **MCP access tests**: 15 assertions verifying MCP tool availability
+- **Capability matrix tests**: 13 assertions verifying tool access at direct/subagent levels
+- **Hook live tests**: Level 1-4 integration tests covering mock interception, real AI review, subagent inheritance, and session-scoped flags
 
 **How to run:**
 

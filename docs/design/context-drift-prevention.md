@@ -213,7 +213,12 @@ Add a `contextReinforcement` section to `.avt/project-config.json`:
       "maxInjectionsPerSession": 10,
       "jaccardThreshold": 0.15,
       "postCompactionReinject": true,
-      "routerAutoRegenerate": true
+      "routerAutoRegenerate": true,
+      "sessionContextEnabled": true,
+      "sessionContextDebounceSeconds": 60,
+      "maxDiscoveriesPerSession": 10,
+      "refreshInterval": 5,
+      "distillationModel": "haiku"
     }
   }
 }
@@ -368,16 +373,29 @@ For the multi-project web dashboard: each project's settings page shows the effe
 ```
 PreToolUse on Write|Edit|Bash|Task
   |-- holistic-review-gate.sh       (existing, ~1ms fast path, can block with exit 2)
-  |-- context-reinforcement.py      (new, ~1ms under threshold, ~50ms when active)
+  |-- context-reinforcement.py      (~1ms under threshold, ~50ms when active)
+  |   |-- Layer 1: Session context  (distilled goals, discoveries, constraints)
+  |   |-- Layer 2: Static router    (Jaccard-matched vision/architecture/rules)
+  |   '-- Spawns: _distill-session-context.py (background, on first threshold hit)
 
 SessionStart on compact
-  |-- post-compaction-reinject.sh    (new, ~10ms, injects vision context after compaction)
+  |-- post-compaction-reinject.sh    (~10ms, session context + vision routes)
+  |   |-- Layer 1: Session context  (active goals, key findings, constraints)
+  |   '-- Layer 2: Vision standards (from context-router.json)
+
+PostToolUse on TaskCreate (governance pipeline triggers context updates)
+  |-- governance-task-intercept.py   (passes session_id/transcript_path to review)
+  |   '-- _run-governance-review.sh  (spawns _update-session-context.py after review)
+
+Background (holistic review completion)
+  |-- _holistic-settle-check.py      (spawns _update-session-context.py after holistic review)
 ```
 
 The hooks coexist without conflict:
 - holistic-review-gate uses exit code 2 to block (gates work)
 - context-reinforcement uses additionalContext to advise (injects reminders)
 - post-compaction-reinject uses additionalContext to restore (re-anchors after compaction)
+- Background context updates run asynchronously via `subprocess.Popen(start_new_session=True)`
 
 ### Hook Registration
 
@@ -407,17 +425,149 @@ Add to `.claude/settings.json`:
 }
 ```
 
-## Open Questions
+## Component 5: Session Context Distillation and Evolution (Implemented)
 
-1. **Thinking block analysis for v2?** The blog post's approach of analyzing thinking blocks is theoretically sound but unproven for drift prevention. Should we plan a v2 that adds keyword extraction from thinking blocks as a refinement to the tool-input matching?
+The static router injection (Components 1-4) proved effective but has a fundamental limitation: it re-injects project-level standards but cannot recall session-specific goals or discoveries. After compaction, the agent loses what it was trying to accomplish and what it learned along the way.
 
-2. **PostCompact hook**: Currently the most-requested missing feature in Claude Code (issues #14258, #17237). When it ships, we should switch the compaction re-injection from SessionStart `compact` matcher to PostCompact for more reliable timing.
+Session context distillation addresses this by capturing the original user prompt, distilling it into key points, and evolving those key points as work progresses.
 
-3. **Router regeneration trigger**: Should the context router regenerate automatically when the KG changes (via a PostToolUse hook on KG MCP calls), or only on explicit command?
+### Architecture: Three-Layer Injection Model
 
-4. **Token counting**: The `maxTokensPerInjection` setting uses an estimate (~4 tokens per word). Should we implement proper tokenization for precise counting, or is the estimate sufficient?
+When `context-reinforcement.py` fires, it checks three sources in priority order:
 
-5. **Scope filtering in headless multi-project mode**: When the gateway manages multiple projects, each project's hooks need isolated session tracking. The session_id in the hook input should be sufficient, but needs verification.
+1. **Session Context (primary)**: Distilled goals, constraints, discoveries from `.avt/.session-context-{session_id}.json`
+2. **Static Router (secondary)**: Vision/architecture/rules from `context-router.json`, Jaccard-matched
+3. **Post-Compaction (existing)**: Vision routes + session context on compaction events
+
+The session context file is produced by two background scripts:
+
+- **`_distill-session-context.py`**: Extracts the original user prompt from the transcript and distills it via haiku into key points, constraints, and key decisions. Short prompts (<500 chars) are stored directly without an AI call. Spawned by `context-reinforcement.py` when the threshold is hit and no session context exists.
+- **`_update-session-context.py`**: Reads recent transcript during governance reviews to discover milestones and mark completed goals. Spawned by `_holistic-settle-check.py` (after holistic review) and `_run-governance-review.sh` (after individual review).
+
+All AI calls happen asynchronously in background processes. The synchronous hook only reads files.
+
+### Session Context File Schema
+
+```json
+{
+  "version": 1,
+  "session_id": "abc123",
+  "created_at": "2026-02-20T10:00:00Z",
+  "updated_at": "2026-02-20T10:15:00Z",
+  "distillation": {
+    "status": "ready",
+    "key_points": [
+      {"id": "kp-1", "text": "Implement dark mode toggle in settings", "status": "active"},
+      {"id": "kp-2", "text": "State management via React context", "status": "completed"}
+    ],
+    "constraints": ["Must pass all existing tests"],
+    "key_decisions": ["User prefers CSS-in-JS over CSS modules"]
+  },
+  "discoveries": [
+    {"id": "disc-1", "text": "ThemeContext already exists in src/context/", "discovered_at": "...", "source": "holistic_review"}
+  ],
+  "thrash_indicators": [],
+  "injection_count": 0,
+  "last_injected_at": null
+}
+```
+
+### Injection Format (~100-200 tokens)
+
+```
+SESSION CONTEXT:
+Goals remaining:
+- Implement dark mode toggle in settings page
+- Update existing components for theme switching
+Key findings:
+- ThemeContext already exists in src/context/ but is unused
+Constraints: Must pass all existing tests; No new dependencies
+```
+
+Completed goals are excluded entirely. Thrash guidance appears only if constructive. Discoveries are capped at 5 most recent.
+
+### Refresh Mechanism
+
+Every N injections (configurable via `refreshInterval`, default 5), the distillation script is re-spawned with `--refresh` to re-read the transcript and update key point statuses.
+
+### Integration with Governance Pipeline
+
+Both holistic and individual governance reviews trigger `_update-session-context.py` after completion, capturing milestones and discoveries from the review process:
+
+- `_holistic-settle-check.py` spawns context update after holistic review processing
+- `_run-governance-review.sh` spawns context update after individual review completion
+- `governance-task-intercept.py` passes `session_id` and `transcript_path` through to review scripts
+
+### Post-Compaction Recovery
+
+`post-compaction-reinject.sh` now reads `session_id` from the hook input JSON and checks for the session context file. Session context is injected as Layer 1 (before vision routes) because it is more critical for post-compaction recovery than project-level standards.
+
+### Additional Settings
+
+Five new settings added to the `contextReinforcement` section:
+
+```json
+{
+  "settings": {
+    "contextReinforcement": {
+      "sessionContextEnabled": true,
+      "sessionContextDebounceSeconds": 60,
+      "maxDiscoveriesPerSession": 10,
+      "refreshInterval": 5,
+      "distillationModel": "haiku"
+    }
+  }
+}
+```
+
+### Safety Properties
+
+- **Atomic writes**: Session context files written via `.tmp` + rename to prevent partial reads
+- **File locking**: `fcntl.flock` for concurrent access safety in `_update-session-context.py`
+- **Throttling**: Updates throttled to once per 60 seconds to avoid rapid-fire updates
+- **Deduplication**: Discoveries deduplicated by substring match, capped at `maxDiscoveriesPerSession`
+- **Mock mode**: `GOVERNANCE_MOCK_REVIEW` enables deterministic testing without AI calls
+- **Fallback**: If AI distillation fails, raw prompt is truncated to 500 chars as a single key point
+
+---
+
+## Implementation Status
+
+All components are implemented and tested:
+
+| Component | Script | Status |
+|-----------|--------|--------|
+| Context Router Generator | `scripts/generate-context-router.py` | Operational |
+| PreToolUse Context Reinforcement | `scripts/hooks/context-reinforcement.py` | Operational (three-layer injection) |
+| Post-Compaction Reinject | `scripts/hooks/post-compaction-reinject.sh` | Operational (session context + vision routes) |
+| Settings Schema | `ProjectConfig.ts`, `types.ts`, `SettingsPanel.tsx` | Operational (13 fields, full UI) |
+| Session Context Distillation | `scripts/hooks/_distill-session-context.py` | Operational |
+| Session Context Evolution | `scripts/hooks/_update-session-context.py` | Operational |
+| Governance Pipeline Integration | `_holistic-settle-check.py`, `_run-governance-review.sh` | Operational |
+
+### Test Coverage
+
+- **Unit tests**: 120 assertions across 10 groups in `scripts/hooks/test-hook-unit.sh`
+  - Groups 1-5: Static router injection, post-compaction, settings cascade, debounce, Jaccard matching (37 assertions)
+  - Group 6: Session context injection in `context-reinforcement.py` (16 assertions)
+  - Group 7: `_distill-session-context.py` mock/fallback/short-prompt paths (22 assertions)
+  - Group 8: `_update-session-context.py` throttle/dedup/parse paths (7 assertions)
+  - Group 9: Post-compaction with session context (11 assertions)
+  - Group 10: Governance pipeline integration, direct Python import tests (27 assertions)
+
+---
+
+## Open Questions (Resolved and Remaining)
+
+1. ~~**Thinking block analysis for v2?**~~ **Deferred.** Session context distillation provides a more direct signal (what the user asked for) than thinking block analysis (what the model is considering). May revisit if session context proves insufficient.
+
+2. ~~**PostCompact hook**~~: Still not shipped (issues #14258, #17237). SessionStart `compact` matcher continues to work. Post-compaction reinject now includes session context as Layer 1.
+
+3. ~~**Router regeneration trigger**~~: **Resolved.** `routerAutoRegenerate: true` (default) regenerates the router when the KG changes. Implemented in `context-reinforcement.py`.
+
+4. ~~**Token counting**~~: **Resolved.** The ~4 tokens per word estimate is sufficient. Session context injection is capped at ~200 tokens, well within the `maxTokensPerInjection` limit.
+
+5. ~~**Scope filtering in headless multi-project mode**~~: **Resolved.** Session-scoped file naming (`.avt/.session-context-{session_id}.json`) provides natural isolation per session.
 
 ## Sources
 

@@ -72,7 +72,7 @@ Key properties:
 |----------|--------|--------|
 | **Governance** | task_pair_created, decision_submitted, verdict_returned, review_completed, holistic_review_started, holistic_review_completed | governance hooks, governance MCP |
 | **Quality** | gate_checked, gate_passed, gate_failed, finding_created, finding_dismissed | quality MCP |
-| **Context** | reinforcement_triggered, reinforcement_skipped (debounce/dedup/cap), compaction_detected, post_compaction_reinjected, injection_content | context reinforcement hook, compaction hook |
+| **Context** | reinforcement_triggered, reinforcement_skipped (debounce/dedup/cap), compaction_detected, post_compaction_reinjected, injection_content, session_context_distilled, session_context_updated, session_context_injected, distillation_spawned, distillation_refreshed, goal_completed, discovery_added | context reinforcement hook, compaction hook, `_distill-session-context.py`, `_update-session-context.py` |
 | **KG** | entity_created, entity_modified, observation_added, tier_violation_attempted | KG MCP |
 | **Agent** | agent_spawned, agent_completed, agent_failed, task_started, task_completed | Task tool usage |
 | **Session** | session_started, session_compacted, session_ended, context_threshold_crossed | session lifecycle |

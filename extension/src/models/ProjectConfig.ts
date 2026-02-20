@@ -18,6 +18,22 @@ export interface QualityGatesConfig {
   findings: boolean;
 }
 
+export interface ContextReinforcementConfig {
+  enabled: boolean;
+  toolCallThreshold: number;
+  maxTokensPerInjection: number;
+  debounceSeconds: number;
+  maxInjectionsPerSession: number;
+  jaccardThreshold: number;
+  postCompactionReinject: boolean;
+  routerAutoRegenerate: boolean;
+  sessionContextEnabled: boolean;
+  sessionContextDebounceSeconds: number;
+  maxDiscoveriesPerSession: number;
+  refreshInterval: number;
+  distillationModel: string;
+}
+
 export interface ProjectSettings {
   mockTests: boolean;
   mockTestsForCostlyOps: boolean;
@@ -25,6 +41,7 @@ export interface ProjectSettings {
   autoGovernance: boolean;
   qualityGates: QualityGatesConfig;
   kgAutoCuration: boolean;
+  contextReinforcement?: ContextReinforcementConfig;
 }
 
 export interface QualityConfig {
@@ -97,6 +114,22 @@ export interface SetupReadiness {
   isComplete: boolean;
 }
 
+export const DEFAULT_CONTEXT_REINFORCEMENT: ContextReinforcementConfig = {
+  enabled: true,
+  toolCallThreshold: 8,
+  maxTokensPerInjection: 400,
+  debounceSeconds: 30,
+  maxInjectionsPerSession: 10,
+  jaccardThreshold: 0.15,
+  postCompactionReinject: true,
+  routerAutoRegenerate: true,
+  sessionContextEnabled: true,
+  sessionContextDebounceSeconds: 60,
+  maxDiscoveriesPerSession: 10,
+  refreshInterval: 5,
+  distillationModel: 'haiku',
+};
+
 export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   mockTests: false,
   mockTestsForCostlyOps: true,
@@ -110,6 +143,7 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
     findings: true,
   },
   kgAutoCuration: true,
+  contextReinforcement: DEFAULT_CONTEXT_REINFORCEMENT,
 };
 
 export const DEFAULT_QUALITY_CONFIG: QualityConfig = {

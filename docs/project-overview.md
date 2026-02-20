@@ -1,6 +1,6 @@
 # Agent Vision Team -- Project Overview
 
-> A platform-native multi-agent system for software development built on Claude Code, providing tier-protected institutional memory, transactional governance, and deterministic quality verification through three MCP servers, eight specialized agents, Agent Teams orchestration, a five-hook verification layer, and a standalone web gateway for remote operation.
+> A platform-native multi-agent system for software development built on Claude Code, providing tier-protected institutional memory, transactional governance, deterministic quality verification, and context drift prevention through three MCP servers, eight specialized agents, Agent Teams orchestration, a seven-hook verification and context layer, and a standalone web gateway for remote operation.
 
 **Last Updated**: 2026-02-19
 
@@ -45,14 +45,18 @@ The system operates in two modes: **locally** via the VS Code extension for deve
    |     with independent MCP, hooks, CLAUDE.md               |
    |     Shared task list, self-claim, direct messaging       |
 +--v--------v------------v-----------v-----------v-----------v---+
-|                   FIVE-HOOK VERIFICATION LAYER                  |
-|                                                                 |
-| 1. PostToolUse(TaskCreate)     governance-task-intercept.py     |
-| 2. PreToolUse(ExitPlanMode)    verify-governance-review.sh      |
-| 3. PreToolUse(Write|Edit|...)  holistic-review-gate.sh          |
-| 4. TeammateIdle                teammate-idle-gate.sh            |
-| 5. TaskCompleted               task-completed-gate.sh           |
-+-----------------------------------------------------------------+
+|              SEVEN-HOOK VERIFICATION & CONTEXT LAYER             |
+|                                                                  |
+| Governance:                                                      |
+| 1. PostToolUse(TaskCreate)     governance-task-intercept.py      |
+| 2. PreToolUse(ExitPlanMode)    verify-governance-review.sh       |
+| 3. PreToolUse(Write|Edit|...)  holistic-review-gate.sh           |
+| 4. TeammateIdle                teammate-idle-gate.sh             |
+| 5. TaskCompleted               task-completed-gate.sh            |
+| Context Reinforcement:                                           |
+| 6. PreToolUse(Write|Edit|...)  context-reinforcement.py          |
+| 7. SessionStart(compact)       post-compaction-reinject.sh       |
++------------------------------------------------------------------+
                           |
 +-------------------------v---------------------------------------+
 |                     THREE MCP SERVERS                            |
@@ -98,7 +102,7 @@ The architecture follows a strict principle: build only what Claude Code cannot 
 |---|---|
 | Agent Teams: teammate spawning, shared tasks, self-claim | Persistent tier-protected memory (KG) |
 | Parent-child and peer-to-peer communication | Deterministic quality verification |
-| Five lifecycle hooks (PostToolUse, PreToolUse, TeammateIdle, TaskCompleted) | Transactional governance review |
+| Seven lifecycle hooks (PostToolUse, PreToolUse, SessionStart, TeammateIdle, TaskCompleted) | Transactional governance review |
 | Git worktree management | Governed task execution |
 | Session persistence/resume | Trust engine with audit trails |
 | Model routing per teammate | AI-powered decision review |
@@ -199,17 +203,28 @@ Transactional review checkpoints for agent decisions, implementing the "intercep
 
 ---
 
-## Five-Hook Verification Layer
+## Seven-Hook Verification and Context Layer
 
-Five Claude Code lifecycle hooks provide deterministic governance verification. These hooks fire for ALL agents (lead, teammates, subagents) with no exceptions and no opt-out.
+Seven Claude Code lifecycle hooks provide deterministic governance verification and context drift prevention. These hooks fire for ALL agents (lead, teammates, subagents) with no exceptions and no opt-out.
+
+### Governance Hooks (5)
 
 | # | Hook Type | Matcher | Script | Purpose |
 |---|-----------|---------|--------|---------|
-| 1 | PostToolUse | `TaskCreate` | `governance-task-intercept.py` | Pairs every task with a governance review; tracks `session_id`; creates session-scoped holistic review flag; spawns settle checker |
+| 1 | PostToolUse | `TaskCreate` | `governance-task-intercept.py` | Pairs every task with a governance review; tracks `session_id`; creates session-scoped holistic review flag; spawns settle checker; passes session_id/transcript_path to review pipeline |
 | 2 | PreToolUse | `ExitPlanMode` | `verify-governance-review.sh` | Ensures plans are verified before presentation; redirects agents to submit plan review if none exists |
 | 3 | PreToolUse | `Write\|Edit\|Bash\|Task` | `holistic-review-gate.sh` | Coordinates work sequencing during holistic review; uses session-scoped flag files with ~1ms fast-path when no review is pending |
 | 4 | TeammateIdle | (all) | `teammate-idle-gate.sh` | Prevents Agent Teams teammates from going idle while they have pending governance obligations |
 | 5 | TaskCompleted | (all) | `task-completed-gate.sh` | Prevents task completion if governance review is still pending or blocked; skips review tasks |
+
+### Context Reinforcement Hooks (2)
+
+| # | Hook Type | Matcher | Script | Purpose |
+|---|-----------|---------|--------|---------|
+| 6 | PreToolUse | `Write\|Edit\|Bash\|Task` | `context-reinforcement.py` | Three-layer context injection: (1) session context with distilled goals/discoveries, (2) Jaccard-matched vision/architecture routes from KG-derived router. Spawns background distillation on first threshold hit |
+| 7 | SessionStart | `compact` | `post-compaction-reinject.sh` | Restores session context (active goals, key findings) and vision standards after context compaction events |
+
+The context reinforcement system prevents drift through active session context (captures/distills the user's original prompt, tracks goal completion via governance review callbacks) and static route injection (Jaccard-matched vision/architecture/rules from a KG-derived context router). Background distillation scripts run asynchronously and never block the synchronous hook path. See [Context Drift Prevention](design/context-drift-prevention.md) for the full research brief and design.
 
 ### Session-Scoped Holistic Review
 
@@ -557,6 +572,7 @@ An autonomous end-to-end testing system that exercises all three MCP servers acr
 
 **Additional test suites**:
 - **Unit tests**: 37 assertions across KG (18) and Quality (19) servers
+- **Hook unit tests**: 120 assertions across 10 groups covering governance hooks (Groups 1-5) and context reinforcement (Groups 6-10: session context injection, distillation, update, post-compaction, governance pipeline integration)
 - **MCP access tests**: 15 assertions verifying MCP tool availability across session types
 - **Capability matrix tests**: 13 assertions verifying file write, edit, bash, and MCP access at direct/subagent levels
 - **Hook live tests**: Level 1-4 tests covering mock interception, real AI review, subagent inheritance, and session-scoped flags
@@ -583,6 +599,10 @@ An autonomous end-to-end testing system that exercises all three MCP servers acr
 | `.avt/trust-engine.db` | Quality finding audit trails | Quality Server |
 | `.avt/governance.db` | Decision store with verdicts, holistic reviews, and usage records | Governance Server |
 | `.avt/.holistic-review-pending-{session_id}` | Session-scoped flag files coordinating work during holistic review | PostToolUse hook |
+| `.avt/.session-context-{session_id}.json` | Distilled session goals, discoveries, constraints for context reinforcement | `_distill-session-context.py`, `_update-session-context.py` |
+| `.avt/.session-calls-{session_id}` | Tool call counter per session for context reinforcement threshold | `context-reinforcement.py` |
+| `.avt/.injection-history-{session_id}` | Injection history for debounce/dedup tracking | `context-reinforcement.py` |
+| `.avt/context-router.json` | KG-derived context router for vision/architecture/rules injection | `generate-context-router.py` |
 | `.avt/api-key.txt` | Gateway API authentication key (auto-generated) | AVT Gateway |
 | `.avt/jobs/` | Job submission state and output (JSON files) | AVT Gateway |
 
@@ -774,9 +794,10 @@ All five implementation phases are complete, plus an Agent Teams adaptation and 
 - **Phase 4** (Governance + E2E): Governance server, governed task system, AI-powered review, holistic collective-intent review with two-layer assurance, E2E harness with 14 scenarios and 292+ assertions
 - **Phase 5** (Remote Operation): AVT Gateway (FastAPI, 35 REST endpoints, WebSocket push, job runner), dual-mode React dashboard, container packaging (Docker, Codespaces), mobile-responsive layout
 - **Agent Teams Adaptation**: Five-hook verification layer (PostToolUse, PreToolUse, TeammateIdle, TaskCompleted), session-scoped holistic review flag files, token usage tracking with dashboard panel, CLAUDE.md skills refactor (963 -> 284 lines), KG client TTL caching
+- **Context Drift Prevention**: Three-layer context injection (session context, static router, post-compaction), session context distillation via background haiku calls, goal tracking through governance review pipeline, 13 tunable settings with UI controls, 120 hook-level unit tests across 10 test groups
 - **CI/CD Pipeline**: Unified script layer (`scripts/ci/`), pre-commit hooks (Husky + lint-staged for lint/format), pre-push hooks (typecheck + build + test + coverage with clear error reporting), GitHub Actions on every push to every branch (parallel jobs, matrix strategy), ESLint + Prettier (TypeScript), Ruff (Python), coverage enforcement
 
-**Total test assertions**: 44 unit + 37 hook + 15 MCP + 13 capability + 292 E2E = 401 assertions
+**Total test assertions**: 44 unit + 120 hook + 15 MCP + 13 capability + 292 E2E = 484 assertions
 
 **Planned**: Cross-project memory, multi-worker parallelism patterns, installation script for target projects, native `.claude/agents/` teammate loading (blocked on Issue #24316).
 

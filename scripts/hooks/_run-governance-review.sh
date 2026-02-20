@@ -5,7 +5,7 @@
 # Runs claude --print with governance-reviewer context, then calls the
 # governance MCP server to complete the review.
 #
-# Usage: _run-governance-review.sh <review_task_id> <impl_task_id> <subject>
+# Usage: _run-governance-review.sh <review_task_id> <impl_task_id> <subject> [session_id] [transcript_path]
 #
 # This script uses temp file I/O (the gold-standard CLI pattern) to avoid
 # argument length limits and pipe buffering issues.
@@ -15,6 +15,8 @@ set -euo pipefail
 REVIEW_TASK_ID="${1:?Missing review_task_id}"
 IMPL_TASK_ID="${2:?Missing impl_task_id}"
 SUBJECT="${3:-unknown}"
+SESSION_ID="${4:-}"
+TRANSCRIPT_PATH="${5:-}"
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 LOG_FILE="${PROJECT_DIR}/.avt/hook-governance.log"
@@ -243,5 +245,12 @@ else:
 store.close()
 print(f'Review completed: verdict={verdict_str}')
 " 2>&1 | while IFS= read -r line; do log "$line"; done
+
+# Spawn context update to capture milestones/discoveries (background, non-blocking)
+UPDATE_SCRIPT="${PROJECT_DIR}/scripts/hooks/_update-session-context.py"
+if [ -f "$UPDATE_SCRIPT" ] && [ -n "${SESSION_ID:-}" ]; then
+    python3 "$UPDATE_SCRIPT" "$SESSION_ID" "${TRANSCRIPT_PATH:-}" "individual_review" &
+    log "Context update spawned for session=$SESSION_ID"
+fi
 
 log "Async review finished for $REVIEW_TASK_ID"

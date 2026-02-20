@@ -207,6 +207,8 @@ The extension has evolved far beyond "observability only":
 | Model references | Opus 4.5 | Opus 4.6 | **Medium** — dated but not structurally wrong |
 | Project rules | Not mentioned | Implemented with enforcement levels | **Medium** — operational feature missing |
 | Research system | Not mentioned | Agent + prompts + briefs | **Medium** — operational feature missing |
+| Context drift prevention | Not mentioned | Three-layer injection (session context, static router, post-compaction), 13 tunable settings, 120 hook tests | **Medium** — significant new subsystem |
+| Hook count | "1 hook" (PreToolUse only) | 7 hooks (5 governance + 2 context reinforcement) | **High** — significantly understated |
 | Implementation phases | Unchecked items | Substantially completed | **Low** — stale but informational |
 
 ---
@@ -284,8 +286,12 @@ The extension has evolved far beyond "observability only":
 |--------------------|---------------|
 | Subagents via Task tool | 6 custom agents in `.claude/agents/` |
 | MCP servers (SSE transport) | 3 servers registered in `.claude/settings.json` |
-| PreToolUse hooks | ExitPlanMode → `verify-governance-review.sh` |
-| Model routing per agent | Opus for worker/quality-reviewer/researcher, Sonnet for others |
+| PreToolUse hooks | ExitPlanMode → `verify-governance-review.sh`; Write\|Edit\|Bash\|Task → `holistic-review-gate.sh` + `context-reinforcement.py` (three-layer injection) |
+| PostToolUse hooks | TaskCreate → `governance-task-intercept.py` (task governance + context pipeline) |
+| SessionStart hooks | compact → `post-compaction-reinject.sh` (session context + vision route restoration) |
+| TeammateIdle hooks | `teammate-idle-gate.sh` (governance obligation enforcement) |
+| TaskCompleted hooks | `task-completed-gate.sh` (governance gate enforcement) |
+| Model routing per agent | Opus for worker/quality-reviewer/researcher, Sonnet for others, Haiku for context distillation |
 | Skills | `/e2e` skill for E2E testing |
 | Commands | `/project-overview` command |
 | `CLAUDE_CODE_TASK_LIST_ID` | Referenced in CLAUDE.md for cross-session persistence |

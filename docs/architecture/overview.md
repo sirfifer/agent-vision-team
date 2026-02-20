@@ -79,7 +79,7 @@ graph LR
     end
 
     subgraph Platform
-        Hooks[5 Lifecycle Hooks]
+        Hooks[7 Lifecycle Hooks]
         Agents[8 Agent Definitions]
         Tasks[Task System]
         CI[CI Scripts + Git Hooks]
@@ -114,7 +114,8 @@ graph LR
 | Governance MCP | Decision review, governed tasks, AI reviewer | Python | `mcp-servers/governance/` | FastMCP, SQLite, temp file I/O |
 | AVT Gateway | REST API, WebSocket push, job runner | Python | `server/avt_gateway/` | FastAPI, SSE MCP client, routers |
 | E2E Test Harness | 14 scenarios, 292+ assertions, parallel execution | Python | `e2e/` | BaseScenario, structural assertions |
-| Hook Scripts | Platform-level governance verification | Bash/Python | `scripts/hooks/` | JSON stdin/stdout, fast-path, exit codes |
+| Context Reinforcement | Session context distillation, goal tracking, three-layer injection | Python/Bash | `scripts/hooks/` | Background distillation, atomic writes, file locking |
+| Hook Scripts | Platform-level governance verification + context drift prevention (7 hooks) | Bash/Python | `scripts/hooks/` | JSON stdin/stdout, fast-path, exit codes, additionalContext injection |
 | CI Scripts | Unified quality pipeline (lint, typecheck, build, test, coverage) | Bash | `scripts/ci/` | Same scripts locally and in CI |
 | GitHub Actions | CI pipeline on every push | YAML | `.github/workflows/ci.yml` | Parallel jobs, matrix strategy, xvfb |
 | Git Hooks | Pre-commit (lint staged), pre-push (full pipeline) | Bash | `.husky/` | Husky v9, lint-staged, clear error reporting |
@@ -127,4 +128,5 @@ graph LR
 4. **Dual-mode transport**: Same React dashboard runs in VS Code (postMessage) and standalone (HTTP/WebSocket) with zero component duplication
 5. **Temp file I/O**: Claude CLI invocations use temp files instead of CLI args or pipes to avoid buffer limits
 6. **Session-scoped holistic review**: Groups of tasks reviewed collectively before any work begins, using timing-based settle detection
-7. **Scripts-first CI/CD**: All quality checks run via bash scripts in `scripts/ci/`; git hooks and GitHub Actions both call the same scripts, ensuring local and CI behavior are identical
+7. **Three-layer context reinforcement**: Session context (distilled goals/discoveries), static router (KG-derived vision/architecture), and post-compaction recovery. Background AI calls via `claude --print --model haiku`; synchronous hooks only read files
+8. **Scripts-first CI/CD**: All quality checks run via bash scripts in `scripts/ci/`; git hooks and GitHub Actions both call the same scripts, ensuring local and CI behavior are identical

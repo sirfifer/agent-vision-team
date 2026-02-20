@@ -97,7 +97,13 @@ def _load_standards() -> tuple[list[dict], list[dict]]:
     return vision, architecture
 
 
-def _queue_individual_review(review_task_id: str, impl_task_id: str, subject: str) -> None:
+def _queue_individual_review(
+    review_task_id: str,
+    impl_task_id: str,
+    subject: str,
+    session_id: str = "",
+    transcript_path: str = "",
+) -> None:
     """Start the individual review for a single task (existing mechanism)."""
     review_script = Path(PROJECT_DIR) / "scripts" / "hooks" / "_run-governance-review.sh"
     if not review_script.exists():
@@ -107,7 +113,7 @@ def _queue_individual_review(review_task_id: str, impl_task_id: str, subject: st
         env = os.environ.copy()
         env["CLAUDE_PROJECT_DIR"] = PROJECT_DIR
         subprocess.Popen(
-            [str(review_script), review_task_id, impl_task_id, subject],
+            [str(review_script), review_task_id, impl_task_id, subject, session_id, transcript_path],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
@@ -116,6 +122,26 @@ def _queue_individual_review(review_task_id: str, impl_task_id: str, subject: st
         _log(f"Individual review queued: review={review_task_id} impl={impl_task_id}")
     except Exception as e:
         _log(f"WARNING: Failed to queue individual review: {e}")
+
+
+def _spawn_context_update(session_id: str, transcript_path: str, source: str) -> None:
+    """Spawn background context update to capture milestones/discoveries."""
+    update_script = Path(PROJECT_DIR) / "scripts" / "hooks" / "_update-session-context.py"
+    if not update_script.exists():
+        return
+    try:
+        env = os.environ.copy()
+        env["CLAUDE_PROJECT_DIR"] = PROJECT_DIR
+        subprocess.Popen(
+            ["python3", str(update_script), session_id, transcript_path, source],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            env=env,
+        )
+        _log(f"Context update spawned: session={session_id} source={source}")
+    except Exception as e:
+        _log(f"WARNING: Failed to spawn context update: {e}")
 
 
 def _remove_flag() -> None:
@@ -204,6 +230,8 @@ def main() -> None:
                     reviews[0].review_task_id,
                     task.implementation_task_id,
                     task.subject,
+                    session_id=session_id,
+                    transcript_path=transcript_path,
                 )
         store.close()
         return
@@ -237,6 +265,8 @@ def main() -> None:
                     reviews[0].review_task_id,
                     task.implementation_task_id,
                     task.subject,
+                    session_id=session_id,
+                    transcript_path=transcript_path,
                 )
 
         store.close()
@@ -285,6 +315,9 @@ def main() -> None:
 
     _log(f"Holistic review complete: verdict={verdict.verdict.value}")
 
+    # Spawn context update to capture milestones/discoveries from transcript
+    _spawn_context_update(session_id, transcript_path, "holistic_review")
+
     if verdict.verdict == Verdict.APPROVED:
         _remove_flag()
         # Start individual reviews
@@ -295,6 +328,8 @@ def main() -> None:
                     reviews[0].review_task_id,
                     task.implementation_task_id,
                     task.subject,
+                    session_id=session_id,
+                    transcript_path=transcript_path,
                 )
         _log("Individual reviews queued after holistic approval.")
 

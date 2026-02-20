@@ -238,7 +238,7 @@ def _try_find_and_block_task(manager: TaskFileManager, subject: str, review_id: 
 # ── Async review queueing ──────────────────────────────────────────────────
 
 
-def _queue_async_review(review_info: dict) -> None:
+def _queue_async_review(review_info: dict, session_id: str = "", transcript_path: str = "") -> None:
     """Spawn an async governance review in the background.
 
     Uses claude --print with the governance-reviewer agent to evaluate
@@ -263,6 +263,8 @@ def _queue_async_review(review_info: dict) -> None:
                 review_info["review_task_id"],
                 review_info["implementation_task_id"],
                 review_info.get("subject", ""),
+                session_id,
+                transcript_path,
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -408,7 +410,7 @@ def main() -> None:
     else:
         # No session_id available; fall back to immediate individual review
         _log("No session_id; falling back to immediate individual review")
-        _queue_async_review(review_info)
+        _queue_async_review(review_info, session_id=session_id, transcript_path=transcript_path)
 
     # Return additionalContext to Claude
     holistic_msg = ""

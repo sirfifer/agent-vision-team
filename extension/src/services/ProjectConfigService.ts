@@ -58,7 +58,18 @@ export class ProjectConfigService {
       return {
         ...DEFAULT_PROJECT_CONFIG,
         ...config,
-        settings: { ...DEFAULT_PROJECT_CONFIG.settings, ...config.settings },
+        settings: {
+          ...DEFAULT_PROJECT_CONFIG.settings,
+          ...config.settings,
+          qualityGates: {
+            ...DEFAULT_PROJECT_CONFIG.settings.qualityGates,
+            ...config.settings?.qualityGates,
+          },
+          contextReinforcement: {
+            ...DEFAULT_PROJECT_CONFIG.settings.contextReinforcement,
+            ...(config.settings?.contextReinforcement ?? {}),
+          },
+        },
         quality: { ...DEFAULT_PROJECT_CONFIG.quality, ...config.quality },
         ingestion: { ...DEFAULT_PROJECT_CONFIG.ingestion, ...config.ingestion },
         rules: config.rules ?? DEFAULT_RULES_CONFIG,

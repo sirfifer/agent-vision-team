@@ -23,6 +23,22 @@ export interface QualityGatesConfig {
   findings: boolean;
 }
 
+export interface ContextReinforcementConfig {
+  enabled: boolean;
+  toolCallThreshold: number;
+  maxTokensPerInjection: number;
+  debounceSeconds: number;
+  maxInjectionsPerSession: number;
+  jaccardThreshold: number;
+  postCompactionReinject: boolean;
+  routerAutoRegenerate: boolean;
+  sessionContextEnabled: boolean;
+  sessionContextDebounceSeconds: number;
+  maxDiscoveriesPerSession: number;
+  refreshInterval: number;
+  distillationModel: string;
+}
+
 export interface ProjectSettings {
   mockTests: boolean;
   mockTestsForCostlyOps: boolean;
@@ -30,6 +46,7 @@ export interface ProjectSettings {
   autoGovernance: boolean;
   qualityGates: QualityGatesConfig;
   kgAutoCuration: boolean;
+  contextReinforcement?: ContextReinforcementConfig;
 }
 
 export interface ProjectMetadata {

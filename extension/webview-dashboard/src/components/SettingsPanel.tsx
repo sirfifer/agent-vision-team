@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useDashboard } from '../context/DashboardContext';
-import type { ProjectConfig, QualityGatesConfig } from '../types';
+import type { ProjectConfig, QualityGatesConfig, ContextReinforcementConfig } from '../types';
 import { WarningDialog } from './ui/WarningDialog';
 
 type WarningType = 'mockTests' | 'mockTestsForCostlyOps' | null;
@@ -85,6 +85,52 @@ export function SettingsPanel() {
         [gate]: !draftConfig.settings.qualityGates[gate],
       },
     });
+  };
+
+  const updateContextReinforcement = (updates: Partial<ContextReinforcementConfig>) => {
+    const current = draftConfig.settings.contextReinforcement ?? {
+      enabled: true,
+      toolCallThreshold: 8,
+      maxTokensPerInjection: 400,
+      debounceSeconds: 30,
+      maxInjectionsPerSession: 10,
+      jaccardThreshold: 0.15,
+      postCompactionReinject: true,
+      routerAutoRegenerate: true,
+      sessionContextEnabled: true,
+      sessionContextDebounceSeconds: 60,
+      maxDiscoveriesPerSession: 10,
+      refreshInterval: 5,
+      distillationModel: 'haiku',
+    };
+    setDraftConfig((prev) =>
+      prev
+        ? {
+            ...prev,
+            settings: {
+              ...prev.settings,
+              contextReinforcement: { ...current, ...updates },
+            },
+          }
+        : null,
+    );
+    setHasChanges(true);
+  };
+
+  const cr = draftConfig.settings.contextReinforcement ?? {
+    enabled: true,
+    toolCallThreshold: 8,
+    maxTokensPerInjection: 400,
+    debounceSeconds: 30,
+    maxInjectionsPerSession: 10,
+    jaccardThreshold: 0.15,
+    postCompactionReinject: true,
+    routerAutoRegenerate: true,
+    sessionContextEnabled: true,
+    sessionContextDebounceSeconds: 60,
+    maxDiscoveriesPerSession: 10,
+    refreshInterval: 5,
+    distillationModel: 'haiku',
   };
 
   const handleSave = () => {
@@ -217,6 +263,293 @@ export function SettingsPanel() {
                 <p className="text-xs text-vscode-muted">Run kg-librarian after task completion</p>
               </div>
             </label>
+          </div>
+
+          {/* Context Reinforcement */}
+          <div className="space-y-3">
+            <h3 className="font-medium">Context Reinforcement</h3>
+            <p className="text-xs text-vscode-muted">
+              Prevents context drift in long sessions by injecting relevant reminders
+            </p>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={cr.enabled}
+                onChange={() => updateContextReinforcement({ enabled: !cr.enabled })}
+                className="mt-1"
+              />
+              <div>
+                <span>Enable Context Reinforcement</span>
+                <p className="text-xs text-vscode-muted">
+                  Inject context reminders during Write/Edit/Bash/Task operations
+                </p>
+              </div>
+            </label>
+
+            {cr.enabled && (
+              <div className="space-y-4 pl-6 border-l-2 border-vscode-border ml-1">
+                <div>
+                  <label className="text-sm">Tool Call Threshold</label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="3"
+                      max="25"
+                      value={cr.toolCallThreshold}
+                      onChange={(e) =>
+                        updateContextReinforcement({
+                          toolCallThreshold: Number(e.target.value),
+                        })
+                      }
+                      className="flex-1"
+                    />
+                    <span className="w-8 text-right font-mono text-sm">{cr.toolCallThreshold}</span>
+                  </div>
+                  <p className="text-xs text-vscode-muted">
+                    Calls before reinforcement activates (default: 8)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm">Max Tokens Per Injection</label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="100"
+                      max="800"
+                      step="50"
+                      value={cr.maxTokensPerInjection}
+                      onChange={(e) =>
+                        updateContextReinforcement({
+                          maxTokensPerInjection: Number(e.target.value),
+                        })
+                      }
+                      className="flex-1"
+                    />
+                    <span className="w-12 text-right font-mono text-sm">
+                      {cr.maxTokensPerInjection}
+                    </span>
+                  </div>
+                  <p className="text-xs text-vscode-muted">
+                    Token budget per injection (default: 400)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm">Debounce (seconds)</label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="10"
+                      max="120"
+                      step="5"
+                      value={cr.debounceSeconds}
+                      onChange={(e) =>
+                        updateContextReinforcement({
+                          debounceSeconds: Number(e.target.value),
+                        })
+                      }
+                      className="flex-1"
+                    />
+                    <span className="w-12 text-right font-mono text-sm">{cr.debounceSeconds}s</span>
+                  </div>
+                  <p className="text-xs text-vscode-muted">
+                    Minimum gap between same-route injections (default: 30s)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm">Max Injections Per Session</label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="3"
+                      max="30"
+                      value={cr.maxInjectionsPerSession}
+                      onChange={(e) =>
+                        updateContextReinforcement({
+                          maxInjectionsPerSession: Number(e.target.value),
+                        })
+                      }
+                      className="flex-1"
+                    />
+                    <span className="w-8 text-right font-mono text-sm">
+                      {cr.maxInjectionsPerSession}
+                    </span>
+                  </div>
+                  <p className="text-xs text-vscode-muted">
+                    Session-wide injection cap (default: 10)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm">Jaccard Threshold</label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="5"
+                      max="50"
+                      step="5"
+                      value={Math.round(cr.jaccardThreshold * 100)}
+                      onChange={(e) =>
+                        updateContextReinforcement({
+                          jaccardThreshold: Number(e.target.value) / 100,
+                        })
+                      }
+                      className="flex-1"
+                    />
+                    <span className="w-12 text-right font-mono text-sm">
+                      {cr.jaccardThreshold.toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-vscode-muted">
+                    Keyword match sensitivity (default: 0.15)
+                  </p>
+                </div>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={cr.postCompactionReinject}
+                    onChange={() =>
+                      updateContextReinforcement({
+                        postCompactionReinject: !cr.postCompactionReinject,
+                      })
+                    }
+                    className="mt-1"
+                  />
+                  <div>
+                    <span className="text-sm">Post-Compaction Reinject</span>
+                    <p className="text-xs text-vscode-muted">
+                      Re-inject vision context after context compaction
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={cr.routerAutoRegenerate}
+                    onChange={() =>
+                      updateContextReinforcement({
+                        routerAutoRegenerate: !cr.routerAutoRegenerate,
+                      })
+                    }
+                    className="mt-1"
+                  />
+                  <div>
+                    <span className="text-sm">Auto-Regenerate Router</span>
+                    <p className="text-xs text-vscode-muted">
+                      Regenerate context router when KG changes
+                    </p>
+                  </div>
+                </label>
+
+                <div className="mt-4 pt-4 border-t border-vscode-border">
+                  <h4 className="text-sm font-medium mb-3">Session Context Distillation</h4>
+                  <p className="text-xs text-vscode-muted mb-3">
+                    Distills the original prompt into key points and tracks milestones during work
+                  </p>
+
+                  <label className="flex items-start gap-3 cursor-pointer mb-3">
+                    <input
+                      type="checkbox"
+                      checked={cr.sessionContextEnabled}
+                      onChange={() =>
+                        updateContextReinforcement({
+                          sessionContextEnabled: !cr.sessionContextEnabled,
+                        })
+                      }
+                      className="mt-1"
+                    />
+                    <div>
+                      <span className="text-sm">Enable Session Context</span>
+                      <p className="text-xs text-vscode-muted">
+                        Distill and re-inject the starting prompt as goals evolve
+                      </p>
+                    </div>
+                  </label>
+
+                  {cr.sessionContextEnabled && (
+                    <div className="space-y-4 pl-4">
+                      <div>
+                        <label className="text-sm">Session Context Debounce (seconds)</label>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="range"
+                            min="30"
+                            max="180"
+                            step="10"
+                            value={cr.sessionContextDebounceSeconds}
+                            onChange={(e) =>
+                              updateContextReinforcement({
+                                sessionContextDebounceSeconds: Number(e.target.value),
+                              })
+                            }
+                            className="flex-1"
+                          />
+                          <span className="w-12 text-right font-mono text-sm">
+                            {cr.sessionContextDebounceSeconds}s
+                          </span>
+                        </div>
+                        <p className="text-xs text-vscode-muted">
+                          Minimum gap between session context injections (default: 60s)
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="text-sm">Max Discoveries Per Session</label>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="range"
+                            min="3"
+                            max="20"
+                            value={cr.maxDiscoveriesPerSession}
+                            onChange={(e) =>
+                              updateContextReinforcement({
+                                maxDiscoveriesPerSession: Number(e.target.value),
+                              })
+                            }
+                            className="flex-1"
+                          />
+                          <span className="w-8 text-right font-mono text-sm">
+                            {cr.maxDiscoveriesPerSession}
+                          </span>
+                        </div>
+                        <p className="text-xs text-vscode-muted">
+                          Cap on milestones/findings tracked per session (default: 10)
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="text-sm">Refresh Interval</label>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="range"
+                            min="3"
+                            max="15"
+                            value={cr.refreshInterval}
+                            onChange={(e) =>
+                              updateContextReinforcement({
+                                refreshInterval: Number(e.target.value),
+                              })
+                            }
+                            className="flex-1"
+                          />
+                          <span className="w-8 text-right font-mono text-sm">
+                            {cr.refreshInterval}
+                          </span>
+                        </div>
+                        <p className="text-xs text-vscode-muted">
+                          Re-distill context every N injections (default: 5)
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Quality Gates */}
