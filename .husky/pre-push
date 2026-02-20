@@ -1,4 +1,12 @@
 ./scripts/ci/typecheck.sh
 ./scripts/ci/build.sh
-./scripts/ci/test.sh
-./scripts/ci/coverage.sh
+
+# Run Python and hook tests locally.
+# Extension tests require @vscode/test-electron (needs display/xvfb) — run in CI only.
+./scripts/ci/test.sh --component knowledge-graph
+./scripts/ci/test.sh --component quality
+./scripts/ci/test.sh --component governance
+./scripts/ci/test.sh --component hooks
+
+# Extension coverage also needs @vscode/test-electron — skip locally
+./scripts/ci/coverage.sh --skip-extension

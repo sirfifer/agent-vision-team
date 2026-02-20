@@ -11,6 +11,14 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # Current baselines (2026-02-19): knowledge-graph=36%, quality=41%, governance=0%
 THRESHOLD=30
 FAILED=false
+SKIP_EXTENSION=false
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --skip-extension) SKIP_EXTENSION=true; shift ;;
+    *) shift ;;
+  esac
+done
 
 echo "============================================"
 echo "  Coverage (threshold: ${THRESHOLD}%)"
@@ -94,7 +102,14 @@ mkdir -p "$PROJECT_ROOT/coverage"
 run_python_coverage "knowledge-graph"
 run_python_coverage "quality"
 run_python_coverage "governance"
-run_extension_coverage
+
+if [ "$SKIP_EXTENSION" = false ]; then
+  run_extension_coverage
+else
+  echo "--- coverage: extension (skipped) ---"
+  record_result "extension" "N/A" "SKIP"
+  echo ""
+fi
 
 # ---------------------------------------------------------------------------
 # Summary table
