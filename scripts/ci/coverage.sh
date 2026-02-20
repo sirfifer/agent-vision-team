@@ -43,7 +43,13 @@ record_result() {
 run_python_coverage() {
   local name="$1"
   local dir="$PROJECT_ROOT/mcp-servers/$name"
-  local pkg_name="collab_${name//-/_}"
+
+  # Discover actual package directory (collab_*) instead of guessing from name
+  local pkg_name
+  pkg_name=$(find "$dir" -maxdepth 1 -type d -name 'collab_*' -exec basename {} \; | head -1)
+  if [ -z "$pkg_name" ]; then
+    pkg_name="collab_${name//-/_}"
+  fi
 
   if [ ! -d "$dir/tests" ]; then
     echo "  Skipping $name (no tests/ directory)"
@@ -51,22 +57,36 @@ run_python_coverage() {
     return 0
   fi
 
+  # Skip if only __init__.py exists (no actual test files)
+  local test_files
+  test_files=$(find "$dir/tests" -name 'test_*.py' -o -name '*_test.py' | head -1)
+  if [ -z "$test_files" ]; then
+    echo "  Skipping $name (no test files)"
+    record_result "$name" "N/A" "SKIP"
+    return 0
+  fi
+
   echo "--- coverage: $name ---"
   cd "$dir"
 
-  local output
-  if output=$(uv run pytest tests/ \
+  local output rc=0
+  output=$(uv run pytest tests/ \
     --cov="$pkg_name" \
     --cov-report=term-missing \
     --cov-report=xml:"$PROJECT_ROOT/coverage/${name}-coverage.xml" \
     --cov-fail-under="$THRESHOLD" \
-    -v 2>&1); then
-    echo "$output"
+    -v 2>&1) || rc=$?
+
+  echo "$output"
+
+  if [ "$rc" -eq 5 ]; then
+    echo "  (no tests collected — skipping coverage)"
+    record_result "$name" "N/A" "SKIP"
+  elif [ "$rc" -eq 0 ]; then
     local pct
     pct=$(echo "$output" | grep "^TOTAL" | awk '{print $NF}' | tr -d '%')
     record_result "$name" "${pct}%" "PASS"
   else
-    echo "$output"
     local pct
     pct=$(echo "$output" | grep "^TOTAL" | awk '{print $NF}' | tr -d '%' || echo "?")
     record_result "$name" "${pct}%" "FAIL"

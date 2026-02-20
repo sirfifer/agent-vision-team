@@ -42,7 +42,13 @@ run_python_tests() {
 
   echo "--- pytest: $name ---"
   cd "$dir"
-  uv run pytest tests/ -v || FAILED=true
+  local rc=0
+  uv run pytest tests/ -v || rc=$?
+  if [ "$rc" -eq 5 ]; then
+    echo "  (no tests collected — skipping)"
+  elif [ "$rc" -ne 0 ]; then
+    FAILED=true
+  fi
   echo ""
 }
 
