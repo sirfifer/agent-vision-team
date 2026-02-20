@@ -1,12 +1,41 @@
-./scripts/ci/typecheck.sh
-./scripts/ci/build.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wrapper that runs a step and prints a clear error on failure
+run_step() {
+  local label="$1"
+  shift
+  echo ""
+  echo "========================================"
+  echo "  pre-push: $label"
+  echo "========================================"
+  if "$@"; then
+    echo "  OK: $label"
+  else
+    local code=$?
+    echo ""
+    echo "========================================"
+    echo "  BLOCKED: $label failed (exit $code)"
+    echo "  Fix the issue above, commit, and push again."
+    echo "========================================"
+    exit 1
+  fi
+}
+
+run_step "typecheck"  ./scripts/ci/typecheck.sh
+run_step "build"      ./scripts/ci/build.sh
 
 # Run Python and hook tests locally.
 # Extension tests require @vscode/test-electron (needs display/xvfb) — run in CI only.
-./scripts/ci/test.sh --component knowledge-graph
-./scripts/ci/test.sh --component quality
-./scripts/ci/test.sh --component governance
-./scripts/ci/test.sh --component hooks
+run_step "test: knowledge-graph"  ./scripts/ci/test.sh --component knowledge-graph
+run_step "test: quality"          ./scripts/ci/test.sh --component quality
+run_step "test: governance"       ./scripts/ci/test.sh --component governance
+run_step "test: hooks"            ./scripts/ci/test.sh --component hooks
 
 # Extension coverage also needs @vscode/test-electron — skip locally
-./scripts/ci/coverage.sh --skip-extension
+run_step "coverage"  ./scripts/ci/coverage.sh --skip-extension
+
+echo ""
+echo "========================================"
+echo "  pre-push: ALL CHECKS PASSED"
+echo "========================================"
