@@ -15,7 +15,8 @@ export type ActivityType =
   | 'drift'
   | 'decision'
   | 'review'
-  | 'research';
+  | 'research'
+  | 'bootstrap';
 
 export interface AgentStatus {
   id: string;

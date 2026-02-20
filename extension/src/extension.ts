@@ -13,6 +13,7 @@ import { FindingsTreeProvider } from './providers/FindingsTreeProvider';
 import { TasksTreeProvider } from './providers/TasksTreeProvider';
 import { MemoryTreeProvider } from './providers/MemoryTreeProvider';
 import { DashboardWebviewProvider } from './providers/DashboardWebviewProvider';
+import type { DecisionHistoryEntry } from './providers/DashboardWebviewProvider';
 import { registerSystemCommands } from './commands/systemCommands';
 import { registerMemoryCommands } from './commands/memoryCommands';
 import { registerTaskCommands } from './commands/taskCommands';
@@ -23,8 +24,8 @@ import type {
   GovernanceStatus,
   PendingReviewEntry,
   GovernedTaskListEntry,
+  DecisionHistoryEntry as RawDecisionHistoryEntry,
 } from './mcp/GovernanceClient';
-import type { DecisionHistoryEntry } from './mcp/GovernanceClient';
 
 let activityCounter = 0;
 function makeActivity(
@@ -318,7 +319,7 @@ async function fetchGovernanceData(governanceClient: GovernanceClient): Promise<
         .catch(() => ({ governed_tasks: [] as GovernedTaskListEntry[], total: 0 })),
       governanceClient
         .getDecisionHistory()
-        .catch(() => ({ decisions: [] as DecisionHistoryEntry[] })),
+        .catch(() => ({ decisions: [] as RawDecisionHistoryEntry[] })),
     ]);
 
     const taskGov = govStatus.task_governance;
@@ -481,7 +482,7 @@ export function activate(context: vscode.ExtensionContext): void {
         id: string;
         tool: string;
         severity: string;
-        component?: string;
+        component: string | null;
         description: string;
         created_at: string;
         status: string;
@@ -502,7 +503,7 @@ export function activate(context: vscode.ExtensionContext): void {
         id: f.id,
         tool: f.tool,
         severity: f.severity,
-        component: f.component,
+        component: f.component ?? undefined,
         description: f.description,
         createdAt: f.created_at,
         status: f.status as 'open' | 'dismissed',

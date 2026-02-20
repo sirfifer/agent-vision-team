@@ -33,7 +33,7 @@ interface QualityGateResults {
   timestamp?: string;
 }
 
-interface DecisionHistoryEntry {
+export interface DecisionHistoryEntry {
   id: string;
   taskId: string;
   agent: string;
@@ -1390,6 +1390,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
       // Add activity entry
       this.addActivity({
+        id: `activity-${Date.now()}`,
         timestamp: new Date().toISOString(),
         type: 'bootstrap',
         agent: 'dashboard',
@@ -1422,7 +1423,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       });
 
       if (response.ok) {
-        const result = await response.json();
+        const result = (await response.json()) as { content?: Array<{ text?: string }> };
         // FastMCP wraps tool results in content array
         const report = result?.content?.[0]?.text ? JSON.parse(result.content[0].text) : result;
         this.postMessage({ type: 'usageReport', report });
