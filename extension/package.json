@@ -218,7 +218,7 @@
     "build": "npm run build:webview && node esbuild.config.js",
     "watch": "node esbuild.config.js --watch",
     "lint": "eslint src --ext ts",
-    "pretest": "npm run build",
+    "pretest": "tsc -p .",
     "test": "node ./out/test/runTest.js",
     "test:coverage": "c8 --check-coverage --lines 80 --reporter=text --reporter=lcov node ./out/test/runTest.js"
   },
