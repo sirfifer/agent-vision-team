@@ -1,5 +1,10 @@
 # Research Briefs
 
+> **IMPORTANT**: This directory is ONLY for output from AVT researcher agents operating
+> within a deployed AVT installation. If you are a Claude Code agent doing development
+> work on the AVT codebase, put your research and design documents in `docs/design/` or
+> `docs/analysis/`, not here.
+
 This directory contains research output from the researcher agent.
 
 ## Naming Convention

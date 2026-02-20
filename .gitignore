@@ -45,6 +45,7 @@ htmlcov/
 # Test caches
 .pytest_cache/
 .ruff_cache/
+.vscode-test/
 
 # Logs
 *.log

@@ -1,5 +1,9 @@
 # Research Prompts
 
+> **IMPORTANT**: This directory is ONLY for research prompt definitions consumed by AVT
+> researcher agents in a deployed AVT installation. If you are a Claude Code agent doing
+> development work on the AVT codebase, this directory is not for you.
+
 This directory contains research prompt definitions for the researcher agent.
 
 ## Format
