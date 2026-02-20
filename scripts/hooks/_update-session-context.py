@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """Background: update session context with milestones and discoveries.
 
 Reads the session transcript during governance review processing to identify

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """Background: distill the original user prompt into session context.
 
 Reads the session transcript to find the first user message,

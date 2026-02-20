@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """PreToolUse hook: context reinforcement to prevent drift.
 
 Tracks tool call count per session. After a configurable threshold,

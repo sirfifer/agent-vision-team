@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import {
+  type ContextReinforcementConfig,
   ProjectConfig,
   SetupReadiness,
   DEFAULT_PROJECT_CONFIG,
@@ -68,7 +69,7 @@ export class ProjectConfigService {
           contextReinforcement: {
             ...DEFAULT_PROJECT_CONFIG.settings.contextReinforcement,
             ...(config.settings?.contextReinforcement ?? {}),
-          },
+          } as ContextReinforcementConfig,
         },
         quality: { ...DEFAULT_PROJECT_CONFIG.quality, ...config.quality },
         ingestion: { ...DEFAULT_PROJECT_CONFIG.ingestion, ...config.ingestion },
