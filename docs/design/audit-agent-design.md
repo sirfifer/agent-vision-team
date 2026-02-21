@@ -594,17 +594,108 @@ The [OTel GenAI semantic conventions](https://opentelemetry.io/docs/specs/semcon
 
 [disler/claude-code-hooks-multi-agent-observability](https://github.com/disler/claude-code-hooks-multi-agent-observability) demonstrates the hook-to-SQLite-to-WebSocket-to-dashboard pipeline for Claude Code. [ColeMurray/claude-code-otel](https://github.com/ColeMurray/claude-code-otel) demonstrates the OTel-to-Grafana pipeline. Both validate that hook-based event emission is the right integration point.
 
-## Open Questions
+## Implementation Status (2026-02-20)
 
-1. **OTel adoption depth**: Should we emit OTel-compatible spans from the start (enabling Grafana/Datadog integration) or keep it simple with our custom JSONL format and add OTel export later?
+The audit agent has been implemented using a **hook piggyback / fan belt architecture** rather than the long-running process described above. Key differences from the original design:
 
-2. **Multi-project isolation**: In headless multi-project mode, should each project have its own audit agent process, or should one audit agent observe all projects with project_id as an event dimension?
+### Architecture Change: Hook Piggyback (No Daemon)
 
-3. **Dashboard technology**: Extend the existing Vue-based AVT dashboard with an audit tab, or use a standalone tool like Grafana that natively handles time-series visualization?
+Instead of a separate long-running process, the implementation uses the system's own hook activity to drive audit processing. When the system is active, hooks fire and piggyback audit event emission. When the system is idle, nothing audit-related runs. This eliminates process management, auto-start/stop logic, and the dashboard server component.
 
-4. **Predictive capabilities**: AgentMonitor showed 0.89 Spearman correlation predicting task outcomes from intermediate signals. Should we build predictive models from audit data, or keep the agent purely observational?
+**Processing flow**: Hook fires -> `emit_audit_event()` appends to events.jsonl (~0.5ms) -> spawns settle checker (detached subprocess) -> settle checker waits 5s -> if no newer events, spawns processor -> processor reads new events, updates stats, checks anomalies -> if anomaly found, spawns escalation chain.
 
-5. **Event emission in subagents**: Worker subagents run in worktrees. Their hook events need to route to the same events.jsonl. Should the event emitter use an absolute path, or should the audit agent watch multiple event files?
+### Tiered LLM Escalation (Not Periodic Analysis)
+
+Instead of periodic Sonnet analysis on a schedule, the implementation uses a three-tier escalation chain triggered only by detected anomalies:
+
+| Tier | Model | When | Cost |
+|------|-------|------|------|
+| **Tier 1** | Haiku | Warning+ anomaly detected | ~$0.005 |
+| **Tier 2** | Sonnet | Haiku says "emerging pattern" | ~$0.03 |
+| **Tier 3** | Opus | Sonnet says "significant milestone" | ~$0.15 |
+
+Each tier is a detached subprocess that spawns the next only if warranted. ~85% of trigger events complete in ~5ms with no LLM call.
+
+### Observation Directives (Editable JSON)
+
+A `directives.json` file defines what to look for without code changes. Each directive specifies watch patterns, tier-specific questions, and recommendation types. New directives can be added by editing this file.
+
+### Dashboard Integration
+
+The dashboard is an **Audit tab** in the existing React webview (not a separate application or route). It shows a health strip, active recommendations with dismiss actions, and a recent events feed. The extension reads pre-computed data directly from `.avt/audit/` files.
+
+### Simplified Recommendation Lifecycle
+
+States: `active -> stale/dismissed/superseded/resolved`. No `PENDING` or `PARTIALLY_RESOLVED` states. TTL-based expiry with evidence count deduplication.
+
+### What Was Not Implemented (Deferred)
+
+- **Causal graph**: The causal-graph.db and chain/impact/pattern/drift API endpoints. Statistical correlation is sufficient for v1.
+- **Ring buffer**: Events are always written at STANDARD level. Anomaly-triggered detail flush deferred.
+- **MCP server event emission**: Events are emitted from hooks only, not from MCP server tool handlers. Hook coverage is sufficient for v1.
+- **Audit levels**: Only STANDARD level implemented. SUMMARY, DETAILED, and FORENSIC deferred.
+- **Self-auditing of recommendations**: Periodic Haiku staleness checks deferred. TTL-based expiry handles the basic case.
+- **OTel export**: Custom JSONL format only.
+- **Apply action for recommendations**: Dashboard has Dismiss only. Apply (auto-tune settings) deferred.
+
+### Implementation Files
+
+```
+scripts/hooks/audit/              # Shared audit library
+    __init__.py
+    emitter.py                    # emit_audit_event() (fire-and-forget, TAP guarantee)
+    config.py                     # Load audit settings from project-config.json
+    directives.json               # 5 observation directives (editable)
+    stats.py                      # StatsAccumulator (SQLite rolling aggregates)
+    anomaly.py                    # AnomalyDetector (5 threshold checks)
+    recommendations.py            # RecommendationManager (JSON-file lifecycle)
+    escalation.py                 # Tiered LLM chain (claude --print + temp file I/O)
+    prompts.py                    # Prompt builders + directive matching
+    tests/                        # 53 unit tests (emitter, stats, anomaly, recommendations, prompts)
+
+scripts/hooks/_audit-settle-check.py  # Background settle checker (5s, longer than governance 3s)
+scripts/hooks/_audit-process.py       # Processor (file lock, checkpoint, anomaly check)
+scripts/hooks/_audit-escalate.py      # Escalation chain runner (Haiku -> Sonnet -> Opus)
+
+extension/webview-dashboard/src/components/audit/AuditPanel.tsx  # Dashboard Audit tab
+extension/src/providers/DashboardWebviewProvider.ts              # 4 audit message handlers
+extension/webview-dashboard/src/types.ts                         # Audit types
+
+.avt/audit/                       # Runtime storage (gitignored)
+    events.jsonl                  # Append-only event log
+    statistics.db                 # SQLite rolling aggregates
+    recommendations.json          # Active recommendations
+    checkpoint.json               # Last-processed byte offset
+    .last-event-ts                # Settle coordination timestamp
+    .processor-lock               # File-based exclusion lock
+```
+
+### Hooks Modified (Event Emission Added)
+
+| Hook | Event emitted |
+|------|--------------|
+| `governance-task-intercept.py` | `governance.task_pair_created` + spawns settle checker |
+| `_holistic-settle-check.py` | `governance.holistic_review_completed` / `governance.holistic_review_skipped` |
+| `_run-governance-review.sh` | `governance.individual_review_completed` |
+| `task-completed-gate.sh` | `task.completion_attempted` |
+| `teammate-idle-gate.sh` | `agent.idle_blocked` |
+| `verify-governance-review.sh` | `governance.plan_exit_attempted` |
+
+## Open Questions (Updated)
+
+1. ~~**OTel adoption depth**~~: Deferred. Using custom JSONL format for v1.
+
+2. ~~**Multi-project isolation**~~: Deferred. Single project per installation.
+
+3. ~~**Dashboard technology**~~: Resolved. Integrated as a tab in the existing React dashboard.
+
+4. **Predictive capabilities**: Still open. AgentMonitor showed 0.89 Spearman correlation. Could build on the statistical foundation in statistics.db.
+
+5. ~~**Event emission in subagents**~~: Resolved. Events use absolute paths via `CLAUDE_PROJECT_DIR` environment variable.
+
+6. **Causal graph**: Deferred from v1. Would enable "why did this happen?" queries. The event log contains the raw data; the correlation engine is the missing piece.
+
+7. **MCP server event emission**: Should governance/quality/KG servers emit their own audit events? Currently only hooks emit. Server-side emission would capture API calls not triggered by hooks.
 
 ## Sources
 

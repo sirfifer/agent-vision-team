@@ -40,6 +40,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+      - uses: astral-sh/setup-uv@v4
       - run: ./scripts/ci/setup.sh
       - run: ./scripts/ci/typecheck.sh
 
@@ -56,6 +57,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+      - uses: astral-sh/setup-uv@v4
       - run: ./scripts/ci/setup.sh
       - run: ./scripts/ci/build.sh
 
@@ -87,6 +89,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+      - uses: astral-sh/setup-uv@v4
       - run: ./scripts/ci/setup.sh
       - run: ./scripts/ci/build.sh
       - run: sudo apt-get install -y xvfb

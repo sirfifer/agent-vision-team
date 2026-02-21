@@ -6,7 +6,7 @@ pattern
 
 ## Description
 
-All five lifecycle hooks follow a consistent verification pattern: read JSON from stdin (Claude Code hook protocol), perform a fast-path exit check (~1ms when not applicable), interact with the governance SQLite database for state management, write JSON to stdout with `hookSpecificOutput.additionalContext`, and use exit code semantics (0=success, 2=redirect with feedback).
+All lifecycle hooks follow a consistent verification pattern: read JSON from stdin (Claude Code hook protocol), perform a fast-path exit check (~1ms when not applicable), interact with the governance SQLite database for state management, write JSON to stdout with `hookSpecificOutput.additionalContext`, and use exit code semantics (0=success, 2=redirect with feedback). Additionally, most hooks piggyback audit event emission as a fire-and-forget side effect (~0.5ms), feeding the passive audit agent.
 
 ## Structure
 
@@ -40,3 +40,5 @@ graph LR
 - All governance state in SQLite (governance.db)
 - Context reinforcement state in session-scoped files (`.avt/.session-context-{session_id}.json`, `.avt/.session-calls-{session_id}`, `.avt/.injection-history-{session_id}`)
 - Context reinforcement and post-compaction hooks use `additionalContext` (advise); governance hooks use exit code 2 (block/redirect)
+- Audit event emission: most hooks call `emit_audit_event()` as a fire-and-forget tail (~0.5ms, wrapped in try/except pass). The TAP guarantee ensures audit failures never affect operational hooks.
+- Audit settle checker: `governance-task-intercept.py` spawns `_audit-settle-check.py` as a detached subprocess after emitting events, triggering batch processing after 5s of quiet

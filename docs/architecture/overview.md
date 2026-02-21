@@ -24,6 +24,7 @@ graph TB
         GOV[Governance MCP]
         Hooks[Hook Scripts]
         Agents[Agent Definitions]
+        Audit[Audit Agent]
     end
 
     CC --> Hooks
@@ -37,6 +38,8 @@ graph TB
     GW --> QS
     GW --> GOV
     Dashboard --> GW
+    Hooks --> Audit
+    Dashboard --> Audit
 
     subgraph External
         Git[Git Repository]
@@ -69,6 +72,7 @@ graph LR
         KG[Knowledge Graph<br/>MCP Server]
         QS[Quality<br/>MCP Server]
         GOV[Governance<br/>MCP Server]
+        AUD[Audit Agent<br/>Hook Piggyback]
     end
 
     subgraph Persistence
@@ -76,6 +80,7 @@ graph LR
         SQLite1[SQLite<br/>Governance DB]
         SQLite2[SQLite<br/>Trust Engine DB]
         JSON[JSON Files<br/>Tasks, Config]
+        AuditDB[SQLite + JSONL<br/>Audit Statistics]
     end
 
     subgraph Platform
@@ -97,6 +102,8 @@ graph LR
     GOV --> SQLite1
     QS --> SQLite2
     Hooks --> GOV
+    Hooks --> AUD
+    AUD --> AuditDB
     Agents --> KG
     Agents --> QS
     Agents --> GOV
@@ -115,6 +122,7 @@ graph LR
 | AVT Gateway | REST API, WebSocket push, job runner | Python | `server/avt_gateway/` | FastAPI, SSE MCP client, routers |
 | E2E Test Harness | 14 scenarios, 292+ assertions, parallel execution | Python | `e2e/` | BaseScenario, structural assertions |
 | Context Reinforcement | Session context distillation, goal tracking, three-layer injection | Python/Bash | `scripts/hooks/` | Background distillation, atomic writes, file locking |
+| Audit Agent | Passive system observer: event emission, anomaly detection, tiered LLM escalation, recommendations | Python | `scripts/hooks/audit/` | Hook piggyback, settle/debounce, fire-and-forget subprocess, TAP guarantee |
 | Hook Scripts | Platform-level governance verification + context drift prevention (7 hooks) | Bash/Python | `scripts/hooks/` | JSON stdin/stdout, fast-path, exit codes, additionalContext injection |
 | CI Scripts | Unified quality pipeline (lint, typecheck, build, test, coverage) | Bash | `scripts/ci/` | Same scripts locally and in CI |
 | GitHub Actions | CI pipeline on every push | YAML | `.github/workflows/ci.yml` | Parallel jobs, matrix strategy, xvfb |
@@ -130,3 +138,4 @@ graph LR
 6. **Session-scoped holistic review**: Groups of tasks reviewed collectively before any work begins, using timing-based settle detection
 7. **Three-layer context reinforcement**: Session context (distilled goals/discoveries), static router (KG-derived vision/architecture), and post-compaction recovery. Background AI calls via `claude --print --model haiku`; synchronous hooks only read files
 8. **Scripts-first CI/CD**: All quality checks run via bash scripts in `scripts/ci/`; git hooks and GitHub Actions both call the same scripts, ensuring local and CI behavior are identical
+9. **Hook-piggybacked audit**: Passive audit agent driven by existing hook activity (no daemon); tiered LLM escalation (Haiku triage, Sonnet analysis, Opus deep dive) triggered only by detected anomalies
