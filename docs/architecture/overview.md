@@ -2,7 +2,7 @@
 
 ## Project Summary
 
-Agent Vision Team (AVT) is a collaborative intelligence platform that coordinates multiple AI agents for software development. It combines Claude Code's native capabilities (subagents, hooks, git worktrees, model routing) with three custom MCP servers (Knowledge Graph, Quality, Governance) to provide transparent, governed multi-agent development workflows.
+Agent Vision Team (AVT) is a collaborative intelligence platform that coordinates multiple AI agents for software development. It combines Claude Code's native capabilities (subagents, hooks, git worktrees, model routing) with three custom MCP servers (Knowledge Graph, Quality, Governance), a context reinforcement system that maintains agent alignment across long sessions, and an audit agent that passively monitors system health and produces actionable recommendations via tiered LLM analysis.
 
 ## System Context
 
@@ -24,6 +24,7 @@ graph TB
         GOV[Governance MCP]
         Hooks[Hook Scripts]
         Agents[Agent Definitions]
+        CR[Context Reinforcement]
         Audit[Audit Agent]
     end
 
@@ -38,7 +39,9 @@ graph TB
     GW --> QS
     GW --> GOV
     Dashboard --> GW
+    Hooks --> CR
     Hooks --> Audit
+    CR --> KG
     Dashboard --> Audit
 
     subgraph External
@@ -72,7 +75,8 @@ graph LR
         KG[Knowledge Graph<br/>MCP Server]
         QS[Quality<br/>MCP Server]
         GOV[Governance<br/>MCP Server]
-        AUD[Audit Agent<br/>Hook Piggyback]
+        CR[Context Reinforcement<br/>Session Alignment]
+        AUD[Audit Agent<br/>Anomaly Detection]
     end
 
     subgraph Persistence
@@ -102,7 +106,9 @@ graph LR
     GOV --> SQLite1
     QS --> SQLite2
     Hooks --> GOV
+    Hooks --> CR
     Hooks --> AUD
+    CR --> JSONL
     AUD --> AuditDB
     Agents --> KG
     Agents --> QS

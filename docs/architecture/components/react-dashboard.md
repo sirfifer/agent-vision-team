@@ -28,6 +28,7 @@ graph TD
         GP["GovernancePanel"]
         AP["ActivityPanel"]
         SP["SettingsPanel"]
+        AuP["AuditPanel"]
     end
 
     subgraph Shared
@@ -45,6 +46,7 @@ graph TD
     App --> GP
     App --> AP
     App --> SP
+    App --> AuP
     App --> AC
     App --> SB
     App --> NV

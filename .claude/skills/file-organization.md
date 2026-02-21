@@ -42,6 +42,13 @@ user_invocable: true
 │   └── rp-xxx.md                    # Research prompt definitions
 ├── research-briefs/                 # Research output briefs
 │   └── rb-xxx.md                    # Completed research briefs
+├── audit/                           # Audit agent runtime storage (gitignored)
+│   ├── events.jsonl                 # Append-only event log (source of truth)
+│   ├── statistics.db                # SQLite rolling aggregates
+│   ├── recommendations.json         # Active recommendations
+│   ├── checkpoint.json              # Last-processed byte offset
+│   ├── .last-event-ts               # Settle coordination timestamp
+│   └── .processor-lock              # File-based exclusion lock
 └── project-config.json              # Project configuration
 
 docs/                                    # Project-level documentation
@@ -63,6 +70,30 @@ e2e/                                     # Autonomous E2E testing harness
 ├── scenarios/                           # 14 test scenarios (s01-s14)
 ├── parallel/                            # ThreadPoolExecutor + isolation
 └── validation/                          # Assertion engine + report generator
+
+scripts/hooks/                               # Claude Code lifecycle hooks
+├── governance-task-intercept.py          # PostToolUse:TaskCreate handler
+├── holistic-review-gate.sh              # PreToolUse mutation tool gate
+├── context-reinforcement.py             # PreToolUse context injection
+├── verify-governance-review.sh          # PreToolUse:ExitPlanMode gate
+├── post-compaction-reinject.sh          # SessionStart:compact recovery
+├── teammate-idle-gate.sh               # TeammateIdle gate
+├── task-completed-gate.sh              # TaskCompleted gate
+├── _holistic-settle-check.py           # Background settle checker (governance)
+├── _run-governance-review.sh           # Individual review runner
+├── _audit-settle-check.py              # Background settle checker (audit, 5s)
+├── _audit-process.py                   # Audit event processor
+├── _audit-escalate.py                  # Tiered LLM escalation chain
+└── audit/                              # Audit agent library
+    ├── emitter.py                      # emit_audit_event() (fire-and-forget)
+    ├── config.py                       # Load audit settings
+    ├── directives.json                 # 5 observation directives (editable)
+    ├── stats.py                        # StatsAccumulator (SQLite)
+    ├── anomaly.py                      # AnomalyDetector (5 threshold checks)
+    ├── recommendations.py              # RecommendationManager (JSON lifecycle)
+    ├── escalation.py                   # LLM chain (Haiku -> Sonnet -> Opus)
+    ├── prompts.py                      # Prompt builders + directive matching
+    └── tests/                          # 53 unit tests
 
 server/                                  # AVT Gateway (headless web mode)
 ├── avt_gateway/                         # FastAPI application

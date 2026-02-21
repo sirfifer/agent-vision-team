@@ -942,8 +942,6 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
     try {
       fs.writeFileSync(inputPath, prompt, 'utf-8');
 
-      let finalResult = '';
-
       await new Promise<void>((resolve, reject) => {
         const inputFd = fs.openSync(inputPath, 'r');
 
@@ -979,10 +977,6 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
           try {
             const event = JSON.parse(line);
             this.handleBootstrapStreamEvent(event);
-            // Capture the final result text
-            if (event.type === 'result' && event.result) {
-              finalResult = event.result;
-            }
           } catch {
             // Skip non-JSON lines (e.g., blank lines, warnings)
           }
@@ -1014,6 +1008,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
 
         // Patch lastEventTime on each stream event
         const origHandler = this.handleBootstrapStreamEvent.bind(this);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.handleBootstrapStreamEvent = (event: any) => {
           lastEventTime = Date.now();
           origHandler(event);
@@ -1097,6 +1092,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
    * Handle a single stream-json event from the bootstrap claude CLI process.
    * Parses tool calls and text to send real-time progress to the webview.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private handleBootstrapStreamEvent(event: any): void {
     switch (event.type) {
       case 'system':
@@ -1145,6 +1141,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   /**
    * Translate a raw tool call into a human-readable summary.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private summarizeToolCall(tool: string, input: any): string {
     try {
       switch (tool) {
@@ -1179,6 +1176,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
   /**
    * Derive the current bootstrap phase from the tool being called.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private deriveBootstrapPhase(tool: string, input: any): string {
     try {
       if (tool === 'Bash') {
@@ -1239,6 +1237,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       const discoveriesPath = path.join(projectDir, '.avt', 'bootstrap-discoveries.json');
       if (fs.existsSync(discoveriesPath)) {
         const data = JSON.parse(fs.readFileSync(discoveriesPath, 'utf-8'));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const items = (data.discoveries || []).map((d: any) => ({
           id: d.id || '',
           name: d.name || d.id || '',
@@ -1309,7 +1308,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       this.postMessage({ type: 'bootstrapReviewLoaded', items });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load bootstrap review:', err);
       this.postMessage({ type: 'bootstrapReviewLoaded', items: [] });
     }
@@ -1418,7 +1417,7 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         type: 'bootstrapReviewFinalized',
         result: { success: true, approved, rejected, edited, errors: [] },
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to finalize bootstrap review:', err);
       this.postMessage({
         type: 'bootstrapReviewFinalized',

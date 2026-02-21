@@ -1,6 +1,6 @@
 # ARCHITECTURE.md v2 — Agent Vision Team
 
-This document is the authoritative architecture reference for the Agent Vision Team Collaborative Intelligence System. It describes the system as built: a Claude Code-based orchestration platform coordinating 8 specialized agents across 3 MCP servers, with transactional governance review, persistent institutional memory, deterministic quality verification, a VS Code extension providing setup, monitoring, and management capabilities, and a headless web mode with multi-project management via the AVT Gateway. Agent Teams is the primary orchestration mechanism, with teammates as full Claude Code sessions sharing a task list and governed by five lifecycle hooks.
+This document is the authoritative architecture reference for the Agent Vision Team Collaborative Intelligence System. It describes the system as built: a Claude Code-based orchestration platform coordinating 8 specialized agents across 3 MCP servers, with transactional governance review, persistent institutional memory, deterministic quality verification, context reinforcement for long-session agent alignment, a passive audit agent for system health monitoring and anomaly-driven recommendations, a VS Code extension providing setup, monitoring, and management capabilities, and a headless web mode with multi-project management via the AVT Gateway. Agent Teams is the primary orchestration mechanism, with teammates as full Claude Code sessions sharing a task list and governed by five lifecycle hooks.
 
 The system operates in two modes. In its **embedded mode**, the dashboard runs as a VS Code webview panel with MCP servers spawned as extension-managed child processes. In its **headless web mode**, an AVT Gateway (FastAPI on port 8080) serves the same React dashboard as a standalone web application, manages per-project MCP server instances with isolated port allocations, and pushes real-time updates over WebSocket. A transport abstraction layer makes dashboard code mode-agnostic. Both modes share the same persistent state (Knowledge Graph, governance database, trust engine) in the project directory. AI inference is cloud-based, handled by Anthropic's Claude models via Claude Code. Claude Code Max provides model access through a subscription (no API keys to manage), but an internet connection is required for all agent operations.
 
@@ -41,6 +41,8 @@ The system operates in two modes. In its **embedded mode**, the dashboard runs a
 | **8 Specialized Agents** | Worker, Quality Reviewer, KG Librarian, Governance Reviewer, Researcher, Project Steward, Architect, Project Bootstrapper |
 | **Agent Teams Orchestration** | Teammates are full Claude Code sessions with independent MCP access, shared task lists, self-claim, direct messaging, and hook enforcement |
 | **Governance Architecture** | Five lifecycle hooks (PostToolUse TaskCreate, PreToolUse ExitPlanMode, PreToolUse Write/Edit/Bash/Task, TeammateIdle, TaskCompleted), session-scoped holistic review with settle/debounce, governed tasks (verified before execution), transactional decision review, multi-review stacking, AI-powered review via `claude --print`, token usage tracking |
+| **Context Reinforcement** | Three-layer agent alignment system: session context distillation (background Haiku calls), static KG-derived vision/architecture router, and post-compaction recovery. Prevents goal drift and maintains institutional awareness across long agent sessions |
+| **Audit Agent** | System health monitor piggybacking on existing hooks; append-only event log (JSONL), rolling statistics (SQLite), threshold-based anomaly detection, tiered LLM escalation (Haiku triage, Sonnet analysis, Opus deep dive), actionable recommendations with lifecycle tracking; fan-belt architecture (dormant when idle) |
 | **Three-Tier Protection Hierarchy** | Vision > Architecture > Quality — lower tiers cannot modify higher tiers |
 | **Project Rules System** | Behavioral guidelines (enforce/prefer) injected into agent prompts from `.avt/project-config.json` |
 | **E2E Testing Harness** | 14 scenarios, 292+ structural assertions, parallel execution with full isolation |
@@ -3068,6 +3070,13 @@ agent-vision-team/
 │   │   └── README.md
 │   ├── research-briefs/
 │   │   └── README.md
+│   ├── audit/                               # Audit agent runtime storage (gitignored)
+│   │   ├── events.jsonl                     # Append-only audit event log
+│   │   ├── statistics.db                    # SQLite rolling aggregates (WAL mode)
+│   │   ├── recommendations.json             # Active and historical recommendations
+│   │   ├── checkpoint.json                  # Last-processed byte offset
+│   │   ├── .last-event-ts                   # Settle coordination timestamp
+│   │   └── .processor-lock                  # File lock (prevents concurrent processors)
 │   └── project-config.json                  # Project configuration (managed by wizard)
 │
 ├── extension/                               # VS Code extension
@@ -3132,6 +3141,8 @@ agent-vision-team/
 │   │   │       ├── ActivityEntry.tsx
 │   │   │       ├── SettingsPanel.tsx
 │   │   │       ├── ResearchPromptsPanel.tsx
+│   │   │       ├── audit/
+│   │   │       │   └── AuditPanel.tsx               # Audit health, recommendations, events
 │   │   │       ├── ui/
 │   │   │       │   └── WarningDialog.tsx
 │   │   │       ├── wizard/
@@ -3314,8 +3325,40 @@ agent-vision-team/
 │   ├── start-mcp-servers.sh
 │   ├── stop-mcp-servers.sh
 │   ├── populate-test-data.sh
+│   ├── ci/
+│   │   ├── lint.sh
+│   │   ├── typecheck.sh
+│   │   ├── build.sh
+│   │   ├── test.sh
+│   │   └── coverage.sh
 │   └── hooks/
-│       └── verify-governance-review.sh
+│       ├── governance-task-intercept.py             # PostToolUse on TaskCreate + audit emission
+│       ├── _holistic-settle-check.py                # Settle/debounce for holistic review + audit emission
+│       ├── _run-governance-review.sh                # Individual governance review + audit emission
+│       ├── verify-governance-review.sh              # PreToolUse on ExitPlanMode + audit emission
+│       ├── holistic-review-gate.sh                  # PreToolUse gate during holistic review
+│       ├── task-completed-gate.sh                   # TaskCompleted governance gate + audit emission
+│       ├── teammate-idle-gate.sh                    # TeammateIdle governance gate + audit emission
+│       ├── context-reinforcement.py                 # PostToolUse context injection
+│       ├── _update-session-context.py               # Background session context updater
+│       ├── _audit-settle-check.py                   # Audit settle checker (5s debounce)
+│       ├── _audit-process.py                        # Audit processor (stats + anomaly detection)
+│       ├── _audit-escalate.py                       # Tiered LLM escalation chain
+│       └── audit/                                   # Audit agent library
+│           ├── __init__.py
+│           ├── emitter.py                           # emit_audit_event() fire-and-forget
+│           ├── config.py                            # Audit settings from project-config.json
+│           ├── stats.py                             # StatsAccumulator (SQLite rolling aggregates)
+│           ├── anomaly.py                           # AnomalyDetector (threshold checks)
+│           ├── recommendations.py                   # RecommendationManager (JSON lifecycle)
+│           ├── escalation.py                        # Tiered LLM escalation (Haiku/Sonnet/Opus)
+│           ├── prompts.py                           # Prompt builders for each escalation tier
+│           ├── directives.json                      # Observation directives (editable)
+│           └── tests/                               # Audit unit tests
+│               ├── test_emitter.py
+│               ├── test_stats.py
+│               ├── test_anomaly.py
+│               └── test_recommendations.py
 │
 ├── templates/                               # Target project scaffolding templates
 │   ├── claude-md/
@@ -3389,6 +3432,11 @@ target-project/
 │   ├── research-briefs/
 │   │   └── README.md
 │   ├── research-prompts.json                # Research prompt registry
+│   ├── audit/                               # Audit agent runtime storage (gitignored)
+│   │   ├── events.jsonl
+│   │   ├── statistics.db
+│   │   ├── recommendations.json
+│   │   └── checkpoint.json
 │   └── project-config.json                  # Project configuration
 │
 ├── docs/

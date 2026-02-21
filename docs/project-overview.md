@@ -1,14 +1,14 @@
 # Agent Vision Team -- Project Overview
 
-> A platform-native multi-agent system for software development built on Claude Code, providing tier-protected institutional memory, transactional governance, deterministic quality verification, and context drift prevention through three MCP servers, eight specialized agents, Agent Teams orchestration, a seven-hook verification and context layer, and a standalone web gateway for remote operation.
+> A platform-native multi-agent system for software development built on Claude Code, providing tier-protected institutional memory, transactional governance, deterministic quality verification, context reinforcement for long-session agent alignment, and a passive audit agent for system health monitoring, through three MCP servers, eight specialized agents, Agent Teams orchestration, a seven-hook verification and context layer, and a standalone web gateway for remote operation.
 
-**Last Updated**: 2026-02-19
+**Last Updated**: 2026-02-20
 
 ---
 
 ## What This Project Is
 
-Agent Vision Team is a collaborative intelligence system that coordinates multiple specialized AI agents to accomplish complex development tasks. It runs entirely on Claude Code Max and extends Claude Code's native capabilities with three MCP servers that provide what the platform cannot do on its own: persistent institutional memory, transactional governance checkpoints, and deterministic quality verification.
+Agent Vision Team is a collaborative intelligence system that coordinates multiple specialized AI agents to accomplish complex development tasks. It runs entirely on Claude Code Max and extends Claude Code's native capabilities with three MCP servers that provide what the platform cannot do on its own: persistent institutional memory, transactional governance checkpoints, and deterministic quality verification. Two additional systems operate alongside the MCP servers: a **context reinforcement** system that prevents agent goal drift across long sessions through three-layer injection (session context, static router, post-compaction recovery), and an **audit agent** that passively monitors system health by piggybacking on hook activity, detecting anomalies via threshold checks, and escalating through a tiered LLM chain (Haiku triage, Sonnet analysis, Opus deep dive) to produce actionable recommendations.
 
 The system is organized around a three-tier governance hierarchy: **Vision** (immutable project principles), **Architecture** (human-gated structural patterns), and **Quality** (automated code standards). Every piece of work an agent produces is measured against this hierarchy. A perfectly linted function that violates the project's design philosophy is a failure, not a success.
 
@@ -56,6 +56,10 @@ The system operates in two modes: **locally** via the VS Code extension for deve
 | Context Reinforcement:                                           |
 | 6. PreToolUse(Write|Edit|...)  context-reinforcement.py          |
 | 7. SessionStart(compact)       post-compaction-reinject.sh       |
+|                                                                  |
+| Audit Agent (piggybacked on hooks 1-5):                          |
+|   emit_audit_event() -> events.jsonl -> settle (5s) ->           |
+|   processor (stats + anomaly) -> escalation (Haiku/Sonnet/Opus)  |
 +------------------------------------------------------------------+
                           |
 +-------------------------v---------------------------------------+
@@ -264,6 +268,56 @@ Meanwhile: Agent tries to Write/Edit/Bash/Task:
 - Fast path is ~1ms when no review is pending (flag file glob check)
 - Single tasks skip holistic review (`MIN_TASKS_FOR_REVIEW = 2`)
 - Stale flags older than 5 minutes are auto-cleared
+
+---
+
+## Audit Agent -- System Health Monitor
+
+The audit agent is a passive observer that watches all AVT activity through hook-piggybacked event emission, detects anomalies via threshold-based checks, and produces actionable recommendations through a tiered LLM escalation chain. It uses a "fan belt" architecture: powered by the system's own hook activity, dormant when idle. No daemon, no long-running process.
+
+### How It Works
+
+```
+Agent does work -> Hook fires -> emit_audit_event() (~0.5ms, fire-and-forget)
+                                        |
+                              Spawn settle checker (5s debounce)
+                                        |
+                              No newer events? -> Processor runs:
+                                        |
+                              Read events -> Update stats (SQLite) ->
+                              Check anomaly thresholds (pure Python, <1ms)
+                                        |
+                              Anomaly found? -> Escalation chain:
+                              Tier 1: Haiku triage (~$0.005)
+                              Tier 2: Sonnet analysis (~$0.03)
+                              Tier 3: Opus deep dive (~$0.15)
+```
+
+~85% of triggers complete in ~5ms with no LLM call. Each escalation tier is a detached subprocess that spawns the next only if warranted.
+
+### What It Detects
+
+| Check | Threshold | Severity |
+|-------|-----------|----------|
+| High governance block rate | > 50% per session | warning |
+| High gate block rate | > 50% with min 3 gates | warning |
+| Repeated idle blocks | 3+ in one batch | info |
+| High reinforcement skip rate | > 70% with min 3 events | warning |
+| Event rate spike | > 3x rolling baseline | info |
+
+### Observation Directives
+
+Five editable directives in `directives.json` guide what the escalation chain looks for: setting/outcome correlations, prompt effectiveness, setting range adequacy, governance health, and coverage gaps. New directives can be added without code changes.
+
+### Recommendations
+
+Anomalies produce actionable recommendations (e.g., "lower toolCallThreshold from 8 to 6") with evidence counts, TTL-based expiry, and lifecycle tracking (active, stale, dismissed, superseded, resolved). The dashboard's Audit tab shows health status, active recommendations with dismiss actions, and a recent events feed.
+
+### Storage
+
+All audit data lives under `.avt/audit/` (gitignored): `events.jsonl` (append-only event log), `statistics.db` (SQLite rolling aggregates), `recommendations.json` (active recommendations), `checkpoint.json` (last-processed byte offset).
+
+**Key files**: `scripts/hooks/audit/` (library: emitter, stats, anomaly, recommendations, escalation, prompts, directives), `scripts/hooks/_audit-settle-check.py`, `scripts/hooks/_audit-process.py`, `scripts/hooks/_audit-escalate.py`, `extension/webview-dashboard/src/components/audit/AuditPanel.tsx`
 
 ---
 
@@ -573,6 +627,7 @@ An autonomous end-to-end testing system that exercises all three MCP servers acr
 **Additional test suites**:
 - **Unit tests**: 37 assertions across KG (18) and Quality (19) servers
 - **Hook unit tests**: 120 assertions across 10 groups covering governance hooks (Groups 1-5) and context reinforcement (Groups 6-10: session context injection, distillation, update, post-compaction, governance pipeline integration)
+- **Audit unit tests**: 53 assertions across 4 test modules (emitter, stats, anomaly, recommendations) covering event emission, TAP guarantee, SQLite statistics, threshold detection, and recommendation lifecycle
 - **MCP access tests**: 15 assertions verifying MCP tool availability across session types
 - **Capability matrix tests**: 13 assertions verifying file write, edit, bash, and MCP access at direct/subagent levels
 - **Hook live tests**: Level 1-4 tests covering mock interception, real AI review, subagent inheritance, and session-scoped flags
@@ -603,6 +658,10 @@ An autonomous end-to-end testing system that exercises all three MCP servers acr
 | `.avt/.session-calls-{session_id}` | Tool call counter per session for context reinforcement threshold | `context-reinforcement.py` |
 | `.avt/.injection-history-{session_id}` | Injection history for debounce/dedup tracking | `context-reinforcement.py` |
 | `.avt/context-router.json` | KG-derived context router for vision/architecture/rules injection | `generate-context-router.py` |
+| `.avt/audit/events.jsonl` | Append-only audit event log (source of truth) | Audit emitter (hook piggyback) |
+| `.avt/audit/statistics.db` | Rolling aggregates: event counts, session summaries, anomalies | Audit processor |
+| `.avt/audit/recommendations.json` | Active and historical recommendations with lifecycle tracking | Audit processor + escalation chain |
+| `.avt/audit/checkpoint.json` | Last-processed byte offset into events.jsonl | Audit processor |
 | `.avt/api-key.txt` | Gateway API authentication key (auto-generated) | AVT Gateway |
 | `.avt/jobs/` | Job submission state and output (JSON files) | AVT Gateway |
 
@@ -796,8 +855,9 @@ All five implementation phases are complete, plus an Agent Teams adaptation and 
 - **Agent Teams Adaptation**: Five-hook verification layer (PostToolUse, PreToolUse, TeammateIdle, TaskCompleted), session-scoped holistic review flag files, token usage tracking with dashboard panel, CLAUDE.md skills refactor (963 -> 284 lines), KG client TTL caching
 - **Context Drift Prevention**: Three-layer context injection (session context, static router, post-compaction), session context distillation via background haiku calls, goal tracking through governance review pipeline, 13 tunable settings with UI controls, 120 hook-level unit tests across 10 test groups
 - **CI/CD Pipeline**: Unified script layer (`scripts/ci/`), pre-commit hooks (Husky + lint-staged for lint/format), pre-push hooks (typecheck + build + test + coverage with clear error reporting), GitHub Actions on every push to every branch (parallel jobs, matrix strategy), ESLint + Prettier (TypeScript), Ruff (Python), coverage enforcement
+- **Audit Agent**: Hook-piggybacked passive system observer with append-only event log (JSONL), rolling statistics (SQLite), threshold-based anomaly detection (5 checks), tiered LLM escalation (Haiku/Sonnet/Opus), observation directives (5 editable, no code changes), recommendation lifecycle (active/stale/dismissed/superseded/resolved), dashboard Audit tab with health strip and recommendation management, 53 unit tests
 
-**Total test assertions**: 44 unit + 120 hook + 15 MCP + 13 capability + 292 E2E = 484 assertions
+**Total test assertions**: 44 unit + 120 hook + 53 audit + 15 MCP + 13 capability + 292 E2E = 537 assertions
 
 **Planned**: Cross-project memory, multi-worker parallelism patterns, installation script for target projects, native `.claude/agents/` teammate loading (blocked on Issue #24316).
 

@@ -70,7 +70,7 @@ run_python_coverage() {
   cd "$dir"
 
   local output rc=0
-  output=$(uv run pytest tests/ \
+  output=$(uv run --extra dev pytest tests/ \
     --cov="$pkg_name" \
     --cov-report=term-missing \
     --cov-report=xml:"$PROJECT_ROOT/coverage/${name}-coverage.xml" \

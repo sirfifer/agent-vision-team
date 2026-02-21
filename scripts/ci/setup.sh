@@ -45,7 +45,7 @@ for dir in "${PYTHON_DIRS[@]}"; do
     echo ""
     echo "--- Python: $dir ---"
     cd "$full_path"
-    uv sync --dev
+    uv sync --extra dev
   fi
 done
 
