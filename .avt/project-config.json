@@ -19,7 +19,12 @@
       "coverage": true,
       "findings": true
     },
-    "kgAutoCuration": true
+    "kgAutoCuration": true,
+    "audit": {
+      "enabled": false,
+      "level": "STANDARD",
+      "settle_seconds": 5
+    }
   },
   "quality": {
     "testCommands": {

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """PostToolUse hook: intercept TaskCreate to enforce governance-gated execution.
 
 This hook fires after every successful TaskCreate call. It:
@@ -33,6 +35,16 @@ DB_PATH = Path(PROJECT_DIR) / ".avt" / "governance.db"
 # Add governance server to Python path so we can import its modules
 sys.path.insert(0, str(GOVERNANCE_DIR))
 
+# Audit: fire-and-forget event emission (TAP guarantee: import failure is harmless)
+_HOOKS_DIR = Path(PROJECT_DIR) / "scripts" / "hooks"
+sys.path.insert(0, str(_HOOKS_DIR))
+try:
+    from audit.emitter import emit_audit_event
+
+    _HAS_AUDIT = True
+except ImportError:
+    _HAS_AUDIT = False
+
 from collab_governance.models import (
     GovernedTaskRecord,
     ReviewType,
@@ -63,7 +75,7 @@ def _is_review_task(subject: str, task_id: str = "") -> bool:
 # ── Extract task info from hook input ──────────────────────────────────────
 
 
-def _extract_task_info(hook_input: dict) -> dict | None:
+def _extract_task_info(hook_input: dict) -> "dict | None":
     """Extract the created task's ID and details from PostToolUse input.
 
     The hook receives tool_input (what the agent sent) and tool_result
@@ -198,7 +210,7 @@ def _create_governance_pair(task_info: dict, session_id: str = "") -> dict:
     }
 
 
-def _discover_task_id(manager: TaskFileManager, subject: str) -> str | None:
+def _discover_task_id(manager: TaskFileManager, subject: str) -> "str | None":
     """Find the implementation task ID by matching subject in the task directory.
 
     TaskCreate's tool_result is an empty string, so we discover the task ID
@@ -220,7 +232,7 @@ def _discover_task_id(manager: TaskFileManager, subject: str) -> str | None:
     return first_match
 
 
-def _try_find_and_block_task(manager: TaskFileManager, subject: str, review_id: str) -> str | None:
+def _try_find_and_block_task(manager: TaskFileManager, subject: str, review_id: str) -> "str | None":
     """Fallback: scan task directory for a recently created task matching subject.
 
     Returns the discovered task ID if found, or None.
@@ -367,6 +379,26 @@ def _spawn_settle_checker(session_id: str, transcript_path: str) -> None:
         _log(f"WARNING: Failed to spawn settle checker: {e}")
 
 
+def _spawn_audit_settle_checker() -> None:
+    """Spawn audit settle checker. Independent of governance settle checker.
+
+    The audit settle checker waits longer (5s vs 3s) so it runs after
+    governance has settled. It processes accumulated audit events.
+    """
+    settle_script = Path(PROJECT_DIR) / "scripts" / "hooks" / "_audit-settle-check.py"
+    if not settle_script.exists():
+        return
+    try:
+        subprocess.Popen(
+            ["python3", str(settle_script), str(time.time())],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except Exception:
+        pass  # TAP guarantee
+
+
 def main() -> None:
     try:
         raw = sys.stdin.read()
@@ -402,11 +434,26 @@ def main() -> None:
         f"impl={review_info['implementation_task_id']} session={session_id}"
     )
 
+    # Audit: emit governance task pair event
+    if _HAS_AUDIT:
+        emit_audit_event(
+            "governance.task_pair_created",
+            {
+                "impl_task_id": review_info["implementation_task_id"],
+                "review_task_id": review_info["review_task_id"],
+                "subject": task_info["subject"],
+            },
+            source="hook:governance-task-intercept",
+            session_id=session_id,
+        )
+
     # Create/update flag file to gate work tools
     if session_id:
         _create_or_update_flag_file(session_id)
         # Spawn settle checker (defers individual reviews until holistic review completes)
         _spawn_settle_checker(session_id, transcript_path)
+        # Spawn audit settle checker (independent of governance settle)
+        _spawn_audit_settle_checker()
     else:
         # No session_id available; fall back to immediate individual review
         _log("No session_id; falling back to immediate individual review")

@@ -509,7 +509,10 @@ export type ExtensionMessage =
   | { type: 'bootstrapComplete'; success: boolean; reportPath?: string; error?: string }
   | { type: 'bootstrapReviewLoaded'; items: BootstrapReviewItem[] }
   | { type: 'bootstrapReviewFinalized'; result: BootstrapFinalizationResult }
-  | { type: 'usageReport'; report: unknown };
+  | { type: 'usageReport'; report: unknown }
+  | { type: 'auditHealth'; data: AuditHealthData }
+  | { type: 'auditRecommendations'; recommendations: AuditRecommendation[] }
+  | { type: 'auditEvents'; events: AuditEvent[] };
 
 export type WebviewMessage =
   | { type: 'connect' }
@@ -543,7 +546,11 @@ export type WebviewMessage =
   | { type: 'runBootstrap'; context: string; focusAreas: BootstrapFocusAreas }
   | { type: 'loadBootstrapReview' }
   | { type: 'finalizeBootstrapReview'; items: BootstrapReviewItem[] }
-  | { type: 'requestUsageReport'; period: string; groupBy: string };
+  | { type: 'requestUsageReport'; period: string; groupBy: string }
+  | { type: 'requestAuditHealth' }
+  | { type: 'requestAuditRecommendations' }
+  | { type: 'requestAuditEvents'; limit?: number }
+  | { type: 'dismissAuditRecommendation'; id: string; reason: string };
 
 export interface IngestionResult {
   tier: 'vision' | 'architecture';
@@ -634,6 +641,57 @@ export interface BootstrapReviewItem {
   contradiction?: BootstrapContradiction;
   /** Whether this item was manually created by the user during review */
   isUserCreated?: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audit Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type AuditRecommendationStatus =
+  | 'active'
+  | 'stale'
+  | 'dismissed'
+  | 'superseded'
+  | 'resolved';
+
+export interface AuditRecommendation {
+  id: string;
+  created_at: number;
+  last_seen_at: number;
+  expires_at: number;
+  status: AuditRecommendationStatus;
+  anomaly_type: string;
+  severity: string;
+  description: string;
+  suggestion: string;
+  category: string;
+  evidence_count: number;
+  latest_metric_values: Record<string, unknown>;
+  escalation_tier?: string;
+  analysis?: string;
+  dismissed_reason?: string | null;
+  resolved_at?: number | null;
+}
+
+export interface AuditHealthData {
+  enabled: boolean;
+  total_events: number;
+  events_last_hour: number;
+  active_recommendations: number;
+  recent_anomalies: number;
+  last_processed_at: number | null;
+  event_types: Record<string, number>;
+}
+
+export interface AuditEvent {
+  id: string;
+  ts: number;
+  ts_iso: string;
+  session_id: string;
+  agent: string;
+  source: string;
+  type: string;
+  data: Record<string, unknown>;
 }
 
 export interface BootstrapFinalizationResult {

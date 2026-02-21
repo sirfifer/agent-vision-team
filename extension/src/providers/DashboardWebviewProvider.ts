@@ -370,6 +370,22 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
         case 'requestUsageReport':
           this.handleRequestUsageReport(message.period, message.groupBy);
           break;
+
+        case 'requestAuditHealth':
+          this.handleRequestAuditHealth();
+          break;
+
+        case 'requestAuditRecommendations':
+          this.handleRequestAuditRecommendations();
+          break;
+
+        case 'requestAuditEvents':
+          this.handleRequestAuditEvents(message.limit);
+          break;
+
+        case 'dismissAuditRecommendation':
+          this.handleDismissAuditRecommendation(message.id, message.reason);
+          break;
       }
     });
   }
@@ -1432,6 +1448,180 @@ export class DashboardWebviewProvider implements vscode.WebviewViewProvider {
       }
     } catch {
       this.postMessage({ type: 'usageReport', report: null });
+    }
+  }
+
+  private async handleRequestAuditHealth(): Promise<void> {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      this.postMessage({
+        type: 'auditHealth',
+        data: {
+          enabled: false,
+          total_events: 0,
+          events_last_hour: 0,
+          active_recommendations: 0,
+          recent_anomalies: 0,
+          last_processed_at: null,
+          event_types: {},
+        },
+      });
+      return;
+    }
+
+    try {
+      const auditDir = path.join(root, '.avt', 'audit');
+      const configPath = path.join(root, '.avt', 'project-config.json');
+
+      // Check if audit is enabled
+      let enabled = false;
+      if (fs.existsSync(configPath)) {
+        const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        enabled = cfg?.settings?.audit?.enabled === true;
+      }
+
+      // Count events
+      const eventsPath = path.join(auditDir, 'events.jsonl');
+      let totalEvents = 0;
+      let eventsLastHour = 0;
+      const eventTypes: Record<string, number> = {};
+      const oneHourAgo = Date.now() / 1000 - 3600;
+
+      if (fs.existsSync(eventsPath)) {
+        const lines = fs.readFileSync(eventsPath, 'utf-8').split('\n').filter(Boolean);
+        totalEvents = lines.length;
+        for (const line of lines) {
+          try {
+            const evt = JSON.parse(line);
+            const etype = evt.type || 'unknown';
+            eventTypes[etype] = (eventTypes[etype] || 0) + 1;
+            if (evt.ts > oneHourAgo) eventsLastHour++;
+          } catch {
+            /* skip */
+          }
+        }
+      }
+
+      // Count active recommendations
+      const recsPath = path.join(auditDir, 'recommendations.json');
+      let activeRecs = 0;
+      if (fs.existsSync(recsPath)) {
+        const data = JSON.parse(fs.readFileSync(recsPath, 'utf-8'));
+        activeRecs = (data.recommendations || []).filter(
+          (r: { status: string }) => r.status === 'active',
+        ).length;
+      }
+
+      // Count recent anomalies from checkpoint
+      const checkpointPath = path.join(auditDir, 'checkpoint.json');
+      let lastProcessedAt: number | null = null;
+      if (fs.existsSync(checkpointPath)) {
+        const cp = JSON.parse(fs.readFileSync(checkpointPath, 'utf-8'));
+        lastProcessedAt = cp.last_processed_ts || null;
+      }
+
+      this.postMessage({
+        type: 'auditHealth',
+        data: {
+          enabled,
+          total_events: totalEvents,
+          events_last_hour: eventsLastHour,
+          active_recommendations: activeRecs,
+          recent_anomalies: activeRecs,
+          last_processed_at: lastProcessedAt,
+          event_types: eventTypes,
+        },
+      });
+    } catch {
+      this.postMessage({
+        type: 'auditHealth',
+        data: {
+          enabled: false,
+          total_events: 0,
+          events_last_hour: 0,
+          active_recommendations: 0,
+          recent_anomalies: 0,
+          last_processed_at: null,
+          event_types: {},
+        },
+      });
+    }
+  }
+
+  private async handleRequestAuditRecommendations(): Promise<void> {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      this.postMessage({ type: 'auditRecommendations', recommendations: [] });
+      return;
+    }
+    try {
+      const recsPath = path.join(root, '.avt', 'audit', 'recommendations.json');
+      if (fs.existsSync(recsPath)) {
+        const data = JSON.parse(fs.readFileSync(recsPath, 'utf-8'));
+        this.postMessage({
+          type: 'auditRecommendations',
+          recommendations: data.recommendations || [],
+        });
+      } else {
+        this.postMessage({ type: 'auditRecommendations', recommendations: [] });
+      }
+    } catch {
+      this.postMessage({ type: 'auditRecommendations', recommendations: [] });
+    }
+  }
+
+  private async handleRequestAuditEvents(limit?: number): Promise<void> {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      this.postMessage({ type: 'auditEvents', events: [] });
+      return;
+    }
+    try {
+      const eventsPath = path.join(root, '.avt', 'audit', 'events.jsonl');
+      if (!fs.existsSync(eventsPath)) {
+        this.postMessage({ type: 'auditEvents', events: [] });
+        return;
+      }
+      const lines = fs.readFileSync(eventsPath, 'utf-8').split('\n').filter(Boolean);
+      const maxEvents = limit || 50;
+      const recentLines = lines.slice(-maxEvents);
+      const events = [];
+      for (const line of recentLines) {
+        try {
+          events.push(JSON.parse(line));
+        } catch {
+          /* skip corrupt lines */
+        }
+      }
+      // Reverse so newest first
+      events.reverse();
+      this.postMessage({ type: 'auditEvents', events });
+    } catch {
+      this.postMessage({ type: 'auditEvents', events: [] });
+    }
+  }
+
+  private async handleDismissAuditRecommendation(id: string, reason: string): Promise<void> {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) return;
+    try {
+      const recsPath = path.join(root, '.avt', 'audit', 'recommendations.json');
+      if (!fs.existsSync(recsPath)) return;
+      const data = JSON.parse(fs.readFileSync(recsPath, 'utf-8'));
+      const recs = data.recommendations || [];
+      for (const rec of recs) {
+        if (rec.id === id) {
+          rec.status = 'dismissed';
+          rec.dismissed_reason = reason;
+          break;
+        }
+      }
+      data.recommendations = recs;
+      data.updated_at = Date.now() / 1000;
+      fs.writeFileSync(recsPath, JSON.stringify(data, null, 2));
+      this.postMessage({ type: 'auditRecommendations', recommendations: recs });
+    } catch (err) {
+      console.error('Failed to dismiss audit recommendation:', err);
     }
   }
 

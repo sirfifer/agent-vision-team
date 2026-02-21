@@ -27,6 +27,15 @@ PENDING=$(sqlite3 "$DB_PATH" \
     "SELECT COUNT(*) FROM task_reviews WHERE status = 'pending';" 2>/dev/null || echo "0")
 
 if [ "$PENDING" -gt 0 ]; then
+    # Audit: emit idle blocked event (fire-and-forget)
+    python3 -c "
+import sys; sys.path.insert(0, '${PROJECT_DIR}/scripts/hooks')
+from audit.emitter import emit_audit_event
+emit_audit_event('agent.idle_blocked', {
+    'reason': 'pending_reviews', 'pending_reviews': int(sys.argv[1]),
+}, source='hook:teammate-idle-gate')
+" "$PENDING" 2>/dev/null &
+
     python3 -c "
 import json, sys
 json.dump({
@@ -41,6 +50,15 @@ PENDING_TASKS=$(sqlite3 "$DB_PATH" \
     "SELECT COUNT(*) FROM governed_tasks WHERE current_status = 'pending_review';" 2>/dev/null || echo "0")
 
 if [ "$PENDING_TASKS" -gt 0 ]; then
+    # Audit: emit idle blocked event (fire-and-forget)
+    python3 -c "
+import sys; sys.path.insert(0, '${PROJECT_DIR}/scripts/hooks')
+from audit.emitter import emit_audit_event
+emit_audit_event('agent.idle_blocked', {
+    'reason': 'pending_tasks', 'pending_tasks': int(sys.argv[1]),
+}, source='hook:teammate-idle-gate')
+" "$PENDING_TASKS" 2>/dev/null &
+
     python3 -c "
 import json, sys
 json.dump({

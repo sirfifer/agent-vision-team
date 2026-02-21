@@ -253,4 +253,14 @@ if [ -f "$UPDATE_SCRIPT" ] && [ -n "${SESSION_ID:-}" ]; then
     log "Context update spawned for session=$SESSION_ID"
 fi
 
+# Audit: emit individual review completion event (fire-and-forget)
+python3 -c "
+import sys; sys.path.insert(0, '${PROJECT_DIR}/scripts/hooks')
+from audit.emitter import emit_audit_event
+emit_audit_event('governance.individual_review_completed', {
+    'review_task_id': sys.argv[1], 'impl_task_id': sys.argv[2],
+    'subject': sys.argv[3],
+}, source='hook:run-governance-review', session_id=sys.argv[4])
+" "$REVIEW_TASK_ID" "$IMPL_TASK_ID" "$SUBJECT" "${SESSION_ID:-}" 2>/dev/null &
+
 log "Async review finished for $REVIEW_TASK_ID"

@@ -23,9 +23,25 @@ fi
 PLAN_REVIEWS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM reviews WHERE plan_id IS NOT NULL;" 2>/dev/null || echo "0")
 
 if [ "$PLAN_REVIEWS" -gt 0 ]; then
+  # Audit: emit plan exit allowed (fire-and-forget)
+  python3 -c "
+import sys; sys.path.insert(0, '${CLAUDE_PROJECT_DIR:-.}/scripts/hooks')
+from audit.emitter import emit_audit_event
+emit_audit_event('governance.plan_exit_attempted', {
+    'plan_reviews_found': int(sys.argv[1]), 'allowed': True,
+}, source='hook:verify-governance-review')
+" "$PLAN_REVIEWS" 2>/dev/null &
   # At least one plan review exists — allow
   exit 0
 else
+  # Audit: emit plan exit blocked (fire-and-forget)
+  python3 -c "
+import sys; sys.path.insert(0, '${CLAUDE_PROJECT_DIR:-.}/scripts/hooks')
+from audit.emitter import emit_audit_event
+emit_audit_event('governance.plan_exit_attempted', {
+    'plan_reviews_found': 0, 'allowed': False,
+}, source='hook:verify-governance-review')
+" 2>/dev/null &
   # No plan review found — block with feedback
   cat <<'FEEDBACK'
 {

@@ -36,6 +36,9 @@ server/.avt/api-key.txt
 # Debug artifacts
 .avt/debug/
 
+# Audit runtime data
+.avt/audit/
+
 # Coverage output
 coverage/
 htmlcov/

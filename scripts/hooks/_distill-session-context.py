@@ -214,7 +214,7 @@ def _run_claude(prompt: str, timeout: int = 30) -> str:
                 pass
 
 
-def _parse_json_response(raw: str) -> dict | None:
+def _parse_json_response(raw: str) -> "dict | None":
     """Extract JSON from claude response."""
     raw = raw.strip()
     if not raw:
@@ -275,7 +275,7 @@ def _write_session_context(
     session_id: str,
     distillation: dict,
     status: str = "ready",
-    existing: dict | None = None,
+    existing: "dict | None" = None,
 ) -> None:
     """Write session context file atomically with file locking."""
     now = datetime.now(timezone.utc).isoformat()

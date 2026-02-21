@@ -289,7 +289,7 @@ def extract_tool_input_text(tool_input: dict | str) -> str:
     return " ".join(parts)
 
 
-def load_session_context(session_ctx_path: Path) -> dict | None:
+def load_session_context(session_ctx_path: Path) -> "dict | None":
     """Load the session context file if it exists and is valid."""
     if not session_ctx_path.exists():
         return None
@@ -302,7 +302,7 @@ def load_session_context(session_ctx_path: Path) -> dict | None:
     return None
 
 
-def build_session_injection(context: dict) -> str | None:
+def build_session_injection(context: dict) -> "str | None":
     """Build the injection string from session context.
 
     Returns formatted string or None if nothing meaningful to inject.

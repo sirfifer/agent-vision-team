@@ -161,7 +161,7 @@ def _run_claude(prompt: str, timeout: int = 30) -> str:
                 pass
 
 
-def _parse_json_response(raw: str) -> dict | None:
+def _parse_json_response(raw: str) -> "dict | None":
     """Extract JSON from claude response."""
     raw = raw.strip()
     if not raw:

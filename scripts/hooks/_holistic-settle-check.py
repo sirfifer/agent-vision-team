@@ -35,6 +35,16 @@ LOG_PATH = Path(PROJECT_DIR) / ".avt" / "hook-holistic.log"
 
 sys.path.insert(0, str(GOVERNANCE_DIR))
 
+# Audit: fire-and-forget event emission
+_HOOKS_DIR = Path(PROJECT_DIR) / "scripts" / "hooks"
+sys.path.insert(0, str(_HOOKS_DIR))
+try:
+    from audit.emitter import emit_audit_event
+
+    _HAS_AUDIT = True
+except ImportError:
+    _HAS_AUDIT = False
+
 
 def _log(msg: str) -> None:
     try:
@@ -221,6 +231,17 @@ def main() -> None:
     # Single task: skip holistic review, go straight to individual review
     if len(tasks) < MIN_TASKS_FOR_REVIEW:
         _log(f"Only {len(tasks)} task(s); skipping holistic review, starting individual review")
+        if _HAS_AUDIT:
+            emit_audit_event(
+                "governance.holistic_review_skipped",
+                {
+                    "session_id": session_id,
+                    "reason": "below_min_tasks",
+                    "task_count": len(tasks),
+                },
+                source="hook:holistic-settle-check",
+                session_id=session_id,
+            )
         _remove_flag()
         for task in tasks:
             # Find the review_task_id from task_reviews table
@@ -314,6 +335,21 @@ def main() -> None:
     store.store_holistic_review(record)
 
     _log(f"Holistic review complete: verdict={verdict.verdict.value}")
+
+    # Audit: emit holistic review completion
+    if _HAS_AUDIT:
+        emit_audit_event(
+            "governance.holistic_review_completed",
+            {
+                "session_id": session_id,
+                "verdict": verdict.verdict.value,
+                "task_count": len(tasks),
+                "findings_count": len(verdict.findings),
+                "standards_verified": verdict.standards_verified,
+            },
+            source="hook:holistic-settle-check",
+            session_id=session_id,
+        )
 
     # Spawn context update to capture milestones/discoveries from transcript
     _spawn_context_update(session_id, transcript_path, "holistic_review")

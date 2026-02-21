@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "description": "Observation directives: what the audit system looks for and recommends about. Edit this file to add new observations without code changes.",
+  "directives": [
+    {
+      "id": "setting-correlation",
+      "description": "Detect when a numeric setting value correlates with poor downstream metrics",
+      "watches": ["settings.*", "governance.verdict_returned", "quality.gate_*"],
+      "haiku_question": "Does the data show a statistical correlation between any setting value and the governance/quality outcome? Look at block rates, skip rates, and gate failures in relation to configured thresholds.",
+      "sonnet_question": "Analyze the correlation between settings and outcomes. What is the setting, what is the observed optimal range, and what specific change would you recommend? Include evidence from the metric data.",
+      "opus_trigger": "The setting's current allowed range may need adjustment, or the correlation suggests a systemic prompt issue that goes beyond simple tuning",
+      "recommendation_type": "setting_tune"
+    },
+    {
+      "id": "prompt-effectiveness",
+      "description": "Detect when prompts (static agent definitions or dynamic reinforcement injections) are not producing intended outcomes",
+      "watches": ["context.reinforcement_*", "governance.verdict_returned"],
+      "haiku_question": "After reinforcement was injected, did the subsequent governance decision still get blocked for the same standard? Is the prompt working? Look at the sequence of reinforcement events followed by review outcomes.",
+      "sonnet_question": "Analyze which prompts are and are not effective. What wording or targeting changes would improve outcomes? Consider: injection timing, content relevance, and agent responsiveness.",
+      "opus_trigger": "Multiple prompts show declining effectiveness, or a fundamental approach change may be needed",
+      "recommendation_type": "prompt_revision"
+    },
+    {
+      "id": "range-adequacy",
+      "description": "Detect when a setting's user-adjustable range is too narrow or too wide",
+      "watches": ["settings.*", "governance.*", "quality.*"],
+      "haiku_question": "Are observed optimal values clustering near the edges of any setting's allowed range? Look at the metric values and compare them to configured thresholds.",
+      "sonnet_question": "Which setting ranges need adjustment? What should the new min/max be based on observed data? Consider how the range change would affect related settings.",
+      "opus_trigger": "Range change would affect multiple interrelated settings or requires understanding cross-setting interactions",
+      "recommendation_type": "range_adjustment"
+    },
+    {
+      "id": "governance-health",
+      "description": "Monitor governance system health: approval/block ratios, review durations, holistic review outcomes",
+      "watches": ["governance.*"],
+      "haiku_question": "Is the governance system healthy? Look at: block rate trends, review timing, whether holistic reviews are being skipped too often, and whether individual reviews consistently disagree with holistic verdicts.",
+      "sonnet_question": "Provide a health assessment of the governance system. What patterns are emerging? Are there specific areas where governance is too strict or too lenient? What adjustments would improve the balance?",
+      "opus_trigger": "Governance system shows systemic issues that suggest architectural changes rather than threshold tuning",
+      "recommendation_type": "governance_health"
+    },
+    {
+      "id": "coverage-gaps",
+      "description": "Detect expected events that never fire, suggesting misconfiguration or missing integration",
+      "watches": ["*"],
+      "haiku_question": "Are there event types that should be firing based on the system architecture but are absent from recent data? For example: context reinforcement events missing despite being enabled, or task completion events without prior governance events.",
+      "sonnet_question": "Identify which event types are missing and what the likely cause is. Is it a configuration issue, a missing hook integration, or a genuine gap in coverage?",
+      "opus_trigger": "Multiple coverage gaps suggest a systemic integration problem",
+      "recommendation_type": "coverage_gap"
+    }
+  ]
+}

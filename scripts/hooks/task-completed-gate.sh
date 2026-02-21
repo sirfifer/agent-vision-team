@@ -64,12 +64,26 @@ DB_TASK_ID="${LIST_ID}/${TASK_ID}"
 STATUS=$(sqlite3 "$DB_PATH" \
     "SELECT current_status FROM governed_tasks WHERE implementation_task_id = '${DB_TASK_ID}' LIMIT 1;" 2>/dev/null || echo "")
 
+# Audit helper: emit task completion event (fire-and-forget)
+_audit_emit() {
+    python3 -c "
+import sys; sys.path.insert(0, '${PROJECT_DIR}/scripts/hooks')
+from audit.emitter import emit_audit_event
+emit_audit_event('task.completion_attempted', {
+    'task_id': sys.argv[1], 'subject': sys.argv[2],
+    'status': sys.argv[3], 'allowed': sys.argv[4] == 'true',
+}, source='hook:task-completed-gate')
+" "$1" "$2" "$3" "$4" 2>/dev/null &
+}
+
 case "$STATUS" in
     "approved"|"")
         # Approved or not governed: allow completion
+        _audit_emit "$TASK_ID" "$TASK_SUBJECT" "${STATUS:-untracked}" "true"
         exit 0
         ;;
     "pending_review")
+        _audit_emit "$TASK_ID" "$TASK_SUBJECT" "$STATUS" "false"
         python3 -c "
 import json, sys
 subject = sys.argv[1] or 'this task'
@@ -80,6 +94,7 @@ json.dump({
         exit 2
         ;;
     "blocked")
+        _audit_emit "$TASK_ID" "$TASK_SUBJECT" "$STATUS" "false"
         python3 -c "
 import json, sys
 subject = sys.argv[1] or 'this task'
@@ -90,6 +105,7 @@ json.dump({
         exit 2
         ;;
     *)
+        _audit_emit "$TASK_ID" "$TASK_SUBJECT" "$STATUS" "false"
         python3 -c "
 import json, sys
 subject = sys.argv[1] or 'this task'

@@ -17,8 +17,9 @@ import { WorkflowTutorial } from './components/tutorial/WorkflowTutorial';
 import { BootstrapDialog } from './components/bootstrap/BootstrapDialog';
 import { JobSubmission } from './components/JobSubmission';
 import { JobList } from './components/JobList';
+import { AuditPanel } from './components/audit/AuditPanel';
 
-type RightTab = 'tasks' | 'decisions' | 'activity' | 'jobs';
+type RightTab = 'tasks' | 'decisions' | 'activity' | 'jobs' | 'audit';
 
 function ConnectionBanner() {
   const { data, sendCommand } = useDashboard();
@@ -142,6 +143,16 @@ function RightPanel({ className }: { className?: string }) {
         >
           Jobs
         </button>
+        <button
+          onClick={() => setActiveTab('audit')}
+          className={`px-4 py-1.5 text-xs font-medium transition-colors ${
+            activeTab === 'audit'
+              ? 'text-vscode-fg border-b-2 border-yellow-400'
+              : 'text-vscode-muted hover:text-vscode-fg'
+          }`}
+        >
+          Audit
+        </button>
       </div>
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
@@ -149,6 +160,7 @@ function RightPanel({ className }: { className?: string }) {
         {activeTab === 'decisions' && <DecisionExplorer />}
         {activeTab === 'activity' && <ActivityFeed />}
         {activeTab === 'jobs' && <JobList />}
+        {activeTab === 'audit' && <AuditPanel />}
       </div>
     </div>
   );
