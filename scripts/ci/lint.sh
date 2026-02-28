@@ -64,9 +64,9 @@ for dir in "${PYTHON_DIRS[@]}"; do
   full_path="$PROJECT_ROOT/$dir"
   if [ -d "$full_path" ]; then
     if [ "$FIX" = true ]; then
-      ruff check --fix "$full_path" || FAILED=true
+      uvx ruff check --fix "$full_path" || FAILED=true
     else
-      ruff check "$full_path" || FAILED=true
+      uvx ruff check "$full_path" || FAILED=true
     fi
   fi
 done
@@ -80,9 +80,9 @@ for dir in "${PYTHON_DIRS[@]}"; do
   full_path="$PROJECT_ROOT/$dir"
   if [ -d "$full_path" ]; then
     if [ "$FIX" = true ]; then
-      ruff format "$full_path" || FAILED=true
+      uvx ruff format "$full_path" || FAILED=true
     else
-      ruff format --check "$full_path" || FAILED=true
+      uvx ruff format --check "$full_path" || FAILED=true
     fi
   fi
 done

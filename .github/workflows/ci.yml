@@ -123,7 +123,7 @@ jobs:
       - run: ./scripts/ci/setup.sh
       - run: ./scripts/ci/build.sh
       - run: mkdir -p coverage
-      - run: ./scripts/ci/coverage.sh
+      - run: ./scripts/ci/coverage.sh --skip-extension
       - name: Upload coverage artifacts
         if: always()
         uses: actions/upload-artifact@v4

@@ -1,0 +1,39 @@
+flowchart LR
+    subgraph BEFORE["Part 1 — Feb 8"]
+        direction TB
+        B1["6 Specialized Agents"]
+        B2["Task Tool Subagents"]
+        B3["5 Governance Hooks"]
+        B4["3 MCP Servers"]
+        B5["292 E2E Assertions"]
+        B6["963-line CLAUDE.md"]
+        B7["No drift prevention"]
+        B8["No system monitoring"]
+        B9["No CI/CD pipeline"]
+    end
+
+    subgraph AFTER["Part 2 — Feb 20"]
+        direction TB
+        A1["8 Specialized Agents\n+ Architect, Bootstrapper"]
+        A2["Agent Teams Teammates\nShared tasks, self-claim,\ndirect messaging"]
+        A3["7 Hooks\n+ Context Reinforcement\n+ Post-Compaction"]
+        A4["3 MCP Servers\n+ KG caching\n+ Token tracking"]
+        A5["537 Total Assertions\n44 unit + 120 hook +\n53 audit + 292 E2E"]
+        A6["284-line CLAUDE.md\n+ 7 on-demand skills"]
+        A7["3-Layer Context\nDrift Prevention"]
+        A8["Audit Agent\nTiered LLM Escalation"]
+        A9["Full CI/CD\nGitHub Actions +\nHusky + lint-staged"]
+    end
+
+    B1 -.-> A1
+    B2 -.-> A2
+    B3 -.-> A3
+    B4 -.-> A4
+    B5 -.-> A5
+    B6 -.-> A6
+    B7 -.-> A7
+    B8 -.-> A8
+    B9 -.-> A9
+
+    style BEFORE fill:#1a1a2e,stroke:#e94560,color:#eee
+    style AFTER fill:#0f3460,stroke:#53a8b6,color:#eee

@@ -1,0 +1,54 @@
+flowchart TB
+    subgraph HOOKS["Existing Governance Hooks"]
+        H1["PostToolUse\n(TaskCreate)"]
+        H2["PreToolUse\n(Write|Edit|Bash)"]
+        H3["TeammateIdle"]
+        H4["TaskCompleted"]
+    end
+
+    subgraph TAP["Network TAP (~0.5ms)"]
+        E["emit_audit_event()\nfire-and-forget"]
+        LOG["events.jsonl\n(append-only)"]
+    end
+
+    subgraph SETTLE["Settle / Debounce (5s)"]
+        S["No newer events?\nProcessor runs"]
+    end
+
+    subgraph PROCESS["Processor (<5ms, no LLM)"]
+        P1["Read new events"]
+        P2["Update rolling stats\n(SQLite)"]
+        P3["Check 5 anomaly\nthresholds"]
+    end
+
+    subgraph RESULT1["85% of cycles"]
+        R1["No anomaly detected\nDone in ~5ms"]
+    end
+
+    subgraph ESCALATION["Tiered LLM Escalation (15%)"]
+        T1["Tier 1: Haiku\nFast triage"]
+        T2["Tier 2: Sonnet\nDeeper analysis"]
+        T3["Tier 3: Opus\nFull deep dive"]
+        REC["Actionable\nRecommendation"]
+    end
+
+    H1 & H2 & H3 & H4 --> E
+    E --> LOG
+    LOG --> S
+    S --> P1
+    P1 --> P2
+    P2 --> P3
+    P3 -->|"No anomaly"| R1
+    P3 -->|"Anomaly found"| T1
+    T1 -->|"Escalate"| T2
+    T1 -->|"Resolved"| REC
+    T2 -->|"Escalate"| T3
+    T2 -->|"Resolved"| REC
+    T3 --> REC
+
+    style HOOKS fill:#1a1a2e,stroke:#e94560,color:#eee
+    style TAP fill:#16213e,stroke:#0f3460,color:#eee
+    style SETTLE fill:#16213e,stroke:#0f3460,color:#eee
+    style PROCESS fill:#0f3460,stroke:#53a8b6,color:#eee
+    style RESULT1 fill:#1a1a2e,stroke:#53a8b6,color:#eee
+    style ESCALATION fill:#0f3460,stroke:#e94560,color:#eee

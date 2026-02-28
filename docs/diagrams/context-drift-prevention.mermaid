@@ -1,0 +1,55 @@
+flowchart TB
+    subgraph TRIGGER["Agent Activity"]
+        A["Agent calls Write / Edit / Bash / Task"]
+    end
+
+    subgraph HOOK["PreToolUse Hook (~1ms)"]
+        B["Check tool call count\n≥ threshold?"]
+        C["Load session context file"]
+        D["Match activity against\ncontext router (Jaccard)"]
+        E["Compose additionalContext\ninjection (≤500 tokens)"]
+    end
+
+    subgraph L1["Layer 1: Session Context"]
+        F["Background distillation\n(Haiku, async)"]
+        G["Session goals +\ndiscoveries + constraints"]
+        H["Updated on governance\nreview callbacks"]
+    end
+
+    subgraph L2["Layer 2: Static Context Router"]
+        I["KG-derived JSON\nlookup table"]
+        J["Vision standards\nArchitecture patterns\nProject rules"]
+    end
+
+    subgraph L3["Layer 3: Post-Compaction Recovery"]
+        K["SessionStart hook\n(compact event)"]
+        L["Reinject session context\n+ vision standards"]
+        M["Restores alignment after\nlossy context trim"]
+    end
+
+    subgraph RESULT["Agent Receives"]
+        N["Original tool call proceeds\nwith reinforced context"]
+    end
+
+    A --> B
+    B -->|Yes| C
+    B -->|No| N
+    C --> D
+    D --> E
+    F --> G
+    G --> C
+    H --> G
+    I --> J
+    J --> D
+    E --> N
+
+    K --> L
+    L --> M
+    M -.->|"Next tool call\ngets full context"| N
+
+    style TRIGGER fill:#1a1a2e,stroke:#e94560,color:#eee
+    style HOOK fill:#16213e,stroke:#0f3460,color:#eee
+    style L1 fill:#0f3460,stroke:#53a8b6,color:#eee
+    style L2 fill:#0f3460,stroke:#53a8b6,color:#eee
+    style L3 fill:#0f3460,stroke:#53a8b6,color:#eee
+    style RESULT fill:#1a1a2e,stroke:#e94560,color:#eee
