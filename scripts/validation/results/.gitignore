@@ -1,0 +1,6 @@
+# Validation results are machine-local and should not be committed.
+# Each developer/CI environment maintains its own baselines and history.
+*.jsonl
+*.json
+*.log
+!.gitignore

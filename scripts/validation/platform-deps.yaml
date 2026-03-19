@@ -1,0 +1,327 @@
+# Platform Dependency Manifest
+# Every Claude Code feature AVT depends on, with expected behavior.
+# Used by validate-platform.sh to hard-validate the platform under us.
+#
+# Categories: model_resolution, cli, agent_teams, hooks, mcp, tasks, environment
+# Tiers: quick (~5s total), standard (~60s), full (~5min)
+# critical: true means a failure here blocks AVT from functioning
+
+version: "1.0"
+last_verified: null  # Filled by validation runner
+claude_code_minimum: "2.1.33"
+
+dependencies:
+
+  # ---------------------------------------------------------------------------
+  # Model Resolution
+  # ---------------------------------------------------------------------------
+  model_alias_haiku:
+    category: model_resolution
+    description: "'haiku' alias resolves to a working model"
+    tier: quick
+    critical: true
+    validation: cli_model_check
+    args:
+      model: "haiku"
+    used_by:
+      - scripts/hooks/_distill-session-context.py
+      - scripts/hooks/_update-session-context.py
+      - scripts/hooks/audit/escalation.py
+      - scripts/hooks/audit/config.py
+      - scripts/hooks/context-reinforcement.py
+      - extension/src/models/ProjectConfig.ts
+      - extension/webview-dashboard/src/components/SettingsPanel.tsx
+
+  model_alias_sonnet:
+    category: model_resolution
+    description: "'sonnet' alias resolves to a working model"
+    tier: quick
+    critical: true
+    validation: cli_model_check
+    args:
+      model: "sonnet"
+    used_by:
+      - .claude/settings.json (defaultModel)
+      - .claude/agents/ (6 agent definitions)
+
+  model_alias_opus:
+    category: model_resolution
+    description: "'opus' alias resolves to a working model"
+    tier: quick
+    critical: true
+    validation: cli_model_check
+    args:
+      model: "opus"
+    used_by:
+      - .claude/settings.json (worker, architect)
+
+  model_identity_haiku:
+    category: model_resolution
+    description: "Identify which Haiku version the alias resolves to"
+    tier: quick
+    critical: false
+    validation: cli_model_identity
+    args:
+      model: "haiku"
+
+  model_identity_sonnet:
+    category: model_resolution
+    description: "Identify which Sonnet version the alias resolves to"
+    tier: quick
+    critical: false
+    validation: cli_model_identity
+    args:
+      model: "sonnet"
+
+  model_identity_opus:
+    category: model_resolution
+    description: "Identify which Opus version the alias resolves to"
+    tier: quick
+    critical: false
+    validation: cli_model_identity
+    args:
+      model: "opus"
+
+  # ---------------------------------------------------------------------------
+  # CLI Functionality
+  # ---------------------------------------------------------------------------
+  claude_print_works:
+    category: cli
+    description: "claude --print produces output"
+    tier: quick
+    critical: true
+    validation: cli_print_check
+    used_by:
+      - mcp-servers/governance/collab_governance/reviewer.py
+      - scripts/hooks/_run-governance-review.sh
+      - scripts/hooks/_distill-session-context.py
+
+  claude_print_model_flag:
+    category: cli
+    description: "claude --print --model flag is respected for each alias"
+    tier: quick
+    critical: true
+    validation: cli_print_model_flag
+    args:
+      models:
+        - haiku
+        - sonnet
+
+  claude_version_check:
+    category: cli
+    description: "Claude Code version meets minimum requirement"
+    tier: quick
+    critical: true
+    validation: version_check
+    args:
+      minimum: "2.1.33"
+
+  nested_session_detection:
+    category: cli
+    description: "claude --print works when CLAUDECODE is unset (nested session)"
+    tier: standard
+    critical: true
+    validation: nested_session_check
+    used_by:
+      - scripts/hooks/_run-governance-review.sh
+
+  # ---------------------------------------------------------------------------
+  # Agent Teams
+  # ---------------------------------------------------------------------------
+  agent_teams_env_var:
+    category: agent_teams
+    description: "Determine if CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS is still needed"
+    tier: standard
+    critical: true
+    validation: agent_teams_env_check
+
+  agent_teams_task_sharing:
+    category: agent_teams
+    description: "Teammates can share a task list"
+    tier: full
+    critical: true
+    validation: agent_teams_task_check
+
+  agent_teams_mcp_access:
+    category: agent_teams
+    description: "Teammates can access MCP servers"
+    tier: full
+    critical: true
+    validation: agent_teams_mcp_check
+    used_by:
+      - CLAUDE.md (Agent Teams Orchestration Protocol)
+
+  agent_teams_hook_inheritance:
+    category: agent_teams
+    description: "Teammates inherit hooks from settings.json"
+    tier: full
+    critical: true
+    validation: agent_teams_hook_check
+    used_by:
+      - scripts/hooks/governance-task-intercept.py
+
+  agent_defs_as_teammates:
+    category: agent_teams
+    description: ".claude/agents/ definitions usable directly as teammates (bug #24316)"
+    tier: standard
+    critical: false
+    validation: agent_defs_teammate_check
+    tracking_issue: "anthropics/claude-code#24316"
+
+  # ---------------------------------------------------------------------------
+  # Hook System
+  # ---------------------------------------------------------------------------
+  hook_post_tool_use_fires:
+    category: hooks
+    description: "PostToolUse hooks fire on TaskCreate"
+    tier: standard
+    critical: true
+    validation: hook_fire_check
+    args:
+      hook_type: "PostToolUse"
+      matcher: "TaskCreate"
+    used_by:
+      - scripts/hooks/governance-task-intercept.py
+
+  hook_pre_tool_use_fires:
+    category: hooks
+    description: "PreToolUse hooks fire on Write|Edit|Bash|Task"
+    tier: standard
+    critical: true
+    validation: hook_fire_check
+    args:
+      hook_type: "PreToolUse"
+      matcher: "Write|Edit|Bash|Task"
+    used_by:
+      - scripts/hooks/holistic-review-gate.sh
+      - scripts/hooks/context-reinforcement.py
+
+  hook_teammate_idle_fires:
+    category: hooks
+    description: "TeammateIdle hooks fire when teammates go idle"
+    tier: full
+    critical: true
+    validation: hook_fire_check
+    args:
+      hook_type: "TeammateIdle"
+    used_by:
+      - scripts/hooks/teammate-idle-gate.sh
+
+  hook_task_completed_fires:
+    category: hooks
+    description: "TaskCompleted hooks fire on task completion"
+    tier: full
+    critical: true
+    validation: hook_fire_check
+    args:
+      hook_type: "TaskCompleted"
+    used_by:
+      - scripts/hooks/task-completed-gate.sh
+
+  hook_session_start_compact:
+    category: hooks
+    description: "SessionStart hooks fire with compact matcher"
+    tier: standard
+    critical: true
+    validation: hook_fire_check
+    args:
+      hook_type: "SessionStart"
+      matcher: "compact"
+    used_by:
+      - scripts/hooks/post-compaction-reinject.sh
+
+  hook_exit_code_blocking:
+    category: hooks
+    description: "PreToolUse exit code 2 blocks the tool call"
+    tier: standard
+    critical: true
+    validation: hook_exit_code_check
+
+  hook_subagent_inheritance:
+    category: hooks
+    description: "Task subagents inherit PostToolUse hooks from parent"
+    tier: standard
+    critical: true
+    validation: hook_subagent_check
+
+  # ---------------------------------------------------------------------------
+  # MCP Servers
+  # ---------------------------------------------------------------------------
+  mcp_user_scope_config:
+    category: mcp
+    description: "~/.claude/mcp.json defines all 3 required servers"
+    tier: quick
+    critical: true
+    validation: mcp_config_check
+    args:
+      servers:
+        - collab-kg
+        - collab-quality
+        - collab-governance
+
+  mcp_server_importable:
+    category: mcp
+    description: "All MCP server Python modules can be imported"
+    tier: quick
+    critical: true
+    validation: mcp_import_check
+
+  mcp_direct_session_access:
+    category: mcp
+    description: "MCP tools callable from a direct Claude Code session"
+    tier: standard
+    critical: true
+    validation: mcp_session_access_check
+    args:
+      context: "direct"
+
+  mcp_subagent_access:
+    category: mcp
+    description: "MCP tools callable from Task subagents (user-scope)"
+    tier: standard
+    critical: true
+    validation: mcp_session_access_check
+    args:
+      context: "subagent"
+    tracking_issue: "anthropics/claude-code#13898"
+
+  mcp_tool_search_active:
+    category: mcp
+    description: "MCP Tool Search / deferred loading is enabled"
+    tier: quick
+    critical: false
+    validation: mcp_tool_search_check
+
+  # ---------------------------------------------------------------------------
+  # Task System
+  # ---------------------------------------------------------------------------
+  task_create_produces_files:
+    category: tasks
+    description: "TaskCreate produces task JSON files in the task directory"
+    tier: standard
+    critical: true
+    validation: task_create_check
+
+  task_blocked_by_works:
+    category: tasks
+    description: "blockedBy field prevents agents from claiming tasks"
+    tier: standard
+    critical: true
+    validation: task_blocked_by_check
+
+  # ---------------------------------------------------------------------------
+  # Environment
+  # ---------------------------------------------------------------------------
+  settings_env_override:
+    category: environment
+    description: "settings.json env block overrides shell environment variables"
+    tier: quick
+    critical: false
+    validation: env_override_check
+
+  auto_memory_loading:
+    category: environment
+    description: "MEMORY.md from auto-memory directory loads into session"
+    tier: standard
+    critical: false
+    validation: auto_memory_check
