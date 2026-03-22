@@ -12,7 +12,6 @@ from typing import Optional
 
 from fastmcp import FastMCP
 
-from .kg_client import KGClient
 from .models import (
     Alternative,
     Confidence,
@@ -26,7 +25,6 @@ from .models import (
     Verdict,
 )
 from .reviewer import GovernanceReviewer
-from .store import GovernanceStore
 from .task_integration import (
     add_additional_review,
     create_governed_task_pair,
@@ -40,8 +38,24 @@ from .task_integration import (
 
 mcp = FastMCP("Collab Intelligence Governance")
 
-store = GovernanceStore()
-kg = KGClient()
+# ---------------------------------------------------------------------------
+# Backend selection via feature flag
+# ---------------------------------------------------------------------------
+_BACKEND = os.environ.get("AVT_STORAGE_BACKEND", "sqlite")
+
+if _BACKEND == "surreal":
+    from .surreal_kg_client import SurrealKGClient
+    from .surreal_store import SurrealGovernanceStore
+
+    store = SurrealGovernanceStore()
+    kg = SurrealKGClient()
+else:
+    from .kg_client import KGClient
+    from .store import GovernanceStore
+
+    store = GovernanceStore()
+    kg = KGClient()
+
 reviewer = GovernanceReviewer()
 
 

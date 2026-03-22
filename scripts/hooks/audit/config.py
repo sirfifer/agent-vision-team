@@ -16,6 +16,7 @@ _PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
 DEFAULTS = {
     "enabled": False,
     "level": "STANDARD",
+    "storage_backend": "sqlite",  # "sqlite" or "surrealdb"
     "settle_seconds": 5,
     "ring_buffer_size": 100,
     "anomaly_flush": True,
@@ -40,7 +41,11 @@ DEFAULTS = {
 
 
 def load_audit_config() -> dict:
-    """Load audit configuration with defaults, overridden by project config."""
+    """Load audit configuration with defaults, overridden by project config.
+
+    The storage_backend can also be set via the AVT_STORAGE_BACKEND
+    environment variable, which takes precedence over config file settings.
+    """
     effective = _deep_copy(DEFAULTS)
 
     project_path = Path(_PROJECT_DIR) / ".avt" / "project-config.json"
@@ -51,6 +56,11 @@ def load_audit_config() -> dict:
             _deep_merge(effective, audit_cfg)
         except (json.JSONDecodeError, OSError):
             pass
+
+    # Environment variable override for storage backend
+    env_backend = os.environ.get("AVT_STORAGE_BACKEND")
+    if env_backend:
+        effective["storage_backend"] = env_backend
 
     return effective
 

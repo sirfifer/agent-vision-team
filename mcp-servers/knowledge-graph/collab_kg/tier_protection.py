@@ -6,7 +6,7 @@ from .models import ProtectionTier
 
 
 def get_entity_tier(observations: list[str]) -> Optional[ProtectionTier]:
-    """Extract protection tier from an entity's observations."""
+    """Extract protection tier from an entity's observations (JSONL backend)."""
     for obs in observations:
         if obs.startswith("protection_tier: "):
             tier_value = obs.split("protection_tier: ", 1)[1].strip()
@@ -15,6 +15,20 @@ def get_entity_tier(observations: list[str]) -> Optional[ProtectionTier]:
             except ValueError:
                 return None
     return None
+
+
+def get_entity_tier_from_field(tier_value: Optional[str]) -> Optional[ProtectionTier]:
+    """Get protection tier from a stored field value (SurrealDB backend).
+
+    Unlike get_entity_tier() which parses observations strings, this reads
+    the protection_tier directly from a dedicated database field.
+    """
+    if tier_value is None:
+        return None
+    try:
+        return ProtectionTier(tier_value)
+    except ValueError:
+        return None
 
 
 def validate_write_access(

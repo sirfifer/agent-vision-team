@@ -21,7 +21,14 @@ from .trust_engine import TrustEngine
 
 mcp = FastMCP("Collab Intelligence Quality")
 
-trust_engine = TrustEngine()
+# Feature flag: set AVT_STORAGE_BACKEND=surrealdb to use SurrealDB trust engine
+_storage_backend = os.environ.get("AVT_STORAGE_BACKEND", "sqlite")
+
+if _storage_backend == "surrealdb":
+    from .surreal_trust_engine import SurrealTrustEngine
+    trust_engine = SurrealTrustEngine()
+else:
+    trust_engine = TrustEngine()
 
 
 @mcp.tool()

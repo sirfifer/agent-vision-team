@@ -10,11 +10,18 @@ if __name__ == "__main__" and os.environ.get("PROJECT_DIR"):
 
 from fastmcp import FastMCP
 
-from .graph import KnowledgeGraph
+_BACKEND = os.environ.get("AVT_STORAGE_BACKEND", "jsonl")
 
 mcp = FastMCP("Collab Intelligence Knowledge Graph")
 
-graph = KnowledgeGraph()
+if _BACKEND == "surreal":
+    from .surreal_graph import SurrealKnowledgeGraph
+
+    graph = SurrealKnowledgeGraph()
+else:
+    from .graph import KnowledgeGraph
+
+    graph = KnowledgeGraph()
 
 
 @mcp.tool()

@@ -165,23 +165,13 @@ def _write_research_findings(kg: KnowledgeGraph, memory_dir: Path) -> int:
     return len(unique)
 
 
-def _all_entities_by_type(kg: KnowledgeGraph, entity_type: str):
-    """Get all entities matching a specific entityType by scanning the KG."""
-    results = []
-    for name, entity in kg._entities.items():
-        if entity.entity_type.value == entity_type:
-            relations = [r for r in kg._relations if r.from_entity == name or r.to == name]
-            from .models import EntityWithRelations
+def _all_entities_by_type(kg, entity_type: str):
+    """Get all entities matching a specific entityType.
 
-            results.append(
-                EntityWithRelations(
-                    name=entity.name,
-                    entityType=entity.entity_type,
-                    observations=entity.observations,
-                    relations=relations,
-                )
-            )
-    return results
+    Delegates to the public get_entities_by_type() method, which is
+    implemented by both KnowledgeGraph and SurrealKnowledgeGraph.
+    """
+    return kg.get_entities_by_type(entity_type)
 
 
 def _now() -> str:

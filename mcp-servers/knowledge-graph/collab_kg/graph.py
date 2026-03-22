@@ -193,3 +193,19 @@ class KnowledgeGraph:
                     )
                 )
         return results
+
+    def get_entities_by_type(self, entity_type: str) -> list[EntityWithRelations]:
+        """Get all entities matching a specific entityType value."""
+        results = []
+        for entity in self._entities.values():
+            if entity.entity_type.value == entity_type:
+                relations = [r for r in self._relations if r.from_entity == entity.name or r.to == entity.name]
+                results.append(
+                    EntityWithRelations(
+                        name=entity.name,
+                        entityType=entity.entity_type,
+                        observations=entity.observations,
+                        relations=relations,
+                    )
+                )
+        return results

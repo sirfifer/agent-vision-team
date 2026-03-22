@@ -134,6 +134,24 @@ def test_get_entities_by_tier():
         assert len(quality) == 1
 
 
+def test_get_entities_by_type():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        graph = KnowledgeGraph(storage_path=str(Path(tmpdir) / "test.jsonl"))
+        graph.create_entities(
+            [
+                {"name": "C1", "entityType": "component", "observations": []},
+                {"name": "C2", "entityType": "component", "observations": []},
+                {"name": "P1", "entityType": "pattern", "observations": []},
+            ]
+        )
+
+        components = graph.get_entities_by_type("component")
+        assert len(components) == 2
+
+        patterns = graph.get_entities_by_type("pattern")
+        assert len(patterns) == 1
+
+
 def test_get_entity_tier():
     observations = ["protection_tier: vision", "some other fact"]
     tier = get_entity_tier(observations)
