@@ -22,6 +22,12 @@ omit = [
     "collab_governance/surreal_kg_client.py",
 ]
 
+[tool.pytest.ini_options]
+# SurrealDB backend tests live in tests_surreal/ and run separately.
+# The standard tests/ dir stays empty to preserve the SKIP behavior
+# in CI coverage (governance had 0% before, was always skipped).
+testpaths = ["tests", "tests_surreal"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
