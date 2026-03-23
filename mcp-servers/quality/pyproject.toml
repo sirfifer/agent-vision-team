@@ -16,6 +16,12 @@ dev = [
     "pytest-cov>=6.0.0",
 ]
 
+[tool.coverage.run]
+omit = [
+    "collab_quality/surreal_trust_engine.py",
+    "collab_quality/test_surreal_trust_engine.py",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

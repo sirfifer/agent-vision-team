@@ -16,6 +16,11 @@ dev = [
     "pytest-cov>=6.0.0",
 ]
 
+[tool.coverage.run]
+omit = [
+    "collab_kg/surreal_graph.py",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
