@@ -24,6 +24,13 @@
       "enabled": false,
       "level": "STANDARD",
       "settle_seconds": 5
+    },
+    "compatibilityMonitor": {
+      "enabled": false,
+      "check_interval_hours": 24,
+      "model_hint": "sonnet",
+      "adaptive_followups": true,
+      "notification_threshold": "P1"
     }
   },
   "quality": {

@@ -39,6 +39,10 @@ server/.avt/api-key.txt
 # Audit runtime data
 .avt/audit/
 
+# Compatibility monitor runtime data
+.avt/compatibility-monitor/
+.avt/compatibility-reports/cr-*.md
+
 # Coverage output
 coverage/
 htmlcov/

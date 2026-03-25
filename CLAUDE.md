@@ -251,6 +251,19 @@ After each meaningful unit of work:
 
 Monitor for: **Time drift** (task too long), **Loop drift** (repeated failures), **Scope drift** (outside task brief), **Quality drift** (findings accumulating). Stop failing worker and reassess when detected.
 
+## Dependency Monitoring (Compatibility Monitor)
+
+AVT tracks Claude Code platform changes via an automated compatibility monitor. It uses the researcher agent to search for releases, deprecations, and new features, then compares findings against the dependency manifest (`scripts/validation/platform-deps.yaml`).
+
+**Activation**: Off by default. Enable in `.avt/project-config.json`:
+```json
+{ "settings": { "compatibilityMonitor": { "enabled": true } } }
+```
+
+**How it works**: A SessionStart hook checks if a daily compatibility scan is due. If so, it injects `additionalContext` telling the orchestrator to spawn a researcher teammate with the prompt at `.avt/research-prompts/rp-cc-compatibility.md`. Findings are classified P0-P3; P0/P1 findings are promoted to `docs/reports/` and trigger orchestrator notification. The researcher can schedule adaptive follow-ups via CronCreate when impending changes are detected.
+
+**Key files**: `scripts/hooks/compatibility-check-trigger.sh` (trigger), `scripts/hooks/compatibility/` (config, monitor logic), `.avt/research-prompts/rp-cc-compatibility.md` (research prompt), `docs/design/compatibility-monitor-design.md` (full design).
+
 ## MCP Server Configuration
 
 MCP servers are registered at **user scope** (`~/.claude/mcp.json`) using stdio transport. **Why user scope**: Project-scope MCP causes subagents to hallucinate MCP results (Issue #13898).
