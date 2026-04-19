@@ -16,6 +16,10 @@ from pathlib import Path
 
 import pytest
 
+# Guard: skip all tests if surrealdb or pydantic are not installed
+pytest.importorskip("surrealdb", reason="surrealdb SDK not installed")
+pytest.importorskip("pydantic", reason="pydantic not installed")
+
 from collab_governance.models import (
     Confidence,
     Decision,
@@ -30,9 +34,6 @@ from collab_governance.models import (
     UsageRecord,
     Verdict,
 )
-
-# Guard: skip all tests if surrealdb is not installed
-surrealdb = pytest.importorskip("surrealdb", reason="surrealdb SDK not installed")
 
 from collab_governance.surreal_store import SurrealGovernanceStore  # noqa: E402
 

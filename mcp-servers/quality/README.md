@@ -170,7 +170,13 @@ record_dismissal(
 
 ## Trust Engine
 
+### Default: SQLite
+
 SQLite database (`.avt/trust-engine.db`) with two tables:
+
+> **Alternative: SurrealDB** -- Set `AVT_STORAGE_BACKEND=surreal` to use the SurrealDB backend (`surreal_trust_engine.py`). Stores findings and dismissals in the shared embedded database at `.avt/avt.db`. See `shared/avt_db/README.md` for details.
+
+### Tables
 
 ### findings
 

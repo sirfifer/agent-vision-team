@@ -38,7 +38,11 @@ def test_avt_db_foundation():
     """Test shared avt_db package."""
     print("\n=== avt_db Foundation ===")
 
-    from surrealdb import Surreal
+    try:
+        from surrealdb import Surreal
+    except ImportError:
+        print("  SKIP: surrealdb SDK not installed")
+        return
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "test.db"

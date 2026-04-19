@@ -138,6 +138,7 @@ Use these skills for detailed protocol documentation:
 - Use the `/architect-protocol` skill for the Architect Protocol
 - Use the `/research-protocol` skill for the Research Protocol
 - Use the `/project-steward-protocol` skill for the Project Hygiene Protocol
+- Use the `/documentation` skill for the Documentation Protocol (which docs to update and when)
 - Use the `/e2e-testing` skill for E2E Testing details
 - Use the `/file-organization` skill for the project file/directory structure
 - Use the `/end-to-end-example` skill for a complete workflow example
@@ -268,7 +269,20 @@ AVT tracks Claude Code platform changes via an automated compatibility monitor. 
 
 MCP servers are registered at **user scope** (`~/.claude/mcp.json`) using stdio transport. **Why user scope**: Project-scope MCP causes subagents to hallucinate MCP results (Issue #13898).
 
-The three servers: **collab-kg** (Knowledge Graph, JSONL), **collab-quality** (quality gates), **collab-governance** (decisions, task integration, AI review).
+The three servers: **collab-kg** (Knowledge Graph), **collab-quality** (quality gates), **collab-governance** (decisions, task integration, AI review).
+
+### Storage Backends
+
+Each MCP server supports two storage backends, controlled by the `AVT_STORAGE_BACKEND` environment variable:
+
+| Backend | Flag Value | KG Storage | Quality Storage | Governance Storage |
+|---------|-----------|------------|-----------------|-------------------|
+| **Legacy** (default) | unset | JSONL file | SQLite | SQLite |
+| **SurrealDB** | `surreal` | Embedded SurrealKV | Embedded SurrealKV | Embedded SurrealKV |
+
+To enable SurrealDB: `export AVT_STORAGE_BACKEND=surreal`
+
+SurrealDB unifies all five legacy stores (JSONL, 2x SQLite, audit JSONL+SQLite) into a single embedded database at `.avt/avt.db`. The shared foundation package lives at `shared/avt_db/`. See `docs/design/surrealdb-storage-backend.md` for the full design.
 
 ## Guidelines for Success
 

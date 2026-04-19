@@ -2,7 +2,7 @@
 
 > A platform-native multi-agent system for software development built on Claude Code, providing tier-protected institutional memory, transactional governance, deterministic quality verification, context reinforcement for long-session agent alignment, and a passive audit agent for system health monitoring, through three MCP servers, eight specialized agents, Agent Teams orchestration, a seven-hook verification and context layer, and a standalone web gateway for remote operation.
 
-**Last Updated**: 2026-02-20
+**Last Updated**: 2026-04-15
 
 ---
 
@@ -149,19 +149,19 @@ Lower tiers cannot modify higher tiers. Vision conflicts override all other work
 
 Persistent institutional memory with tier-based access control. Stores entities (components, patterns, decisions, vision standards), relations between them, and timestamped observations. All Claude Code sessions share the same graph.
 
-**Implementation**: Python + FastMCP, JSONL persistence at `.avt/knowledge-graph.jsonl`
+**Implementation**: Python + FastMCP, with two storage backends: JSONL persistence at `.avt/knowledge-graph.jsonl` (default) or SurrealDB at `.avt/avt.db` (via `AVT_STORAGE_BACKEND=surreal`)
 
 **Tools**: `create_entities`, `create_relations`, `add_observations`, `get_entity`, `search_nodes`, `get_entities_by_tier`, `delete_entity`, `delete_relations`, `delete_observations`, `ingest_documents`, `validate_tier_access`
 
 **Tier Protection**: Enforced at the tool level. Vision-tier entities are immutable by agents. Architecture-tier writes require explicit approval. Quality-tier is open to all callers.
 
-**Key files**: `mcp-servers/knowledge-graph/collab_kg/` -- `server.py` (FastMCP entry), `graph.py` (entity/relation CRUD), `storage.py` (JSONL persistence), `tier_protection.py` (access control), `ingestion.py` (document ingestion pipeline)
+**Key files**: `mcp-servers/knowledge-graph/collab_kg/` -- `server.py` (FastMCP entry), `graph.py` (entity/relation CRUD), `surreal_graph.py` (SurrealDB backend), `storage.py` (JSONL persistence), `tier_protection.py` (access control), `ingestion.py` (document ingestion pipeline)
 
 ### Quality Server (Port 3102)
 
 Deterministic quality verification wrapping real tools behind a unified MCP interface, plus a trust engine for finding management.
 
-**Implementation**: Python + FastMCP, SQLite persistence for trust engine
+**Implementation**: Python + FastMCP, with two storage backends: SQLite at `.avt/trust-engine.db` (default) or SurrealDB at `.avt/avt.db` (via `AVT_STORAGE_BACKEND=surreal`)
 
 **Tools**: `auto_format`, `run_lint`, `run_tests`, `check_coverage`, `check_all_gates`, `validate`, `get_trust_decision`, `record_dismissal`
 
@@ -171,13 +171,13 @@ Deterministic quality verification wrapping real tools behind a unified MCP inte
 
 **Trust engine principle**: No silent dismissals. Every dismissed finding requires a justification string and the identity of who dismissed it, creating an auditable trail.
 
-**Key files**: `mcp-servers/quality/collab_quality/` -- `server.py`, `tools/` (formatting, linting, testing, coverage), `trust_engine.py`, `gates.py`
+**Key files**: `mcp-servers/quality/collab_quality/` -- `server.py`, `tools/` (formatting, linting, testing, coverage), `trust_engine.py`, `surreal_trust_engine.py` (SurrealDB backend), `gates.py`
 
 ### Governance Server (Port 3103)
 
 Transactional review checkpoints for agent decisions, implementing the "intercept early, redirect early" pattern. Workers submit decisions and block until the governance server returns a verdict.
 
-**Implementation**: Python + FastMCP, SQLite persistence for decision store
+**Implementation**: Python + FastMCP, with two storage backends: SQLite at `.avt/governance.db` (default) or SurrealDB at `.avt/avt.db` (via `AVT_STORAGE_BACKEND=surreal`)
 
 **Decision tools**: `submit_decision`, `submit_plan_for_review`, `submit_completion_review`, `get_decision_history`, `get_governance_status`
 
@@ -203,7 +203,7 @@ Transactional review checkpoints for agent decisions, implementing the "intercep
 
 **Data models**: `Decision`, `ReviewVerdict`, `GovernedTaskRecord`, `TaskReviewRecord`, `UsageRecord`, `HolisticReviewRecord` (all Pydantic, defined in `models.py`)
 
-**Key files**: `mcp-servers/governance/collab_governance/` -- `server.py`, `store.py` (SQLite: decisions, reviews, governed_tasks, task_reviews, usage, holistic_reviews), `reviewer.py` (AI review logic + `review_task_group()`), `task_integration.py` (Claude Code Task System integration), `kg_client.py` (KG integration with TTL cache), `models.py` (Pydantic models including `UsageRecord` and `HolisticReviewRecord`)
+**Key files**: `mcp-servers/governance/collab_governance/` -- `server.py`, `store.py` (SQLite persistence), `surreal_store.py` (SurrealDB backend), `reviewer.py` (AI review logic + `review_task_group()`), `task_integration.py` (Claude Code Task System integration), `kg_client.py` (KG integration with TTL cache), `surreal_kg_client.py` (SurrealDB KG reader), `models.py` (Pydantic models including `UsageRecord` and `HolisticReviewRecord`)
 
 ---
 
@@ -501,6 +501,7 @@ The orchestrator's instructions are split between a concise `CLAUDE.md` (under 3
 | `/architect-protocol` | `.claude/skills/architect-protocol.md` | Architect vs Worker roles, intent/outcome protocol |
 | `/research-protocol` | `.claude/skills/research-protocol.md` | Research modes, workflow, model selection |
 | `/project-steward-protocol` | `.claude/skills/project-steward-protocol.md` | Steward monitors, review cadence |
+| `/documentation` | `.claude/skills/documentation.md` | Documentation protocol: which docs to update and when |
 | `/e2e-testing` | `.claude/skills/e2e-testing.md` | 14 scenarios table, quick start, interpretation guide |
 | `/file-organization` | `.claude/skills/file-organization.md` | Full project directory tree |
 | `/end-to-end-example` | `.claude/skills/end-to-end-example.md` | 9-step auth implementation walkthrough |
@@ -650,9 +651,10 @@ An autonomous end-to-end testing system that exercises all three MCP servers acr
 
 | Path | What | Managed By |
 |------|------|------------|
-| `.avt/knowledge-graph.jsonl` | KG entity/relation persistence | KG Server |
-| `.avt/trust-engine.db` | Quality finding audit trails | Quality Server |
-| `.avt/governance.db` | Decision store with verdicts, holistic reviews, and usage records | Governance Server |
+| `.avt/knowledge-graph.jsonl` | KG entity/relation persistence (JSONL backend) | KG Server |
+| `.avt/trust-engine.db` | Quality finding audit trails (SQLite backend) | Quality Server |
+| `.avt/governance.db` | Decision store with verdicts, holistic reviews, and usage records (SQLite backend) | Governance Server |
+| `.avt/avt.db` | Unified SurrealDB persistence (when `AVT_STORAGE_BACKEND=surreal`) | All servers via `shared/avt_db/` |
 | `.avt/.holistic-review-pending-{session_id}` | Session-scoped flag files coordinating work during holistic review | PostToolUse hook |
 | `.avt/.session-context-{session_id}.json` | Distilled session goals, discoveries, constraints for context reinforcement | `_distill-session-context.py`, `_update-session-context.py` |
 | `.avt/.session-calls-{session_id}` | Tool call counter per session for context reinforcement threshold | `context-reinforcement.py` |
@@ -689,7 +691,7 @@ The KG Librarian syncs important graph entries to human-readable files:
 | Path | What |
 |------|------|
 | `.claude/agents/*.md` | Eight agent definitions (architect, worker, quality-reviewer, kg-librarian, governance-reviewer, researcher, project-steward, project-bootstrapper) |
-| `.claude/skills/*.md` | Seven on-demand skill files (bootstrap-protocol, architect-protocol, research-protocol, project-steward-protocol, e2e-testing, file-organization, end-to-end-example) |
+| `.claude/skills/*.md` | Eight on-demand skill files (bootstrap-protocol, architect-protocol, research-protocol, project-steward-protocol, documentation, e2e-testing, file-organization, end-to-end-example) |
 | `.claude/settings.json` | Agent Teams config, five lifecycle hooks, agent tool permissions, env vars |
 | `CLAUDE.md` | Orchestrator instructions (under 300 lines; detailed protocols in skills) |
 
@@ -703,8 +705,10 @@ The KG Librarian syncs important graph entries to human-readable files:
 | MCP Servers | Python 3.12+ / FastMCP 2.x | Three servers: KG, Quality, Governance |
 | AVT Gateway | Python 3.12+ / FastAPI + uvicorn + httpx | Standalone web backend, REST API, WebSocket, job runner |
 | Web Server | Nginx | Reverse proxy, TLS termination, SPA static serving |
-| KG Persistence | JSONL | Lightweight, version-controllable, matches Anthropic's KG Memory format |
-| Decision/Trust/Usage Store | SQLite | Zero-config transactional storage for governance, trust engine, and usage tracking |
+| KG Persistence | JSONL (default) or SurrealDB | JSONL: lightweight, version-controllable. SurrealDB: unified with graph traversals and vector search |
+| Decision/Trust/Usage Store | SQLite (default) or SurrealDB | SQLite: zero-config transactional storage. SurrealDB: unified persistence with cross-layer queries |
+| Unified Storage (optional) | SurrealDB 1.0.8 (embedded SurrealKV) | Replaces all 5 legacy stores with one embedded database; activated via `AVT_STORAGE_BACKEND=surreal` |
+| Shared DB Package | `shared/avt_db/` (Python) | Connection management, 19-table schema, migration, vector embeddings |
 | VS Code Extension | TypeScript + esbuild | Extension host runtime (local mode) |
 | Dashboard | React 19 + Vite | Rich observability webview (dual-mode: VS Code + standalone web) |
 | E2E Testing | Python + Pydantic + ThreadPoolExecutor | Autonomous scenario-based testing |
@@ -856,6 +860,7 @@ All five implementation phases are complete, plus an Agent Teams adaptation and 
 - **Context Drift Prevention**: Three-layer context injection (session context, static router, post-compaction), session context distillation via background haiku calls, goal tracking through governance review pipeline, 13 tunable settings with UI controls, 120 hook-level unit tests across 10 test groups
 - **CI/CD Pipeline**: Unified script layer (`scripts/ci/`), pre-commit hooks (Husky + lint-staged for lint/format), pre-push hooks (typecheck + build + test + coverage with clear error reporting), GitHub Actions on every push to every branch (parallel jobs, matrix strategy), ESLint + Prettier (TypeScript), Ruff (Python), coverage enforcement
 - **Audit Agent**: Hook-piggybacked passive system observer with append-only event log (JSONL), rolling statistics (SQLite), threshold-based anomaly detection (5 checks), tiered LLM escalation (Haiku/Sonnet/Opus), observation directives (5 editable, no code changes), recommendation lifecycle (active/stale/dismissed/superseded/resolved), dashboard Audit tab with health strip and recommendation management, 53 unit tests
+- **SurrealDB Unified Storage**: Optional unified persistence backend replacing all 5 legacy stores (JSONL + 2x SQLite + audit) with a single embedded SurrealDB database. Feature-flagged via `AVT_STORAGE_BACKEND=surreal`. Shared foundation package (`shared/avt_db/`) with 19-table schema across 5 domains, drop-in backends for all three MCP servers, one-shot migration from legacy formats, and optional vector search via sentence-transformers. Resolves the KGClient compaction race condition and enables native graph traversals and cross-layer queries.
 
 **Total test assertions**: 44 unit + 120 hook + 53 audit + 15 MCP + 13 capability + 292 E2E = 537 assertions
 
@@ -872,5 +877,7 @@ All five implementation phases are complete, plus an Agent Teams adaptation and 
 - [Knowledge Graph Server](../mcp-servers/knowledge-graph/README.md) -- KG API and tier protection
 - [Quality Server](../mcp-servers/quality/README.md) -- Quality tools and trust engine
 - [Governance Server](../mcp-servers/governance/README.md) -- Governance tools and governed tasks
+- [SurrealDB Storage Backend](design/surrealdb-storage-backend.md) -- Unified persistence layer design
+- [Shared avt_db Package](../shared/avt_db/README.md) -- SurrealDB foundation package
 - [AVT Gateway](../server/pyproject.toml) -- Standalone web gateway for remote operation
 - On-demand skills: `.claude/skills/*.md` -- Detailed protocol documentation

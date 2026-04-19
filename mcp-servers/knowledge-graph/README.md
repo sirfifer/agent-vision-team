@@ -170,11 +170,17 @@ class EntityWithRelations(Entity):
 
 ## Storage
 
+### Default: JSONL
+
 - **Format**: JSONL (one entity or relation per line)
 - **Path**: `.avt/knowledge-graph.jsonl` (configurable)
 - **Loading**: Entire file loaded into memory on startup
 - **Writing**: Append-only for new entities/relations
 - **Compaction**: Automatic after 1000 writes (rewrites file with current state only)
+
+### Alternative: SurrealDB
+
+Set `AVT_STORAGE_BACKEND=surreal` to use the SurrealDB backend (`surreal_graph.py`). This stores entities and relations in the shared embedded database at `.avt/avt.db`, providing native graph traversals and eliminating the JSONL compaction race condition. See `shared/avt_db/README.md` for details.
 
 ### Example JSONL
 

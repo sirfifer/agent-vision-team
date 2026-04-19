@@ -6,7 +6,7 @@ user_invocable: true
 
 # Architect Protocol
 
-The architect subagent designs architecture with explicit intent and expected outcomes for every decision.
+The architect agent designs architecture with explicit intent and expected outcomes for every decision.
 
 ## When to Spawn the Architect
 

@@ -10,6 +10,9 @@ import sys
 
 import pytest
 
+# Guard: skip all tests if surrealdb SDK is not installed
+pytest.importorskip("surrealdb", reason="surrealdb SDK not installed")
+
 # Ensure the shared avt_db package is importable
 _PROJECT_DIR = os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())
 _SHARED_DIR = os.path.join(_PROJECT_DIR, "shared")

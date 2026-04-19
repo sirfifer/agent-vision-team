@@ -6,7 +6,7 @@ user_invocable: true
 
 # Bootstrap Protocol
 
-The project-bootstrapper subagent onboards an existing, mature codebase into the AVT system by discovering governance artifacts that already exist implicitly in the code and documentation.
+The project-bootstrapper agent onboards an existing, mature codebase into the AVT system by discovering governance artifacts that already exist implicitly in the code and documentation.
 
 ## When to Use the Bootstrapper
 
@@ -16,8 +16,16 @@ The project-bootstrapper subagent onboards an existing, mature codebase into the
 
 ## How to Invoke
 
+As an Agent Teams teammate:
 ```
-Task tool -> subagent_type: project-bootstrapper
+Agent tool -> subagent_type: general-purpose, team_name: <team>
+name: "project-bootstrapper"
+prompt: <embedded bootstrapper system prompt + "Bootstrap the project at /path/to/codebase">
+```
+
+Or as a fallback (no Agent Teams):
+```
+Agent tool -> subagent_type: project-bootstrapper
 prompt: "Bootstrap the project at /path/to/codebase"
 ```
 

@@ -6,7 +6,7 @@ user_invocable: true
 
 # Project Hygiene Protocol
 
-The project-steward subagent maintains project organization, naming conventions, and completeness across the codebase.
+The project-steward agent maintains project organization, naming conventions, and completeness across the codebase.
 
 ## What the Steward Monitors
 
@@ -26,9 +26,17 @@ The project-steward subagent maintains project organization, naming conventions,
 
 ## Spawning the Steward
 
+As an Agent Teams teammate:
 ```
-Task tool -> subagent_type: project-steward
-prompt: "Perform a full project hygiene review" | "Check naming conventions in src/" | "Verify all essential project files exist"
+Agent tool -> subagent_type: general-purpose, team_name: <team>
+name: "project-steward"
+prompt: <embedded steward system prompt + task>
+```
+
+Or as a fallback (no Agent Teams):
+```
+Agent tool -> subagent_type: project-steward
+prompt: "Perform a full project hygiene review"
 ```
 
 ## Steward Outputs

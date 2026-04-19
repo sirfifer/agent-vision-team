@@ -113,8 +113,8 @@ No parameters.
 
 When an agent calls `submit_decision`:
 
-1. **Store** — Decision saved to SQLite (`.avt/governance.db`) with auto-incremented sequence
-2. **Load standards** — Vision standards and architecture entities read from KG JSONL file
+1. **Store** — Decision saved to SQLite (`.avt/governance.db`) or SurrealDB (`.avt/avt.db` when `AVT_STORAGE_BACKEND=surreal`) with auto-incremented sequence
+2. **Load standards** — Vision standards and architecture entities read from KG (JSONL or SurrealDB)
 3. **Auto-flag** — `deviation` and `scope_change` categories automatically get `needs_human_review`
 4. **AI review** — For other categories, runs `claude --print` with the governance-reviewer agent, passing decision details and all applicable standards
 5. **Parse verdict** — Extracts structured JSON from the AI response (handles clean JSON, markdown blocks, and embedded JSON)
@@ -129,7 +129,9 @@ When an agent calls `submit_decision`:
 | `server.py` | FastMCP tool definitions and main entry point |
 | `models.py` | Pydantic models: Decision, ReviewVerdict, Finding, Alternative, GovernedTaskRecord, HolisticReviewRecord |
 | `store.py` | SQLite persistence: decisions, reviews, governed_tasks, holistic_reviews tables |
+| `surreal_store.py` | SurrealDB persistence (drop-in replacement for `store.py`, activated by `AVT_STORAGE_BACKEND=surreal`) |
 | `kg_client.py` | Direct JSONL reader for KG vision/architecture data |
+| `surreal_kg_client.py` | SurrealDB KG reader with 5-minute TTL cache (activated by `AVT_STORAGE_BACKEND=surreal`) |
 | `reviewer.py` | `claude --print` orchestration with prompt templates, JSON parsing, and `review_task_group()` for holistic review |
 | `session_state.py` | Generates `.avt/session-state.md` from governance DB (task stats, decision history) |
 | `task_integration.py` | Direct manipulation of Claude Code task files for governed task execution |

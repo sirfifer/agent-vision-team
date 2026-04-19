@@ -6,7 +6,7 @@ user_invocable: true
 
 # Research Protocol
 
-The researcher subagent gathers intelligence to inform development decisions and track external changes that affect the project.
+The researcher agent gathers intelligence to inform development decisions and track external changes that affect the project.
 
 ## Research Modes
 
@@ -32,9 +32,15 @@ The researcher subagent gathers intelligence to inform development decisions and
 ## Research Workflow
 
 1. **Create research prompt**: Define the research in `.avt/research-prompts/` or via the dashboard
-2. **Spawn researcher**:
+2. **Spawn researcher teammate**:
    ```
-   Task tool -> subagent_type: researcher
+   Agent tool -> subagent_type: general-purpose, team_name: <team>
+   name: "researcher"
+   prompt: <embedded researcher system prompt + research task>
+   ```
+   Or as a fallback (no Agent Teams):
+   ```
+   Agent tool -> subagent_type: researcher
    prompt: "Execute the research prompt in .avt/research-prompts/rp-xxx.md"
    ```
 3. **Researcher outputs**: Research briefs stored in `.avt/research-briefs/`
